@@ -8,8 +8,8 @@ title ChatProxy Platform - Environment Setup
 
 echo.
 echo ╔════════════════════════════════════════════════════════════════╗
-echo ║   ChatProxy Platform - Environment File Setup                 ║
-echo ║   Creating .env files from templates                          ║
+echo ║   ChatProxy Platform - Environment File Setup                  ║
+echo ║   Creating .env files from templates                           ║
 echo ╚════════════════════════════════════════════════════════════════╝
 echo.
 

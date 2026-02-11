@@ -119,10 +119,15 @@ generate_secrets.bat
 
 **What it does:**
 - ✅ Generates 64-character cryptographically secure JWT secrets
-- ✅ Automatically updates all three .env files with the SAME secrets
+- ✅ Generates 32-character secure database passwords (PostgreSQL & MongoDB)
+- ✅ Automatically updates all .env files with matching secrets
+- ✅ Updates JWT secrets in 3 services (auth, accounting, proxy)
+- ✅ Updates PostgreSQL passwords in 2 services (flowise, accounting)
+- ✅ Updates MongoDB passwords in 2 services (auth, proxy)
 - ✅ Creates backup files (.env.backup) before updating
 - ✅ Verifies all files exist before proceeding
 - ✅ Shows color-coded success/error messages
+- ⚠️ **Note:** FLOWISE_API_KEY must be created AFTER Flowise starts (see Step 3 below)
 
 **Expected output:**
 ```
@@ -135,21 +140,32 @@ ChatProxy Platform - JWT Secret Generator
 ✓ auth-service/.env found
 ✓ accounting-service/.env found
 ✓ flowise-proxy-service-py/.env found
+✓ flowise/.env found
 
-ℹ Generating cryptographically secure JWT secrets...
+ℹ Generating cryptographically secure secrets...
 ✓ JWT_ACCESS_SECRET: a1b2c3d4e5f6g7h8i9j0... (64 chars)
 ✓ JWT_REFRESH_SECRET: z9y8x7w6v5u4t3s2r1q0... (64 chars)
+✓ POSTGRES_PASSWORD: yPaIO==HdzSXGu&+... (32 chars)
+✓ MONGO_PASSWORD: f1Nf%q!Mb%QdF%LF... (32 chars)
 
 ℹ Updating .env files with JWT secrets...
 ✓ auth-service/.env updated with JWT secrets
 ✓ accounting-service/.env updated with JWT secrets
 ✓ flowise-proxy-service-py/.env updated with JWT secrets
 
+ℹ Updating database passwords...
+✓ flowise (PostgreSQL) password updated
+✓ accounting-service (PostgreSQL) password updated
+✓ auth-service (MongoDB) password updated
+✓ flowise-proxy-service-py (MongoDB) password updated
+
 ══════════════════════════════════════════════════════════════════
 Summary
 ══════════════════════════════════════════════════════════════════
-✓ All 3 services updated successfully!
-✓ Same JWT secrets copied to all three services
+✓ All 7 updates completed successfully!
+✓ Same JWT secrets in auth, accounting, and proxy services
+✓ PostgreSQL passwords updated in flowise and accounting
+✓ MongoDB passwords updated in auth and proxy services
 
 ℹ Backups created: <service>/.env.backup
 ℹ Next step: Start services with docker compose
@@ -159,9 +175,12 @@ Summary
 ```powershell
 # Check that JWT secrets are present and identical
 findstr "JWT_ACCESS_SECRET" auth-service\.env accounting-service\.env flowise-proxy-service-py\.env
+
+# Check that database passwords were set
+findstr "POSTGRES_PASSWORD" flowise\.env accounting-service\.env
 ```
 
-All three should show **identical values** (not placeholders like `your-secret-key-here`).
+All JWT secrets should show **identical values** (not placeholders like `your-secret-key-here`).
 
 **Manual alternative (if automated script fails):**
 ```powershell
@@ -292,7 +311,13 @@ On first access, Flowise will prompt you to create an admin account:
 
 **Important:** Complete the initial setup wizard and save your credentials.
 
-### 1.4 Generate Flowise API Key
+---
+
+## Step 3: Configure Flowise API Key (Post-Deployment)
+
+⚠️ **CRITICAL:** This step MUST be done AFTER Flowise is running. The API key cannot be generated before Flowise starts.
+
+### 3.1 Generate Flowise API Key
 
 The Flowise Proxy Service requires an API key to sync chatflows from Flowise.
 
@@ -326,16 +351,16 @@ The Flowise Proxy Service requires an API key to sync chatflows from Flowise.
 
 ---
 
-## Step 2: Generate JWT Secrets (Security Setup)
+## Step 4: Generate JWT Secrets (Security Setup)
 
-### 2.1 Why Generate JWT Secrets?
+### 4.1 Why Generate JWT Secrets?
 
 JWT (JSON Web Token) secrets are used to sign authentication tokens across all services. For security:
 - ✅ **Same secrets** must be used in auth-service, accounting-service, and flowise-proxy
 - ✅ **Unique secrets** should be generated for each deployment
 - ✅ **Strong secrets** prevent token forgery and unauthorized access
 
-### 2.2 Generate Secrets Automatically
+### 4.2 Generate Secrets Automatically
 
 **Automated JWT Secret Generation (Recommended)**
 
@@ -349,6 +374,7 @@ This will automatically:
 - Update all three .env files with identical secrets
 - Create backup files before updating
 - Verify all files exist
+- ⚠️ **NOTE:** You'll still need to manually add FLOWISE_API_KEY from Step 3
 
 **Output:**
 ```
@@ -459,9 +485,9 @@ findstr "JWT_ACCESS_SECRET" auth-service\.env accounting-service\.env flowise-pr
 All three should show the same value.
 
 ---
+5: Launch Auth Service
 
-## Step 3: Launch Auth Service
-
+### 5
 ### 3.1 Start Auth Service Containers
 
 ```batch
@@ -486,7 +512,7 @@ setup_and_run.bat
 - **Email:** `admin@example.com`
 - **Password:** `admin@admin`
 
-### 2.3 Verify Admin Account
+### 5.3 Verify Admin Account
 
 After the script completes, verify the admin account was created successfully by checking the output or running:
 
@@ -496,9 +522,9 @@ list_users.bat
 
 ---
 
-## Step 4: Manage Users and Credits (CSV-Based System)
+## Step 6: Manage Users and Credits (CSV-Based System)
 
-### 3.1 Overview
+### 6.1 Overview
 
 The platform includes a simple CSV-based system for managing users and credits - perfect for teachers without computer knowledge!
 
@@ -508,7 +534,7 @@ The platform includes a simple CSV-based system for managing users and credits -
 - Set and update credit amounts
 - All from a simple spreadsheet (Excel/Notepad)
 
-### 3.2 Edit Users in CSV
+### 6.2 Edit Users in CSV
 
 Navigate to the user management folder:
 ```batch
