@@ -37,7 +37,7 @@ echo   [31m✗[0m Errors: %ERRORS%
 echo ════════════════════════════════════════════════════════════════
 echo.
 
-if %COPIED% GTR 0 (
+if !COPIED! GTR 0 (
     echo [32m[SUCCESS][0m Environment files created successfully!
     echo.
     echo [33m[IMPORTANT][0m Next steps:
@@ -62,7 +62,7 @@ if %COPIED% GTR 0 (
 )
 
 pause
-exit /b 0
+goto :eof
 
 REM ============================================
 REM Function to copy .env.example to .env
