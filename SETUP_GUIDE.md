@@ -321,6 +321,33 @@ On first access, Flowise will prompt you to create an admin account:
 
 The Flowise Proxy Service requires an API key to sync chatflows from Flowise.
 
+**Option A: Automated Configuration (Recommended)**
+
+```batch
+# Run the interactive configuration script
+configure_flowise_api.bat
+```
+
+This interactive script will:
+1. Show you step-by-step instructions to get the API key from Flowise UI
+2. Prompt you to enter the API key
+3. Validate the key format
+4. Automatically update `flowise-proxy-service-py/.env`
+5. Create a backup before making changes
+6. Display next steps for restarting the service
+
+**Follow the on-screen prompts:**
+1. **Login to Flowise:** Open http://localhost:3002 (login: ecysit@eduhk.hk / Admin@2026)
+2. **Generate API Key:** Settings → API Keys → Create New Key
+3. **Copy the key** and paste it when prompted
+4. **Restart the service** as instructed
+
+---
+
+**Option B: Manual Configuration**
+
+If you prefer manual setup:
+
 1. **Login to Flowise:**
    - Open http://localhost:3002
    - Login with your admin credentials (ecysit@eduhk.hk / Admin@2026)

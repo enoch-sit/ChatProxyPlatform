@@ -21,6 +21,7 @@ class SecretGenerator:
     def generate_jwt_secret(length: int = 64) -> str:
         """
         Generate a secure JWT secret using cryptographically strong random.
+        Avoids shell-special characters that break Docker Compose ($, &, %, {, }, |, etc.)
         
         Args:
             length: Length of the secret (default 64 characters)
@@ -28,21 +29,24 @@ class SecretGenerator:
         Returns:
             Secure random string suitable for JWT signing
         """
-        alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+[]{}|;:,.<>?"
+        # Safe characters: no $, &, %, {, }, |, `, ", ', \, etc.
+        alphabet = string.ascii_letters + string.digits + "!@#*()-_=+[].:,<>?"
         return ''.join(secrets.choice(alphabet) for _ in range(length))
     
     @staticmethod
     def generate_password(length: int = 32) -> str:
         """
         Generate a secure database password.
+        Avoids shell-special characters that break Docker Compose ($, &, %, etc.)
         
         Args:
             length: Length of the password (default 32 characters)
             
         Returns:
-            Secure random password
+            Secure random password safe for Docker Compose
         """
-        alphabet = string.ascii_letters + string.digits + "!@#$%^&*-_=+"
+        # Safe characters: no $, &, %, {, }, |, `, ", ', \, etc.
+        alphabet = string.ascii_letters + string.digits + "!@#*-_=+"
         return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
