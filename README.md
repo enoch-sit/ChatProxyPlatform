@@ -12,13 +12,19 @@
 
 **For complete beginners (no technical knowledge):**
 ```bash
-# 1. Configure drives automatically (detects RAID, updates paths)
+# 1. After git clone, create environment files
+setup_env_files.bat
+
+# 2. Generate JWT secrets
+powershell .\generate-secrets.ps1
+
+# 3. Configure drives automatically (detects RAID, updates paths)
 configure_drives.bat
 
-# 2. Check your system
+# 4. Check your system
 check_system.bat
 
-# 3. Follow the step-by-step guide
+# 5. Follow the step-by-step guide
 # Open: DEPLOYMENT_PLAN.md
 ```
 
