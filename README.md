@@ -92,14 +92,14 @@ sync_all_users.bat
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     User Interface                           │
+│                     User Interface                          │
 │  Bridge UI (React + TypeScript) - Port 3082                 │
 └─────────────────┬───────────────────────────────────────────┘
                   │
                   ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Integration Layer                               │
-│  Flowise Proxy (Python FastAPI) - Port 8000                │
+│              Integration Layer                              │
+│  Flowise Proxy (Python FastAPI) - Port 8000                 │
 └───────┬─────────────────┬─────────────────┬─────────────────┘
         │                 │                 │
         ▼                 ▼                 ▼
