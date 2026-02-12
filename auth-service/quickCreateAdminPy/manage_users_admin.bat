@@ -49,32 +49,20 @@ if not exist "users.csv" (
 echo [INFO] Found users.csv file
 echo.
 
-REM Check if Python virtual environment exists
-if not exist "venv\" (
-    echo [INFO] Creating Python virtual environment...
-    python -m venv venv
-    echo [SUCCESS] Virtual environment created
-    echo.
+REM Install required packages (system-wide)
+echo [INFO] Checking required packages...
+python -c "import requests" 2>nul
+if errorlevel 1 (
+    echo [INFO] Installing requests package...
+    pip install --quiet requests
 )
-
-REM Activate virtual environment
-echo [INFO] Activating virtual environment...
-call venv\Scripts\activate.bat
-
-REM Install/update requirements
-echo [INFO] Installing required packages...
-pip install --quiet --upgrade pip
-pip install --quiet requests
-echo [SUCCESS] Packages installed
+echo [SUCCESS] Packages ready
 echo.
 
 REM Run the CSV management script
 echo [INFO] Processing users from CSV file...
 echo.
 python manage_users_csv.py
-
-REM Deactivate virtual environment
-call venv\Scripts\deactivate.bat
 
 echo.
 echo ============================================
