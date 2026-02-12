@@ -4,202 +4,194 @@ Complete step-by-step guide to deploy the ChatProxy Platform on Windows using Do
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Fresh Installation)
 
-**After Git Clone (IMPORTANT - First Time Setup):**
-
-If you just cloned the repository, **you must create `.env` files first** (they're not in git):
+**Complete setup in 5 commands:**
 
 ```batch
-# 1. Clone the repository (if not done yet)
+# 1. Clone the repository
 git clone https://github.com/enoch-sit/ChatProxyPlatform.git
 cd ChatProxyPlatform
 
-# 2. Create all .env files from templates
+# 2. Create .env files from templates
 setup_env_files.bat
 
-# 3. Generate and populate JWT secrets automatically
+# 3. Generate secure secrets and passwords
 generate_secrets.bat
+
+# 4. Start Flowise with PostgreSQL
+cd flowise
+start-with-postgres.bat
+
+# 5. Open browser and create API key
+# http://localhost:3002 → Settings → API Keys → Create
+# Then add to flowise-proxy-service-py/.env
 ```
 
-**For fresh Windows installations (after .env setup):**
-1. **Configure drives** - Run **`configure_drives.bat`** to automatically detect RAID and optimize storage paths
-2. Read the complete **[DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md)** - step-by-step guide for beginners
-3. Track your progress with **[DEPLOYMENT_PROGRESS.md](DEPLOYMENT_PROGRESS.md)** - printable checklist
-4. Run **`check_system.bat`** - automated system checker for prerequisites
 
 **For existing installations:**
-Continue with this guide below.
+See management commands below.
 
 ---
 
-## 🔧 Prerequisites Setup
+## 📋 Prerequisites
 
-### Initial Repository Setup (Git Clone)
+- ✅ Docker Desktop installed and running
+- ✅ Git (for cloning the repository)
+- ✅ Python 3.x installed
+- ✅ Windows PowerShell or Command Prompt
 
-**CRITICAL:** After cloning the repository, `.env` files don't exist (they're in `.gitignore`). You must create them:
+**Quick Check:** All setup scripts will verify prerequisites automatically.
 
-#### Step 1: Create Environment Files
+---
 
-**What files are needed?**
+## 🔧 Step-by-Step Setup
 
-The platform requires `.env` configuration files for all 5 services:
-1. ✅ `flowise/.env` - Flowise AI + PostgreSQL configuration
-2. ✅ `auth-service/.env` - Authentication service + MongoDB + JWT secrets
-3. ✅ `accounting-service/.env` - Accounting service + PostgreSQL + JWT secrets
-4. ✅ `flowise-proxy-service-py/.env` - Proxy service + MongoDB + JWT secrets
-5. ✅ `bridge/.env` - Frontend React app configuration
+### Step 1: Clone Repository
 
-**Automated Setup (Recommended):**
+```batch
+git clone https://github.com/enoch-sit/ChatProxyPlatform.git
+cd ChatProxyPlatform
+```
 
-Run the automated setup script:
+### Step 2: Create Environment Files
+
+All services require `.env` configuration files (not in git for security).
+
 ```batch
 setup_env_files.bat
 ```
 
 **What it does:**
-- ✅ Scans all 5 services for `.env.example` templates
-- ✅ Copies each `.env.example` → `.env` if not already exists
-- ✅ Skips if `.env` already exists (safe to re-run)
-- ✅ Shows color-coded summary (copied/skipped/errors)
-- ✅ Provides next steps for JWT secret generation
+- ✅ Creates `.env` files from templates for all 5 services
+- ✅ Skips if files already exist (safe to re-run)
+- ✅ Shows summary of created/skipped/errors
 
-**Expected output:**
-```
-╔════════════════════════════════════════════════════════════════╗
-║   ChatProxy Platform - Environment File Setup                  ║
-║   Creating .env files from templates                           ║
-╚════════════════════════════════════════════════════════════════╝
+**Created files:**
+1. `flowise/.env` - Flowise AI + PostgreSQL
+2. `auth-service/.env` - Authentication + MongoDB
+3. `accounting-service/.env` - Accounting + PostgreSQL
+4. `flowise-proxy-service-py/.env` - Proxy + MongoDB
+5. `bridge/.env` - Frontend UI
 
-[OK] Flowise AI Flow Builder - Created .env file
-[OK] Authentication Service - Created .env file
-[OK] Accounting Service - Created .env file
-[OK] Flowise Proxy Service - Created .env file
-[OK] Bridge UI Frontend - Created .env file
+### Step 3: Generate Secrets and Passwords
 
-════════════════════════════════════════════════════════════════
-Summary:
-  ✓ Copied: 5
-  ○ Skipped: 0
-  ✗ Errors: 0
-════════════════════════════════════════════════════════════════
-```
+All JWT secrets and database passwords must be generated securely.
 
-**Manual alternative (if script fails):**
-```batch
-copy flowise\.env.example flowise\.env
-copy auth-service\.env.example auth-service\.env
-copy accounting-service\.env.example accounting-service\.env
-copy flowise-proxy-service-py\.env.example flowise-proxy-service-py\.env
-copy bridge\.env.example bridge\.env
-```
-
-**Verify all files were created:**
-```powershell
-# Check if all .env files exist
-Test-Path flowise\.env
-Test-Path auth-service\.env
-Test-Path accounting-service\.env
-Test-Path flowise-proxy-service-py\.env
-Test-Path bridge\.env
-```
-
-All should return `True`.
-
-⚠️ **IMPORTANT:** The script creates files but does NOT fill in JWT secrets. Continue to Step 2.
-
-#### Step 2: Generate and Populate JWT Secrets
-
-**CRITICAL:** JWT secrets must be **identical** across three services (auth-service, accounting-service, flowise-proxy).
-
-**Automated secret generation (Recommended):**
 ```batch
 generate_secrets.bat
 ```
 
 **What it does:**
-- ✅ Generates 64-character cryptographically secure JWT secrets
-- ✅ Generates 32-character secure database passwords (PostgreSQL & MongoDB)
-- ✅ Automatically updates all .env files with matching secrets
-- ✅ Updates JWT secrets in 3 services (auth, accounting, proxy)
-- ✅ Updates PostgreSQL passwords in 2 services (flowise, accounting)
-- ✅ Updates MongoDB passwords in 2 services (auth, proxy)
-- ✅ Creates backup files (.env.backup) before updating
-- ✅ Verifies all files exist before proceeding
-- ✅ Shows color-coded success/error messages
-- ⚠️ **Note:** FLOWISE_API_KEY must be created AFTER Flowise starts (see Step 3 below)
+- ✅ Generates 64-char secure JWT secrets
+- ✅ Generates 32-char database passwords (PostgreSQL & MongoDB)
+- ✅ Uses **only shell-safe characters** (alphanumeric + `-`, `_`, `.`)
+- ✅ Updates all `.env` files automatically
+- ✅ **Same JWT secrets** across auth, accounting, and proxy services
+- ✅ Creates `.env.backup` files before updating
 
 **Expected output:**
 ```
-══════════════════════════════════════════════════════════════════
-ChatProxy Platform - JWT Secret Generator
-══════════════════════════════════════════════════════════════════
+✓ JWT_ACCESS_SECRET: pTeevk7vRzKx... (64 chars)
+✓ JWT_REFRESH_SECRET: XTF0aRBtILQL... (64 chars)
+✓ POSTGRES_PASSWORD: 67ic_Tao5TpqTMIS... (32 chars)
+✓ MONGO_PASSWORD: ATReubut9oP1LQBr... (32 chars)
 
-ℹ Workspace: C:\Users\user\...\ThankGodForChatProxyPlatform
-ℹ Checking for .env files...
-✓ auth-service/.env found
-✓ accounting-service/.env found
-✓ flowise-proxy-service-py/.env found
-✓ flowise/.env found
-
-ℹ Generating cryptographically secure secrets...
-✓ JWT_ACCESS_SECRET: a1b2c3d4e5f6g7h8i9j0... (64 chars)
-✓ JWT_REFRESH_SECRET: z9y8x7w6v5u4t3s2r1q0... (64 chars)
-✓ POSTGRES_PASSWORD: yPaIO==HdzSXGu&+... (32 chars)
-✓ MONGO_PASSWORD: f1Nf%q!Mb%QdF%LF... (32 chars)
-
-ℹ Updating .env files with JWT secrets...
-✓ auth-service/.env updated with JWT secrets
-✓ accounting-service/.env updated with JWT secrets
-✓ flowise-proxy-service-py/.env updated with JWT secrets
-
-ℹ Updating database passwords...
-✓ flowise (PostgreSQL) password updated
-✓ accounting-service (PostgreSQL) password updated
-✓ auth-service (MongoDB) password updated
-✓ flowise-proxy-service-py (MongoDB) password updated
-
-══════════════════════════════════════════════════════════════════
-Summary
-══════════════════════════════════════════════════════════════════
-✓ All 7 updates completed successfully!
-✓ Same JWT secrets in auth, accounting, and proxy services
-✓ PostgreSQL passwords updated in flowise and accounting
-✓ MongoDB passwords updated in auth and proxy services
-
-ℹ Backups created: <service>/.env.backup
-ℹ Next step: Start services with docker compose
+✓ All 11 updates completed successfully!
 ```
 
-**Verify secrets were populated:**
-```powershell
-# Check that JWT secrets are present and identical
-findstr "JWT_ACCESS_SECRET" auth-service\.env accounting-service\.env flowise-proxy-service-py\.env
+⚠️ **Note:** `FLOWISE_API_KEY` must be created AFTER Flowise starts (Step 5).
 
-# Check that database passwords were set
-findstr "POSTGRES_PASSWORD" flowise\.env accounting-service\.env
+### Step 4: Start Flowise with PostgreSQL
+
+```batch
+cd flowise
+start-with-postgres.bat
 ```
 
-All JWT secrets should show **identical values** (not placeholders like `your-secret-key-here`).
+**Wait for startup** (30-60 seconds):
+```batch
+docker ps
+```
 
-**Manual alternative (if automated script fails):**
-```powershell
-# 1. Generate secrets using Python directly
-python generate_secrets.py
+You should see:
+- `flowise` container running
+- `flowise-postgres` container running (healthy)
 
-# 2. If Python script fails, manually edit .env files:
-#    - auth-service\.env
-#    - accounting-service\.env  
-#    - flowise-proxy-service-py\.env
-#
-# Generate 64-char random strings and paste SAME values in all three!
+**Access Flowise:**
+Open browser: http://localhost:3002
+
+**First-time setup:**
+- Create admin account
+- Name: `admin`
+- Email: `ecysit@eduhk.hk`
+- Password: `Admin@2026`
+
+### Step 5: Create Flowise API Key
+
+The proxy service needs an API key to sync chatflows from Flowise.
+
+**Manual Steps:**
+1. **Login to Flowise:** http://localhost:3002
+2. **Generate Key:** Click profile icon → Settings → API Keys → Create New Key
+3. **Copy the key** (e.g., `A27MfYLThKBwYcpDb2M9s6rwXIwUAly9P8j_ujX_J9I`)
+
+**Add to config:**
+```batch
+cd ..\flowise-proxy-service-py
+notepad .env
+```
+
+Find and update:
+```env
+FLOWISE_API_KEY=A27MfYLThKBwYcpDb2M9s6rwXIwUAly9P8j_ujX_J9I
+```
+
+Save and close.
+
+### Step 6: Start Other Services (Optional)
+
+**Auth Service:**
+```batch
+cd ..\auth-service
+start.bat
+```
+
+**Accounting Service:**
+```batch
+cd ..\accounting-service
+start.bat
+```
+
+**Flowise Proxy Service:**
+```batch
+cd ..\flowise-proxy-service-py
+docker compose up -d
+```
+
+**Bridge UI:**
+```batch
+cd ..\bridge
+start.bat
+```
+
+### Step 7: Create Admin and Users
+
+**Create admin account:**
+```batch
+cd auth-service\quickCreateAdminPy
+setup_and_run.bat
+```
+
+**Manage users via CSV:**
+```batch
+notepad users.csv    # Edit users
+sync_all_users.bat   # Apply changes
 ```
 
 ---
 
-## 📊 Drive Configuration (Optional but Recommended)
-
-### Why Configure Drives?
+## 📊 Drive Configuration (Optional)
 
 If your system has multiple drives (especially RAID), optimizing storage locations can provide:
 - ✅ Better performance (separate database I/O from system drive)
