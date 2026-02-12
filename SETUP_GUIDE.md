@@ -195,11 +195,13 @@ start.bat
 
 ### Step 7: Create Admin and Users
 
-**Create admin account:**
+**Create users from CSV:**
 ```batch
 cd auth-service\quickCreateAdminPy
-setup_and_run.bat
+manage_users_admin.bat
 ```
+
+⚠️ **Note:** Right-click and select "Run as administrator"
 
 **Default Admin Credentials:**
 - **Username:** `admin`
