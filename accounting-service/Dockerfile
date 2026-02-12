@@ -6,8 +6,8 @@ WORKDIR /usr/src/app
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install all dependencies
-RUN npm install
+# Install all dependencies (needed for building)
+RUN npm ci || npm install
 
 # Copy source code and TypeScript config
 COPY tsconfig.json ./
@@ -30,8 +30,8 @@ WORKDIR /usr/src/app
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install production dependencies only
-RUN npm install --production
+# Install ONLY production dependencies
+RUN npm ci --omit=dev || npm install --production
 
 # Copy built files from builder stage
 COPY --from=builder /usr/src/app/dist ./dist
