@@ -79,31 +79,24 @@ if errorlevel 1 (
 )
 
 REM -------------------------------------------------------
-REM Check npm (may be npm or npm.cmd depending on system)
+REM Check npm
+REM NOTE: npm.cmd on Windows can turn echo back on via endlocal.
+REM       We isolate all npm calls through "cmd /c" to prevent this.
 REM -------------------------------------------------------
 echo Checking npm...
-where npm >nul 2>&1
+cmd /c "npm --version" >nul 2>&1
 if errorlevel 1 (
-    where npm.cmd >nul 2>&1
-    if errorlevel 1 (
-        echo   [MISSING] npm is NOT found in PATH
-        set CHECK_NPM=MISSING
-    ) else (
-        echo   [OK] npm.cmd found
-        set CHECK_NPM=OK
-    )
+    echo   [MISSING] npm is NOT found in PATH
+    set CHECK_NPM=MISSING
 ) else (
-    npm --version >nul 2>&1
-    if errorlevel 1 (
-        echo   [WARN] npm found but version check failed
-        set CHECK_NPM=WARN
-    ) else (
-        for /f "tokens=*" %%i in ('npm --version 2^>^&1') do (
+    for /f "tokens=*" %%i in ('cmd /c "npm --version" 2^>^&1') do (
+        if "!CHECK_NPM!"=="" (
             echo   [OK] npm %%i
             set CHECK_NPM=OK
         )
     )
 )
+@echo off
 
 REM -------------------------------------------------------
 REM Check Docker (installation)
@@ -162,17 +155,14 @@ if errorlevel 1 (
     set MISSING_LIST=!MISSING_LIST! Git(optional)
     set CHECK_GIT=MISSING
 ) else (
-    git --version >nul 2>&1
-    if errorlevel 1 (
-        echo   [WARN] Git found but version check failed
-        set CHECK_GIT=WARN
-    ) else (
-        for /f "tokens=*" %%i in ('git --version 2^>^&1') do (
+    for /f "tokens=*" %%i in ('git --version 2^>^&1') do (
+        if "!CHECK_GIT!"=="" (
             echo   [OK] %%i
             set CHECK_GIT=OK
         )
     )
 )
+@echo off
 
 echo.
 
