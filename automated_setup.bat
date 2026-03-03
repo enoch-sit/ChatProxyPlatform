@@ -171,10 +171,8 @@ if errorlevel 1 (
     )
 ) else (
     for /f "tokens=*" %%i in ('git --version 2^>^&1') do (
-        if "!CHECK_GIT!"=="" (
-            echo   [OK] %%i
-            set CHECK_GIT=OK
-        )
+        echo   [OK] %%i
+        set CHECK_GIT=OK
     )
 )
 @echo off
@@ -198,93 +196,96 @@ echo.
 echo.
 
 REM ============================================================================
-REM Step 2: Install Missing Prerequisites
+REM Step 2: Install Missing Prerequisites (using GOTO to avoid block-parser issues)
 REM ============================================================================
-if %NEED_CORE_INSTALL%==1 (
-    echo ================================================================================
+if %NEED_CORE_INSTALL%==0 goto :skip_install
+
+echo ================================================================================
 echo [Step 2/2] Installing Missing Core Prerequisites
-    echo ================================================================================
-    echo.
-    echo The following REQUIRED software is missing:%MISSING_LIST%
-    echo.
+echo ================================================================================
+echo.
+echo The following REQUIRED software is missing: %MISSING_LIST%
+echo.
 
-    REM Check if winget is available
-    echo Checking if winget package manager is available...
-    where /q winget 2>nul
-    if errorlevel 1 (
-        echo [ERROR] winget is not available on this system
-        echo.
-        echo Please manually install the missing software:
-        echo   - Python 3.12:      https://www.python.org/downloads/
-        echo   - Node.js LTS:      https://nodejs.org/
-        echo   - Docker Desktop:   https://www.docker.com/products/docker-desktop/
-        echo.
-        echo After installing, run this script again: automated_setup.bat
-        echo.
-        pause
-        exit /b 1
-    )
-    echo   [OK] winget is available
-    echo.
+echo Checking if winget package manager is available...
+where /q winget 2>nul
+if errorlevel 1 goto :no_winget
+echo   [OK] winget is available
+echo.
 
-    echo Installing prerequisites using winget...
-    echo This may take 5-10 minutes. Please wait...
-    echo.
+echo Installing prerequisites using winget...
+echo This may take 5-10 minutes. Please wait...
+echo.
 
-    if "%CHECK_PYTHON%"=="MISSING" (
-        echo [Installing] Python 3.12...
-        winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements --silent
-        if errorlevel 1 (echo   [WARN] Python install may have failed) else (echo   [OK] Python installed)
-    )
+if not "%CHECK_PYTHON%"=="MISSING" goto :skip_python
+echo [Installing] Python 3.12...
+winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements --silent
+if errorlevel 1 (echo   [WARN] Python install may have failed) else (echo   [OK] Python installed)
+:skip_python
 
-    if "%CHECK_NODE%"=="MISSING" (
-        echo [Installing] Node.js LTS...
-        winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent
-        if errorlevel 1 (echo   [WARN] Node.js install may have failed) else (echo   [OK] Node.js installed)
-    )
+if not "%CHECK_NODE%"=="MISSING" goto :skip_node
+echo [Installing] Node.js LTS...
+winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent
+if errorlevel 1 (echo   [WARN] Node.js install may have failed) else (echo   [OK] Node.js installed)
+:skip_node
 
-    if "%CHECK_DOCKER%"=="MISSING" (
-        echo [Installing] Docker Desktop...
-        winget install -e --id Docker.DockerDesktop --accept-source-agreements --accept-package-agreements
-        if errorlevel 1 (echo   [WARN] Docker install may have failed) else (echo   [OK] Docker Desktop installed)
-    )
+if not "%CHECK_DOCKER%"=="MISSING" goto :skip_docker_install
+echo [Installing] Docker Desktop...
+winget install -e --id Docker.DockerDesktop --accept-source-agreements --accept-package-agreements
+if errorlevel 1 (echo   [WARN] Docker install may have failed) else (echo   [OK] Docker Desktop installed)
+:skip_docker_install
 
-    echo.
-    if %NEED_REBOOT%==1 (
-        echo ================================================================================
-        echo [IMPORTANT] Restart Required - Docker Desktop was installed
-        echo ================================================================================
-        echo.
-        echo   1. RESTART YOUR COMPUTER
-        echo   2. Open Docker Desktop from the Start Menu after restart
-        echo   3. Wait for the green icon in the system tray
-        echo   4. Run this script again: automated_setup.bat
-        echo.
-        pause
-        exit /b 0
-    ) else (
-        echo ================================================================================
-        echo [IMPORTANT] Close and reopen this terminal for PATH changes to take effect
-        echo Then run this script again: automated_setup.bat
-        echo ================================================================================
-        echo.
-        pause
-        exit /b 0
-    )
-)
+echo.
+if %NEED_REBOOT%==0 goto :need_path_refresh
+
+echo ================================================================================
+echo [IMPORTANT] Restart Required - Docker Desktop was installed
+echo ================================================================================
+echo.
+echo   1. RESTART YOUR COMPUTER
+echo   2. Open Docker Desktop from the Start Menu after restart
+echo   3. Wait for the green icon in the system tray
+echo   4. Run this script again: automated_setup.bat
+echo.
+pause
+exit /b 0
+
+:need_path_refresh
+echo ================================================================================
+echo [IMPORTANT] Close and reopen this terminal for PATH changes to take effect
+echo Then run this script again: automated_setup.bat
+echo ================================================================================
+echo.
+pause
+exit /b 0
+
+:no_winget
+echo [ERROR] winget is not available on this system
+echo.
+echo Please manually install the missing software:
+echo   - Python 3.12:      https://www.python.org/downloads/
+echo   - Node.js LTS:      https://nodejs.org/
+echo   - Docker Desktop:   https://www.docker.com/products/docker-desktop/
+echo.
+echo After installing, run this script again: automated_setup.bat
+echo.
+pause
+exit /b 1
+
+:skip_install
 
 REM ── Git is optional - install silently if missing then continue ──────────────
-if "%CHECK_GIT%"=="MISSING" (
-    where /q winget 2>nul
-    if not errorlevel 1 (
-        echo Installing Git (optional - setup will continue either way)...
-        winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements --silent >nul 2>&1
-        echo   [OK] Git installed (or was already present)
-    ) else (
-        echo   [NOTE] Git not installed and winget unavailable - continuing without Git
-    )
-    @echo off
-)
+if not "%CHECK_GIT%"=="MISSING" goto :skip_git_install
+where /q winget 2>nul
+if errorlevel 1 goto :skip_git_nowinget
+echo Installing Git (optional - setup will continue either way)...
+winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements --silent >nul 2>&1
+echo   [OK] Git installed (or was already present)
+goto :skip_git_install
+:skip_git_nowinget
+echo   [NOTE] Git not installed and winget unavailable - continuing without Git
+:skip_git_install
+@echo off
 
 
 REM ============================================================================
