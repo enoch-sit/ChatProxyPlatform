@@ -1,0 +1,73 @@
+============================================ 
+  LOGIN PROBLEM DIAGNOSTIC REPORT 
+============================================ 
+Workspace: C:\Users\user\Documents\ThankGodForJesusChrist\ThankGodForChatProxyPlatform 
+Timestamp: 03/03/2026 ¶g¤G  9:50:27.60 
+ 
+============================================ 
+TEST 1: Docker Service Status 
+============================================ 
+[CRITICAL] Docker Desktop is not running 
+  Solution: Start Docker Desktop 
+ 
+============================================ 
+TEST 2: Auth Service Container 
+============================================ 
+failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
+[CRITICAL] Auth service container is not running 
+ 
+============================================ 
+TEST 3: MongoDB Container 
+============================================ 
+[CRITICAL] MongoDB container is not running 
+ 
+============================================ 
+TEST 4: Auth Service .env File 
+============================================ 
+[OK] .env file exists 
+ 
+============================================ 
+TEST 5: JWT Secrets Configuration 
+============================================ 
+[OK] JWT_ACCESS_SECRET is configured 
+[OK] JWT_REFRESH_SECRET is configured 
+ 
+============================================ 
+TEST 6: JWT Secrets Consistency 
+============================================ 
+[OK] JWT secrets match across all services 
+ 
+============================================ 
+TEST 7: Auth Service Port (3000) 
+============================================ 
+[WARNING] Port 3000 is not listening 
+  Auth service may not be running 
+ 
+============================================ 
+TEST 8: Auth Service Health 
+============================================ 
+[CRITICAL] Health endpoint not responding at http://localhost:3000/health 
+  Check container logs: docker logs auth-service 
+ 
+============================================ 
+TEST 9: MongoDB Connection 
+============================================ 
+[CRITICAL] Cannot connect to MongoDB container 
+  Solution: Restart MongoDB container 
+ 
+============================================ 
+TEST 10: Bridge Configuration 
+============================================ 
+[WARNING] Bridge .env file not found 
+  Bridge may use default API URLs 
+  Create .env with: VITE_FLOWISE_PROXY_API_URL=http://localhost:8000 
+ 
+============================================ 
+TEST 11: Docker Networks 
+============================================ 
+[WARNING] chatproxy-network does not exist 
+  This may cause service communication issues 
+ 
+============================================ 
+TEST 12: User Database 
+============================================ 
