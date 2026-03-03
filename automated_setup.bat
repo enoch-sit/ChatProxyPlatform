@@ -101,10 +101,11 @@ if "!NPM_CHECK_CMD!"=="" (
     )
 ) else (
     for /f "tokens=*" %%i in ('powershell -NoProfile -Command "npm --version 2>$null" 2^>nul') do (
-        if "!CHECK_NPM!"=="" (
-            echo   [OK] npm %%i
-            set CHECK_NPM=OK
-        )
+        echo   [OK] npm %%i
+        set CHECK_NPM=OK
+    )
+    if not "!CHECK_NPM!"=="OK" (
+        echo   [MISSING] npm is NOT installed
     )
 )
 @echo off
@@ -113,54 +114,43 @@ REM -------------------------------------------------------
 REM Check Docker
 REM -------------------------------------------------------
 echo Checking Docker...
-where /q docker 2>nul
-if errorlevel 1 (
-    echo   [MISSING] Docker is NOT installed (not found in PATH)
+set DOCKER_VER_LINE=
+for /f "tokens=*" %%i in ('docker --version 2^>nul') do set DOCKER_VER_LINE=%%i
+if "!DOCKER_VER_LINE!"=="" (
+    echo   [MISSING] Docker is NOT installed or not in PATH
     set NEED_CORE_INSTALL=1
     set NEED_REBOOT=1
     set MISSING_LIST=!MISSING_LIST! Docker
     set CHECK_DOCKER=MISSING
     set CHECK_DOCKER_DAEMON=N/A
 ) else (
-    docker --version >nul 2>&1
+    echo   [OK] !DOCKER_VER_LINE!
+    set CHECK_DOCKER=OK
+    echo   Checking Docker daemon...
+    docker ps >nul 2>&1
     if errorlevel 1 (
-        echo   [MISSING] Docker command found but not working
-        set NEED_CORE_INSTALL=1
-        set NEED_REBOOT=1
-        set MISSING_LIST=!MISSING_LIST! Docker
-        set CHECK_DOCKER=BROKEN
-        set CHECK_DOCKER_DAEMON=N/A
-    ) else (
-        for /f "tokens=*" %%i in ('docker --version 2^>^&1') do (
-            echo   [OK] %%i
-            set CHECK_DOCKER=OK
-        )
-        echo   Checking Docker daemon...
+        echo   [STOPPED] Docker Desktop is NOT running
+        echo.
+        echo   *** ACTION REQUIRED ***
+        echo   1. Open Docker Desktop from the Start Menu
+        echo   2. Wait for the green icon in the system tray
+        echo   3. Then press any key here to continue...
+        echo.
+        set CHECK_DOCKER_DAEMON=STOPPED
+        pause
+        REM Re-check after user presses key
         docker ps >nul 2>&1
         if errorlevel 1 (
-            echo   [STOPPED] Docker Desktop is NOT running
-            echo.
-            echo   *** ACTION REQUIRED ***
-            echo   1. Open Docker Desktop from the Start Menu
-            echo   2. Wait for the green icon in the system tray
-            echo   3. Then press any key here to continue...
-            echo.
-            set CHECK_DOCKER_DAEMON=STOPPED
+            echo   [ERROR] Docker is still not running. Exiting.
             pause
-            REM Re-check after user presses key
-            docker ps >nul 2>&1
-            if errorlevel 1 (
-                echo   [ERROR] Docker is still not running. Exiting.
-                pause
-                exit /b 1
-            ) else (
-                echo   [OK] Docker daemon is now running
-                set CHECK_DOCKER_DAEMON=OK
-            )
+            exit /b 1
         ) else (
-            echo   [OK] Docker daemon is running
+            echo   [OK] Docker daemon is now running
             set CHECK_DOCKER_DAEMON=OK
         )
+    ) else (
+        echo   [OK] Docker daemon is running
+        set CHECK_DOCKER_DAEMON=OK
     )
 )
 @echo off
