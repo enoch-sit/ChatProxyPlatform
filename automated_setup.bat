@@ -34,7 +34,7 @@ REM ============================================================================
 echo [Step 1/2] Checking prerequisites...
 echo.
 
-set NEED_INSTALL=0
+set NEED_CORE_INSTALL=0
 set NEED_REBOOT=0
 set MISSING_LIST=
 set CHECK_PYTHON=MISSING
@@ -51,15 +51,15 @@ echo Checking Python...
 python --version >nul 2>&1
 if errorlevel 1 (
     echo   [MISSING] Python is NOT installed
-    set NEED_INSTALL=1
+    set NEED_CORE_INSTALL=1
     set MISSING_LIST=!MISSING_LIST! Python
-    set CHECK_PYTHON=MISSING
 ) else (
     for /f "tokens=*" %%i in ('python --version 2^>^&1') do (
         echo   [OK] %%i
         set CHECK_PYTHON=OK
     )
 )
+@echo off
 
 REM -------------------------------------------------------
 REM Check Node.js
@@ -68,28 +68,39 @@ echo Checking Node.js...
 node --version >nul 2>&1
 if errorlevel 1 (
     echo   [MISSING] Node.js is NOT installed
-    set NEED_INSTALL=1
+    set NEED_CORE_INSTALL=1
     set MISSING_LIST=!MISSING_LIST! Node.js
-    set CHECK_NODE=MISSING
 ) else (
     for /f "tokens=*" %%i in ('node --version 2^>^&1') do (
         echo   [OK] Node.js %%i
         set CHECK_NODE=OK
     )
 )
+@echo off
 
 REM -------------------------------------------------------
 REM Check npm
-REM NOTE: npm.cmd on Windows can turn echo back on via endlocal.
-REM       We isolate all npm calls through "cmd /c" to prevent this.
+REM NOTE: npm.cmd internally calls endlocal which turns echo back ON.
+REM       We use PowerShell to check npm so the parent shell is unaffected.
+REM       We also check both "npm" and "npm.cmd" to handle per-user installs.
 REM -------------------------------------------------------
 echo Checking npm...
-cmd /c "npm --version" >nul 2>&1
-if errorlevel 1 (
-    echo   [MISSING] npm is NOT found in PATH
-    set CHECK_NPM=MISSING
+set NPM_CHECK_CMD=
+where /q npm     2>nul && set NPM_CHECK_CMD=npm
+where /q npm.cmd 2>nul && set NPM_CHECK_CMD=npm.cmd
+if "!NPM_CHECK_CMD!"=="" (
+    REM Not in PATH at all - try PowerShell which searches PATH fresh
+    for /f "tokens=*" %%i in ('powershell -NoProfile -Command "try { $v = (npm --version 2>$null); if($v){$v} else {'NOTFOUND'} } catch { ''NOTFOUND'' }" 2^>nul') do set NPM_PS_VER=%%i
+    if "!NPM_PS_VER!"=="NOTFOUND" (
+        echo   [MISSING] npm is NOT installed
+    ) else if "!NPM_PS_VER!"=="" (
+        echo   [MISSING] npm is NOT installed
+    ) else (
+        echo   [OK] npm !NPM_PS_VER! (found via PowerShell)
+        set CHECK_NPM=OK
+    )
 ) else (
-    for /f "tokens=*" %%i in ('cmd /c "npm --version" 2^>^&1') do (
+    for /f "tokens=*" %%i in ('powershell -NoProfile -Command "npm --version 2>$null" 2^>nul') do (
         if "!CHECK_NPM!"=="" (
             echo   [OK] npm %%i
             set CHECK_NPM=OK
@@ -99,13 +110,13 @@ if errorlevel 1 (
 @echo off
 
 REM -------------------------------------------------------
-REM Check Docker (installation)
+REM Check Docker
 REM -------------------------------------------------------
 echo Checking Docker...
-where docker >nul 2>&1
+where /q docker 2>nul
 if errorlevel 1 (
     echo   [MISSING] Docker is NOT installed (not found in PATH)
-    set NEED_INSTALL=1
+    set NEED_CORE_INSTALL=1
     set NEED_REBOOT=1
     set MISSING_LIST=!MISSING_LIST! Docker
     set CHECK_DOCKER=MISSING
@@ -114,7 +125,7 @@ if errorlevel 1 (
     docker --version >nul 2>&1
     if errorlevel 1 (
         echo   [MISSING] Docker command found but not working
-        set NEED_INSTALL=1
+        set NEED_CORE_INSTALL=1
         set NEED_REBOOT=1
         set MISSING_LIST=!MISSING_LIST! Docker
         set CHECK_DOCKER=BROKEN
@@ -124,8 +135,6 @@ if errorlevel 1 (
             echo   [OK] %%i
             set CHECK_DOCKER=OK
         )
-
-        REM Check if Docker daemon is running
         echo   Checking Docker daemon...
         docker ps >nul 2>&1
         if errorlevel 1 (
@@ -138,22 +147,38 @@ if errorlevel 1 (
             echo.
             set CHECK_DOCKER_DAEMON=STOPPED
             pause
+            REM Re-check after user presses key
+            docker ps >nul 2>&1
+            if errorlevel 1 (
+                echo   [ERROR] Docker is still not running. Exiting.
+                pause
+                exit /b 1
+            ) else (
+                echo   [OK] Docker daemon is now running
+                set CHECK_DOCKER_DAEMON=OK
+            )
         ) else (
             echo   [OK] Docker daemon is running
             set CHECK_DOCKER_DAEMON=OK
         )
     )
 )
+@echo off
 
 REM -------------------------------------------------------
-REM Check Git
+REM Check Git (optional - does NOT block setup)
 REM -------------------------------------------------------
 echo Checking Git...
-where git >nul 2>&1
+git --version >nul 2>&1
 if errorlevel 1 (
-    echo   [OPTIONAL] Git is NOT installed
-    set MISSING_LIST=!MISSING_LIST! Git(optional)
-    set CHECK_GIT=MISSING
+    where /q git.exe 2>nul
+    if errorlevel 1 (
+        echo   [OPTIONAL] Git is not installed - will install automatically
+        set MISSING_LIST=!MISSING_LIST! Git(optional)
+    ) else (
+        echo   [OK] Git found (exe)
+        set CHECK_GIT=OK
+    )
 ) else (
     for /f "tokens=*" %%i in ('git --version 2^>^&1') do (
         if "!CHECK_GIT!"=="" (
@@ -164,11 +189,10 @@ if errorlevel 1 (
 )
 @echo off
 
-echo.
-
 REM -------------------------------------------------------
 REM Print Summary of all checks
 REM -------------------------------------------------------
+echo.
 echo ================================================================================
 echo Prerequisites Summary:
 echo ================================================================================
@@ -181,35 +205,22 @@ echo   Git:            %CHECK_GIT%
 echo ================================================================================
 echo.
 
-REM Abort if Docker daemon is stopped (user must start Docker Desktop)
-if "%CHECK_DOCKER_DAEMON%"=="STOPPED" (
-    echo [ERROR] Docker Desktop must be running before setup can continue.
-    echo.
-    echo Please:
-    echo   1. Start Docker Desktop from the Start Menu
-    echo   2. Wait for it to fully load (green icon in the system tray)
-    echo   3. Run this script again: automated_setup.bat
-    echo.
-    pause
-    exit /b 1
-)
-
 echo.
 
 REM ============================================================================
 REM Step 2: Install Missing Prerequisites
 REM ============================================================================
-if %NEED_INSTALL%==1 (
+if %NEED_CORE_INSTALL%==1 (
     echo ================================================================================
-    echo [Step 2/2] Installing Missing Prerequisites
+echo [Step 2/2] Installing Missing Core Prerequisites
     echo ================================================================================
     echo.
-    echo Missing software:%MISSING_LIST%
+    echo The following REQUIRED software is missing:%MISSING_LIST%
     echo.
-    
+
     REM Check if winget is available
     echo Checking if winget package manager is available...
-    where winget >nul 2>&1
+    where /q winget 2>nul
     if errorlevel 1 (
         echo [ERROR] winget is not available on this system
         echo.
@@ -217,7 +228,6 @@ if %NEED_INSTALL%==1 (
         echo   - Python 3.12:      https://www.python.org/downloads/
         echo   - Node.js LTS:      https://nodejs.org/
         echo   - Docker Desktop:   https://www.docker.com/products/docker-desktop/
-        echo   - Git:              https://git-scm.com/downloads/
         echo.
         echo After installing, run this script again: automated_setup.bat
         echo.
@@ -226,76 +236,39 @@ if %NEED_INSTALL%==1 (
     )
     echo   [OK] winget is available
     echo.
-    
+
     echo Installing prerequisites using winget...
     echo This may take 5-10 minutes. Please wait...
     echo.
-    
-    REM Install Python if missing
+
     if "%CHECK_PYTHON%"=="MISSING" (
         echo [Installing] Python 3.12...
         winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements --silent
-        if errorlevel 1 (
-            echo   [WARN] Python install may have failed - check above output
-        ) else (
-            echo   [OK] Python installed
-        )
+        if errorlevel 1 (echo   [WARN] Python install may have failed) else (echo   [OK] Python installed)
     )
-    
-    REM Install Node.js if missing
+
     if "%CHECK_NODE%"=="MISSING" (
         echo [Installing] Node.js LTS...
         winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent
-        if errorlevel 1 (
-            echo   [WARN] Node.js install may have failed - check above output
-        ) else (
-            echo   [OK] Node.js installed
-        )
+        if errorlevel 1 (echo   [WARN] Node.js install may have failed) else (echo   [OK] Node.js installed)
     )
-    
-    REM Install Docker if missing
+
     if "%CHECK_DOCKER%"=="MISSING" (
         echo [Installing] Docker Desktop...
-        echo NOTE: Docker requires WSL2 and a system reboot after installation
         winget install -e --id Docker.DockerDesktop --accept-source-agreements --accept-package-agreements
-        if errorlevel 1 (
-            echo   [WARN] Docker install may have failed - check above output
-        ) else (
-            echo   [OK] Docker Desktop installed
-        )
+        if errorlevel 1 (echo   [WARN] Docker install may have failed) else (echo   [OK] Docker Desktop installed)
     )
-    
-    REM Install Git if missing (optional)
-    if "%CHECK_GIT%"=="MISSING" (
-        echo [Installing] Git (optional)...
-        winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements --silent
-        if errorlevel 1 (
-            echo   [WARN] Git install may have failed (optional - can continue without it)
-        ) else (
-            echo   [OK] Git installed
-        )
-    )
-    
+
     echo.
-    echo ================================================================================
-    echo Installation Complete
-    echo ================================================================================
-    echo.
-    
     if %NEED_REBOOT%==1 (
         echo ================================================================================
-        echo [IMPORTANT] System Restart Required
+        echo [IMPORTANT] Restart Required - Docker Desktop was installed
         echo ================================================================================
         echo.
-        echo Docker Desktop was installed and requires WSL2 to be enabled.
-        echo.
-        echo Next steps:
         echo   1. RESTART YOUR COMPUTER
-        echo   2. After restart, open Docker Desktop from the Start Menu
+        echo   2. Open Docker Desktop from the Start Menu after restart
         echo   3. Wait for the green icon in the system tray
         echo   4. Run this script again: automated_setup.bat
-        echo.
-        echo ================================================================================
         echo.
         pause
         exit /b 0
@@ -309,6 +282,20 @@ if %NEED_INSTALL%==1 (
         exit /b 0
     )
 )
+
+REM ── Git is optional - install silently if missing then continue ──────────────
+if "%CHECK_GIT%"=="MISSING" (
+    where /q winget 2>nul
+    if not errorlevel 1 (
+        echo Installing Git (optional - setup will continue either way)...
+        winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements --silent >nul 2>&1
+        echo   [OK] Git installed (or was already present)
+    ) else (
+        echo   [NOTE] Git not installed and winget unavailable - continuing without Git
+    )
+    @echo off
+)
+
 
 REM ============================================================================
 REM Step 2/2: Run Python Setup Script
