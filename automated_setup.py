@@ -229,31 +229,26 @@ def check_drive_space() -> Dict[str, Tuple[float, float]]:
 
 def select_data_drive(drives: Dict[str, Tuple[float, float]]) -> str:
     """
-    Select the best drive for Docker volumes
-    Prefers D: drive if available with >10GB free space
-    Otherwise prefers drives with >10GB free space
+    Select the best drive for Docker volumes.
+    Prefers non-C data drives (D, E, F ...) with >10GB free space.
+    Falls back to the drive with the most free space.
     """
     print_info("Selecting drive for Docker volumes...")
     
-    # Prefer D: drive if it exists and has sufficient space (>10GB)
-    if 'D' in drives and drives['D'][0] > 10:
-        free_gb = drives['D'][0]
-        print_success(f"Selected drive D: with {free_gb:.1f} GB free (preferred data drive)")
-        return 'D'
+    # Preferred order: any non-C drive with >10GB, checked D→E→F→...
+    preferred_order = [d for d in 'DEFGHIJKLMNOPQRSTUVWXYZ' if d != 'C']
     
-    # Find drive with most free space and >10GB available
-    best_drive = None
-    best_free = 0
+    for letter in preferred_order:
+        if letter in drives and drives[letter][0] > 10:
+            free_gb = drives[letter][0]
+            print_success(f"Selected drive {letter}: with {free_gb:.1f} GB free (preferred data drive)")
+            return letter
     
-    for drive, (free_gb, total_gb) in drives.items():
-        if free_gb > 10 and free_gb > best_free:
-            best_drive = drive
-            best_free = free_gb
-    
-    # If no drive has >10GB, use the one with most space
-    if not best_drive:
-        best_drive = max(drives.items(), key=lambda x: x[1][0])[0]
-        print_warning(f"No drive has >10GB free, using {best_drive}: with {drives[best_drive][0]:.1f} GB")
+    # No preferred drive found — use the drive with the most free space (even C:)
+    best_drive = max(drives.items(), key=lambda x: x[1][0])[0]
+    best_free = drives[best_drive][0]
+    if best_free < 10:
+        print_warning(f"No drive has >10GB free. Using {best_drive}: with {best_free:.1f} GB (low space!)")
     else:
         print_success(f"Selected drive {best_drive}: with {best_free:.1f} GB free")
     
@@ -344,8 +339,15 @@ def update_env_file(file_path: str, updates: Dict[str, str]):
         f.writelines(updated_lines)
 
 def configure_docker_volumes(data_drive: str):
-    """Update docker-compose files to use specified drive"""
-    print_info(f"Configuring Docker volumes on drive {data_drive}...")
+    """Update docker-compose files to use the specified drive for Docker volumes.
+    
+    Handles both:
+      - Hardcoded absolute paths:  [A-Z]:/DockerVolumes/...
+      - Relative paths:            ./mongodb-auth, ./postgres-accounting, etc.
+    """
+    import re
+    
+    print_info(f"Configuring Docker volumes on drive {data_drive}:...")
     
     base_path = WORKSPACE_ROOT
     volume_base = f"{data_drive}:/DockerVolumes"
@@ -365,16 +367,20 @@ def configure_docker_volumes(data_drive: str):
             if not compose_file.exists():
                 continue
             
-            print_info(f"  Updating {compose_file.relative_to(base_path)}")
-            
             with open(compose_file, 'r') as f:
-                content = f.read()
+                original = f.read()
             
-            # Replace volume paths (this is a simple replacement, might need refinement)
-            # Pattern: ./data -> D:/DockerVolumes/service-name/data
-            service_name = service.replace("-service", "").replace("-py", "")
+            content = original
             
-            # Update based on service type
+            # ── 1. Replace ANY existing absolute drive path X:/DockerVolumes ──
+            # e.g.  D:/DockerVolumes/...  or  E:/DockerVolumes/...
+            content = re.sub(
+                r'[A-Za-z]:/DockerVolumes',
+                volume_base,
+                content
+            )
+            
+            # ── 2. Replace remaining relative paths ──
             if "flowise" in service.lower() and "proxy" not in service.lower():
                 content = content.replace("flowise-data:", f"{volume_base}/flowise-data:")
                 content = content.replace("./flowise-postgres", f"{volume_base}/flowise-postgres")
@@ -385,10 +391,14 @@ def configure_docker_volumes(data_drive: str):
             elif "proxy" in service:
                 content = content.replace("./mongodb-proxy", f"{volume_base}/mongodb-proxy")
             
-            with open(compose_file, 'w') as f:
-                f.write(content)
+            if content != original:
+                print_info(f"  Updated {compose_file.relative_to(base_path)}")
+                with open(compose_file, 'w') as f:
+                    f.write(content)
+            else:
+                print_info(f"  No changes needed: {compose_file.relative_to(base_path)}")
     
-    print_success("Docker volumes configured")
+    print_success(f"Docker volumes configured → {volume_base}/*")
 
 def start_flowise():
     """Start Flowise service"""
