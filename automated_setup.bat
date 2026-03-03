@@ -304,23 +304,7 @@ if not exist "%~dp0automated_setup.py" (
     exit /b 1
 )
 
-REM Final Docker daemon check before launching Python
-echo Verifying Docker is ready...
-docker ps >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo [ERROR] Docker Desktop is not running!
-    echo.
-    echo Please:
-    echo   1. Open Docker Desktop from the Start Menu
-    echo   2. Wait for it to fully start (green icon in the system tray)
-    echo   3. Run this script again: automated_setup.bat
-    echo.
-    pause
-    exit /b 1
-)
-echo   [OK] Docker is ready
-echo.
+REM Docker was already verified running in Step 1 prereqs check above.
 
 REM Run the Python setup script
 echo Starting ChatProxyPlatform setup...
