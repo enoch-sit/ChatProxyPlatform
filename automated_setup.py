@@ -89,19 +89,23 @@ def print_info(text: str):
     """Print info message"""
     print(f"{Colors.OKCYAN}ℹ {text}{Colors.ENDC}")
 
-def run_command(cmd: List[str], cwd: Optional[str] = None, shell: bool = False) -> Tuple[int, str, str]:
+def run_command(cmd, cwd: Optional[str] = None, shell: bool = False, timeout: Optional[int] = 300) -> Tuple[int, str, str]:
     """
-    Run a command and return (exit_code, stdout, stderr)
+    Run a command and return (exit_code, stdout, stderr).
+    cmd can be a list of strings or a pre-joined string (for shell=True).
+    Pass timeout=None to disable the timeout entirely (e.g. for image pulls).
     """
     try:
         if shell:
+            # Accept either a list or an already-joined string
+            shell_cmd = ' '.join(cmd) if isinstance(cmd, list) else cmd
             result = subprocess.run(
-                ' '.join(cmd),
+                shell_cmd,
                 cwd=cwd,
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=300
+                timeout=timeout
             )
         else:
             result = subprocess.run(
@@ -109,7 +113,7 @@ def run_command(cmd: List[str], cwd: Optional[str] = None, shell: bool = False) 
                 cwd=cwd,
                 capture_output=True,
                 text=True,
-                timeout=300
+                timeout=timeout
             )
         return result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
@@ -449,9 +453,15 @@ def start_flowise():
     else:
          cmd = ["docker", "compose", "up", "-d"]
 
+    # Pull images first with no timeout (slow networks can take many minutes)
+    print_info("  Pulling Docker images (this may take a while on first run)...")
+    pull_cmd = ["docker", "compose", "--env-file", ".env", "pull"] if (flowise_dir / "start-with-postgres.bat").exists() else ["docker", "compose", "pull"]
+    run_command(pull_cmd, cwd=str(flowise_dir), timeout=None)  # no timeout for pull
+
     code, stdout, stderr = run_command(
         cmd,
-        cwd=str(flowise_dir)
+        cwd=str(flowise_dir),
+        timeout=600  # 10 min — allows image pull + start on slow machines
     )
     
     if code != 0:
@@ -459,9 +469,10 @@ def start_flowise():
         # Fallback to shell execution if direct exec fails
         print_info("  Retrying with shell execution...")
         code, stdout, stderr = run_command(
-            ' '.join(cmd),
+            cmd,  # pass the list; run_command joins it internally when shell=True
             cwd=str(flowise_dir),
-            shell=True
+            shell=True,
+            timeout=600
         )
         if code != 0:
              return False
