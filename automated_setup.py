@@ -41,6 +41,8 @@ import shutil
 import secrets
 import string
 import ctypes
+import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import urllib.request
@@ -49,6 +51,35 @@ import urllib.error
 
 # Get the workspace root (script's directory)
 WORKSPACE_ROOT = Path(__file__).parent.resolve()
+
+# ---------------------------------------------------------------------------
+# Debug logging
+# ---------------------------------------------------------------------------
+_LOG_FILE: Optional[Path] = None
+_logger: Optional[logging.Logger] = None
+
+def setup_logging() -> Path:
+    """Create a timestamped log file in the workspace root and wire up the logger."""
+    global _LOG_FILE, _logger
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = WORKSPACE_ROOT / f"setup_debug_{timestamp}.log"
+    _LOG_FILE = log_path
+
+    _logger = logging.getLogger("setup")
+    _logger.setLevel(logging.DEBUG)
+    fh = logging.FileHandler(log_path, encoding="utf-8")
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+    _logger.addHandler(fh)
+    return log_path
+
+def _log(level: str, text: str):
+    """Write a plain-text line to the log file (strips ANSI codes)."""
+    if _logger is None:
+        return
+    import re
+    clean = re.sub(r'\x1b\[[0-9;]*m', '', text)
+    getattr(_logger, level)(clean)
 
 # Enable ANSI escape codes on Windows
 if os.name == 'nt':
@@ -72,22 +103,27 @@ def print_header(text: str):
     print(f"\n{Colors.HEADER}{Colors.BOLD}{'='*70}{Colors.ENDC}")
     print(f"{Colors.HEADER}{Colors.BOLD}{text.center(70)}{Colors.ENDC}")
     print(f"{Colors.HEADER}{Colors.BOLD}{'='*70}{Colors.ENDC}\n")
+    _log("info", f"\n{'='*70}\n{text.center(70)}\n{'='*70}")
 
 def print_success(text: str):
     """Print success message"""
     print(f"{Colors.OKGREEN}✓ {text}{Colors.ENDC}")
+    _log("info", f"[SUCCESS] {text}")
 
 def print_error(text: str):
     """Print error message"""
     print(f"{Colors.FAIL}✗ {text}{Colors.ENDC}")
+    _log("error", f"[ERROR] {text}")
 
 def print_warning(text: str):
     """Print warning message"""
     print(f"{Colors.WARNING}⚠ {text}{Colors.ENDC}")
+    _log("warning", f"[WARNING] {text}")
 
 def print_info(text: str):
     """Print info message"""
     print(f"{Colors.OKCYAN}ℹ {text}{Colors.ENDC}")
+    _log("info", f"[INFO] {text}")
 
 def run_command(cmd, cwd: Optional[str] = None, shell: bool = False, timeout: Optional[int] = 300) -> Tuple[int, str, str]:
     """
@@ -95,6 +131,8 @@ def run_command(cmd, cwd: Optional[str] = None, shell: bool = False, timeout: Op
     cmd can be a list of strings or a pre-joined string (for shell=True).
     Pass timeout=None to disable the timeout entirely (e.g. for image pulls).
     """
+    display_cmd = ' '.join(cmd) if isinstance(cmd, list) else cmd
+    _log("debug", f"CMD cwd={cwd!r} shell={shell} timeout={timeout}: {display_cmd}")
     try:
         if shell:
             # Accept either a list or an already-joined string
@@ -115,10 +153,17 @@ def run_command(cmd, cwd: Optional[str] = None, shell: bool = False, timeout: Op
                 text=True,
                 timeout=timeout
             )
+        _log("debug", f"  exit={result.returncode}")
+        if result.stdout.strip():
+            _log("debug", f"  stdout: {result.stdout.strip()}")
+        if result.stderr.strip():
+            _log("debug", f"  stderr: {result.stderr.strip()}")
         return result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
+        _log("error", f"  CMD TIMED OUT after {timeout}s: {display_cmd}")
         return -1, "", "Command timed out"
     except Exception as e:
+        _log("error", f"  CMD EXCEPTION: {e}")
         return -1, "", str(e)
 
 def check_admin() -> bool:
@@ -943,7 +988,10 @@ def check_existing_config() -> bool:
 
 def main():
     """Main setup function"""
+    log_file = setup_logging()
     print_header("ChatProxyPlatform - Automated Setup")
+    print_info(f"Debug log: {log_file}")
+    _log("info", f"Python {sys.version}  |  Platform: {sys.platform}")
     
     # Show workspace location
     print_info(f"Workspace: {WORKSPACE_ROOT}")
@@ -1120,4 +1168,7 @@ if __name__ == "__main__":
         print_error(f"Unexpected error: {e}")
         import traceback
         traceback.print_exc()
+        _log("error", f"UNHANDLED EXCEPTION: {e}\n{traceback.format_exc()}")
+        if _LOG_FILE:
+            print_info(f"Full debug log saved to: {_LOG_FILE}")
         sys.exit(1)
