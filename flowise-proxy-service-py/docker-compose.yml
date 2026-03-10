@@ -19,7 +19,7 @@ services:
     - FLOWISE_API_URL=${FLOWISE_API_URL:-http://flowise:3000}
     - FLOWISE_API_KEY=${FLOWISE_API_KEY}
     - EXTERNAL_AUTH_URL=${EXTERNAL_AUTH_URL:-http://auth-service:3000}
-    - ACCOUNTING_SERVICE_URL=${ACCOUNTING_SERVICE_URL:-http://accounting-service:3001/api}
+    - ACCOUNTING_SERVICE_URL=${ACCOUNTING_SERVICE_URL:-http://accounting-service:3001}
     - MONGODB_URL=${MONGODB_URL}
     - MONGODB_DATABASE_NAME=${MONGODB_DATABASE_NAME:-flowise_proxy}
     - DEBUG=${DEBUG:-false}
