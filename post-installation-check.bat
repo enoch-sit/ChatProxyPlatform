@@ -23,19 +23,19 @@ for /f "tokens=*" %%T in ('powershell -NoProfile -Command "Get-Date -Format yyyy
 set LOGFILE=%~dp0post_install_check_%TS%.log
 
 REM ---- Bootstrap the log file --------------------------------
-echo ChatProxyPlatform Post-Installation Check > "%LOGFILE%"
-echo Timestamp : %TS%                          >> "%LOGFILE%"
-echo Workspace : %~dp0                         >> "%LOGFILE%"
-echo.                                          >> "%LOGFILE%"
+>  "%LOGFILE%" echo ChatProxyPlatform Post-Installation Check
+>> "%LOGFILE%" echo Timestamp : %TS%
+>> "%LOGFILE%" echo Workspace : %~dp0
+>> "%LOGFILE%" echo.
 
 goto :MAIN
 
 REM ============================================================
-REM  :log  <message>   – print to console AND append to log
+REM  :log  <message>  –  print to console AND append to log
 REM ============================================================
 :log
   echo %~1
-  echo %~1 >> "%LOGFILE%"
+  >> "%LOGFILE%" echo %~1
   goto :eof
 
 REM ============================================================
@@ -46,16 +46,18 @@ REM ============================================================
   echo ==================================================================
   echo   %~1
   echo ==================================================================
-  echo. >> "%LOGFILE%"
-  echo ================================================================== >> "%LOGFILE%"
-  echo   %~1 >> "%LOGFILE%"
-  echo ================================================================== >> "%LOGFILE%"
+  >> "%LOGFILE%" echo.
+  >> "%LOGFILE%" echo ==================================================================
+  >> "%LOGFILE%" echo   %~1
+  >> "%LOGFILE%" echo ==================================================================
   goto :eof
 
 REM ============================================================
-REM  :tee_cmd  — pipe a block's stdout+stderr to console+log
-REM  Not a real subroutine; use inline:
-REM    <commands> 2>&1 | powershell ... Tee-Object ...
+REM  Temp-file TEE helper
+REM  Usage: surround a block with:
+REM    set _T=%TEMP%\pic_%RANDOM%.tmp
+REM    ( commands ) > "%_T%" 2>&1
+REM    type "%_T%"  &  type "%_T%" >> "%LOGFILE%"  &  del "%_T%" 2>nul
 REM ============================================================
 
 :MAIN
@@ -73,6 +75,7 @@ REM  SECTION 1 - SYSTEM INFO
 REM ====================================================================
 call :section "1. SYSTEM INFO"
 
+set _T=%TEMP%\pic_%RANDOM%.tmp
 (
   echo === Hostname ===
   hostname
@@ -81,24 +84,31 @@ call :section "1. SYSTEM INFO"
   ver
   echo.
   echo === Docker version ===
-  docker version 2>&1
+  docker version
   echo.
   echo === Docker info ===
-  docker info 2>&1
-) 2>&1 | powershell -NoProfile -NonInteractive -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"
+  docker info
+) > "%_T%" 2>&1
+type "%_T%"
+type "%_T%" >> "%LOGFILE%"
+del "%_T%" 2>nul
 
 REM ====================================================================
 REM  SECTION 2 - RUNNING CONTAINERS
 REM ====================================================================
 call :section "2. DOCKER CONTAINERS"
 
+set _T=%TEMP%\pic_%RANDOM%.tmp
 (
   echo === docker ps -a ===
-  docker ps -a 2>&1
+  docker ps -a
   echo.
   echo === docker stats --no-stream ===
-  docker stats --no-stream 2>&1
-) 2>&1 | powershell -NoProfile -NonInteractive -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"
+  docker stats --no-stream
+) > "%_T%" 2>&1
+type "%_T%"
+type "%_T%" >> "%LOGFILE%"
+del "%_T%" 2>nul
 
 REM ====================================================================
 REM  SECTION 3 - CONTAINER HEALTH / INSPECT
@@ -108,9 +118,11 @@ call :section "3. CONTAINER HEALTH STATUS"
 for %%C in (flowise flowise-postgres auth-service mongodb-auth accounting-service postgres-accounting flowise-proxy mongodb-proxy bridge-ui auth-mailhog) do (
   call :log ""
   call :log "  --- %%C ---"
-  (
-    docker inspect --format "State={{.State.Status}}  Health={{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}  Started={{.State.StartedAt}}" %%C 2>&1
-  ) 2>&1 | powershell -NoProfile -NonInteractive -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"
+  set _T=%TEMP%\pic_%RANDOM%.tmp
+  docker inspect --format "State={{.State.Status}}  Health={{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}  Started={{.State.StartedAt}}" %%C > "!_T!" 2>&1
+  type "!_T!"
+  type "!_T!" >> "%LOGFILE%"
+  del "!_T!" 2>nul
 )
 
 REM ====================================================================
@@ -121,9 +133,11 @@ call :section "4. CONTAINER LOGS (last 100 lines each)"
 for %%C in (auth-service accounting-service flowise flowise-proxy bridge-ui) do (
   call :log ""
   call :log "  ========== LOG: %%C =========="
-  (
-    docker logs --tail=100 --timestamps %%C 2>&1
-  ) 2>&1 | powershell -NoProfile -NonInteractive -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"
+  set _T=%TEMP%\pic_%RANDOM%.tmp
+  docker logs --tail=100 --timestamps %%C > "!_T!" 2>&1
+  type "!_T!"
+  type "!_T!" >> "%LOGFILE%"
+  del "!_T!" 2>nul
 )
 
 REM ====================================================================
@@ -233,16 +247,20 @@ call :section "8. MONGODB: ADMIN USER DOCUMENT"
 call :log "  Container: mongodb-auth  DB: auth_db"
 call :log ""
 
+set _T=%TEMP%\pic_%RANDOM%.tmp
 (
   echo --- admin user document ---
-  docker exec mongodb-auth mongosh auth_db --quiet --eval "JSON.stringify(db.users.findOne({username:'admin'}),null,2)" 2>&1
+  docker exec mongodb-auth mongosh auth_db --quiet --eval "JSON.stringify(db.users.findOne({username:'admin'}),null,2)"
   echo.
   echo --- all users (username / email / role / isVerified) ---
-  docker exec mongodb-auth mongosh auth_db --quiet --eval "db.users.find({},{username:1,email:1,role:1,isVerified:1,_id:0}).forEach(function(d){print(JSON.stringify(d))})" 2>&1
+  docker exec mongodb-auth mongosh auth_db --quiet --eval "db.users.find({},{username:1,email:1,role:1,isVerified:1,_id:0}).forEach(function(d){print(JSON.stringify(d))})"
   echo.
   echo --- user count by role ---
-  docker exec mongodb-auth mongosh auth_db --quiet --eval "db.users.aggregate([{$group:{_id:'$role',count:{$sum:1}}}]).forEach(function(d){print(JSON.stringify(d))})" 2>&1
-) 2>&1 | powershell -NoProfile -NonInteractive -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"
+  docker exec mongodb-auth mongosh auth_db --quiet --eval "db.users.aggregate([{$group:{_id:'$role',count:{$sum:1}}}]).forEach(function(d){print(JSON.stringify(d))})"
+) > "%_T%" 2>&1
+type "%_T%"
+type "%_T%" >> "%LOGFILE%"
+del "%_T%" 2>nul
 
 REM ====================================================================
 REM  SECTION 9 - JWT SECRET CONSISTENCY CHECK
@@ -253,16 +271,20 @@ call :log "  Checking JWT_ACCESS_SECRET across auth-service and flowise-proxy...
 call :log "  (Secrets must match for tokens to validate correctly)"
 call :log ""
 
+set _T=%TEMP%\pic_%RANDOM%.tmp
 (
   echo --- auth-service JWT_ACCESS_SECRET (first 20 chars) ---
-  docker exec auth-service sh -c "echo ${JWT_ACCESS_SECRET:0:20}" 2>&1
+  docker exec auth-service sh -c "echo ${JWT_ACCESS_SECRET:0:20}"
   echo.
   echo --- flowise-proxy JWT_ACCESS_SECRET (first 20 chars) ---
-  docker exec flowise-proxy sh -c "echo ${JWT_ACCESS_SECRET:0:20}" 2>&1
+  docker exec flowise-proxy sh -c "echo ${JWT_ACCESS_SECRET:0:20}"
   echo.
   echo --- flowise-proxy JWT_SECRET_KEY (first 20 chars) ---
-  docker exec flowise-proxy sh -c "echo ${JWT_SECRET_KEY:0:20}" 2>&1
-) 2>&1 | powershell -NoProfile -NonInteractive -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"
+  docker exec flowise-proxy sh -c "echo ${JWT_SECRET_KEY:0:20}"
+) > "%_T%" 2>&1
+type "%_T%"
+type "%_T%" >> "%LOGFILE%"
+del "%_T%" 2>nul
 
 REM ====================================================================
 REM  SECTION 10 - AUTO-FIX: FORCE ADMIN isVerified + role IN MONGODB
@@ -273,15 +295,17 @@ call :log "  This is SAFE to run multiple times."
 call :log "  It only updates the admin document in MongoDB."
 call :log ""
 
+set _T=%TEMP%\pic_%RANDOM%.tmp
 (
   echo --- Updating admin user ---
-  docker exec mongodb-auth mongosh auth_db --quiet --eval ^
-    "var r=db.users.updateOne({username:'admin'},{$set:{isVerified:true,role:'admin'}});print('matched='+r.matchedCount+' modified='+r.modifiedCount);" 2>&1
+  docker exec mongodb-auth mongosh auth_db --quiet --eval "var r=db.users.updateOne({username:'admin'},{$set:{isVerified:true,role:'admin'}});print('matched='+r.matchedCount+' modified='+r.modifiedCount);"
   echo.
   echo --- Admin document after fix ---
-  docker exec mongodb-auth mongosh auth_db --quiet --eval ^
-    "JSON.stringify(db.users.findOne({username:'admin'},{username:1,email:1,role:1,isVerified:1,_id:0}),null,2)" 2>&1
-) 2>&1 | powershell -NoProfile -NonInteractive -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"
+  docker exec mongodb-auth mongosh auth_db --quiet --eval "JSON.stringify(db.users.findOne({username:'admin'},{username:1,email:1,role:1,isVerified:1,_id:0}),null,2)"
+) > "%_T%" 2>&1
+type "%_T%"
+type "%_T%" >> "%LOGFILE%"
+del "%_T%" 2>nul
 
 REM ====================================================================
 REM  SECTION 11 - RE-TEST LOGIN AFTER FIX
@@ -316,16 +340,20 @@ REM  SECTION 12 - DOCKER ENVIRONMENT VARIABLES (sensitive preview)
 REM ====================================================================
 call :section "12. CONTAINER ENVIRONMENT SNAPSHOT (non-secret keys only)"
 
+set _T=%TEMP%\pic_%RANDOM%.tmp
 (
   echo --- auth-service env (PORT, NODE_ENV, MONGO_URI pattern) ---
-  docker exec auth-service sh -c "env | grep -E '^(PORT|NODE_ENV|MONGO_URI|EMAIL_HOST|API_URL|JWT_ACCESS_EXPIRES)'" 2>&1
+  docker exec auth-service sh -c "env | grep -E '^(PORT|NODE_ENV|MONGO_URI|EMAIL_HOST|API_URL|JWT_ACCESS_EXPIRES)'"
   echo.
   echo --- flowise-proxy env (PORT, NODE_ENV, FLOWISE_API_URL, log level) ---
-  docker exec flowise-proxy sh -c "env | grep -E '^(PORT|HOST|NODE_ENV|FLOWISE_API_URL|LOG_LEVEL|DEBUG|EXTERNAL_AUTH_URL|ACCOUNTING_SERVICE_URL)'" 2>&1
+  docker exec flowise-proxy sh -c "env | grep -E '^(PORT|HOST|NODE_ENV|FLOWISE_API_URL|LOG_LEVEL|DEBUG|EXTERNAL_AUTH_URL|ACCOUNTING_SERVICE_URL)'"
   echo.
   echo --- auth-service /health response ---
-  docker exec auth-service sh -c "wget -qO- http://localhost:3000/health 2>&1 || curl -s http://localhost:3000/health 2>&1" 2>&1
-) 2>&1 | powershell -NoProfile -NonInteractive -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"
+  docker exec auth-service sh -c "wget -qO- http://localhost:3000/health 2>&1 || curl -s http://localhost:3000/health 2>&1"
+) > "%_T%" 2>&1
+type "%_T%"
+type "%_T%" >> "%LOGFILE%"
+del "%_T%" 2>nul
 
 REM ====================================================================
 REM  DONE - SUMMARY
