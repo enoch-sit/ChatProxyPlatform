@@ -621,6 +621,7 @@ def configure_all_services(jwt_access: str, jwt_refresh: str, flowise_api_key: s
         "JWT_REFRESH_SECRET": jwt_refresh,
         "FLOWISE_API_KEY": flowise_api_key,
         "FLOWISE_API_URL": "http://flowise:3002",
+        "EXTERNAL_AUTH_URL": "http://auth-service:3000",
         "MONGODB_URL": f"mongodb://admin:{mongo_password}@mongodb-proxy:27017/flowise_proxy?authSource=admin"
     })
     print_success("  Configured flowise-proxy-service-py")
