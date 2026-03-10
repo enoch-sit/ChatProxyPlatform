@@ -49,7 +49,7 @@ services:
     - MONGO_INITDB_ROOT_PASSWORD=65424b6a739b4198ae2a3e08b35deeda
     - MONGO_INITDB_DATABASE=flowise_proxy
     volumes:
-    - D:/DockerVolumes/mongodb-proxy:/data/db
+    - mongodb_data:/data/db
     - ./init-mongo-prod.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
     networks:
     - flowise-network
