@@ -1,0 +1,689 @@
+ChatProxyPlatform Post-Installation Check
+Timestamp : 20260310_172320
+Workspace : C:\Users\intune_teacher\Documents\ChatProxyPlatform\
+
+ECHO is off.
+======================================================================
+  ChatProxyPlatform - Post-Installation Check
+  20260310_172320
+======================================================================
+  Log file: C:\Users\intune_teacher\Documents\ChatProxyPlatform\post_install_check_20260310_172320.log
+ECHO is off.
+
+==================================================================
+  1. SYSTEM INFO
+==================================================================
+=== Hostname ===
+AIWorkstation1
+
+=== Windows version ===
+
+Microsoft Windows [Version 10.0.26200.7840]
+
+=== Docker version ===
+Client:
+ Version:           29.2.1
+ API version:       1.53
+ Go version:        go1.25.6
+ Git commit:        a5c7197
+ Built:             Mon Feb  2 17:20:16 2026
+ OS/Arch:           windows/amd64
+ Context:           desktop-linux
+
+Server: Docker Desktop 4.63.0 (220185)
+ Engine:
+  Version:          29.2.1
+  API version:      1.53 (minimum version 1.44)
+  Go version:       go1.25.6
+  Git commit:       6bc6209
+  Built:            Mon Feb  2 17:17:24 2026
+  OS/Arch:          linux/amd64
+  Experimental:     false
+ containerd:
+  Version:          v2.2.1
+  GitCommit:        dea7da592f5d1d2b7755e3a161be07f43fad8f75
+ runc:
+  Version:          1.3.4
+  GitCommit:        v1.3.4-0-gd6d73eb8
+ docker-init:
+  Version:          0.19.0
+  GitCommit:        de40ad0
+
+=== Docker info ===
+Client:
+ Version:    29.2.1
+ Context:    desktop-linux
+ Debug Mode: false
+ Plugins:
+  agent: create or run AI agents (Docker Inc.)
+    Version:  v1.27.1
+    Path:     C:\Program Files\Docker\cli-plugins\docker-agent.exe
+  ai: Docker AI Agent - Ask Gordon (Docker Inc.)
+    Version:  v1.18.0
+    Path:     C:\Program Files\Docker\cli-plugins\docker-ai.exe
+  buildx: Docker Buildx (Docker Inc.)
+    Version:  v0.31.1-desktop.1
+    Path:     C:\Program Files\Docker\cli-plugins\docker-buildx.exe
+  compose: Docker Compose (Docker Inc.)
+    Version:  v5.0.2
+    Path:     C:\Program Files\Docker\cli-plugins\docker-compose.exe
+  debug: Get a shell into any image or container (Docker Inc.)
+    Version:  0.0.47
+    Path:     C:\Program Files\Docker\cli-plugins\docker-debug.exe
+  desktop: Docker Desktop commands (Docker Inc.)
+    Version:  v0.3.0
+    Path:     C:\Program Files\Docker\cli-plugins\docker-desktop.exe
+  extension: Manages Docker extensions (Docker Inc.)
+    Version:  v0.2.31
+    Path:     C:\Program Files\Docker\cli-plugins\docker-extension.exe
+  init: Creates Docker-related starter files for your project (Docker Inc.)
+    Version:  v1.4.0
+    Path:     C:\Program Files\Docker\cli-plugins\docker-init.exe
+  mcp: Docker MCP Plugin (Docker Inc.)
+    Version:  v0.40.1
+    Path:     C:\Program Files\Docker\cli-plugins\docker-mcp.exe
+  model: Docker Model Runner (Docker Inc.)
+    Version:  v1.1.1
+    Path:     C:\Program Files\Docker\cli-plugins\docker-model.exe
+  offload: Docker Offload (Docker Inc.)
+    Version:  v0.5.56
+    Path:     C:\Program Files\Docker\cli-plugins\docker-offload.exe
+  pass: Docker Pass Secrets Manager Plugin (beta) (Docker Inc.)
+    Version:  v0.0.24
+    Path:     C:\Program Files\Docker\cli-plugins\docker-pass.exe
+  sandbox: Docker Sandbox (Docker Inc.)
+    Version:  v0.12.0
+    Path:     C:\Program Files\Docker\cli-plugins\docker-sandbox.exe
+  sbom: View the packaged-based Software Bill Of Materials (SBOM) for an image (Anchore Inc.)
+    Version:  0.6.0
+    Path:     C:\Program Files\Docker\cli-plugins\docker-sbom.exe
+  scout: Docker Scout (Docker Inc.)
+    Version:  v1.20.0
+    Path:     C:\Program Files\Docker\cli-plugins\docker-scout.exe
+
+Server:
+ Containers: 10
+  Running: 10
+  Paused: 0
+  Stopped: 0
+ Images: 10
+ Server Version: 29.2.1
+ Storage Driver: overlayfs
+  driver-type: io.containerd.snapshotter.v1
+ Logging Driver: json-file
+ Cgroup Driver: cgroupfs
+ Cgroup Version: 2
+ Plugins:
+  Volume: local
+  Network: bridge host ipvlan macvlan null overlay
+  Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog
+ CDI spec directories:
+  /etc/cdi
+  /var/run/cdi
+ Discovered Devices:
+  cdi: docker.com/gpu=webgpu
+ Swarm: inactive
+ Runtimes: io.containerd.runc.v2 nvidia runc
+ Default Runtime: runc
+ Init Binary: docker-init
+ containerd version: dea7da592f5d1d2b7755e3a161be07f43fad8f75
+ runc version: v1.3.4-0-gd6d73eb8
+ init version: de40ad0
+ Security Options:
+  seccomp
+   Profile: builtin
+  cgroupns
+ Kernel Version: 6.6.87.2-microsoft-standard-WSL2
+ Operating System: Docker Desktop
+ OSType: linux
+ Architecture: x86_64
+ CPUs: 24
+ Total Memory: 62.53GiB
+ Name: docker-desktop
+ ID: b82882e0-89be-49fb-93c2-2ed89f69c288
+ Docker Root Dir: /var/lib/docker
+ Debug Mode: false
+ HTTP Proxy: http.docker.internal:3128
+ HTTPS Proxy: http.docker.internal:3128
+ No Proxy: hubproxy.docker.internal
+ Labels:
+  com.docker.desktop.address=npipe://\\.\pipe\docker_cli
+ Experimental: false
+ Insecure Registries:
+  hubproxy.docker.internal:5555
+  ::1/128
+  127.0.0.0/8
+ Live Restore Enabled: false
+ Firewall Backend: iptables
+
+
+==================================================================
+  2. DOCKER CONTAINERS
+==================================================================
+=== docker ps -a ===
+CONTAINER ID   IMAGE                                    COMMAND                  CREATED         STATUS                   PORTS                                                                                      NAMES
+c902d98a023c   flowise-proxy-service-py-flowise-proxy   "uvicorn app.main:ap…"   8 minutes ago   Up 8 minutes (healthy)   0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp                                                flowise-proxy
+d4429d593d0a   bridge-bridge-ui                         "/docker-entrypoint.…"   24 hours ago    Up 24 hours (healthy)    0.0.0.0:3082->3082/tcp, [::]:3082->3082/tcp                                                bridge-ui
+731be6e2a788   mongo:7-jammy                            "docker-entrypoint.s…"   24 hours ago    Up 24 hours (healthy)    0.0.0.0:27020->27017/tcp, [::]:27020->27017/tcp                                            mongodb-proxy
+48c77399f7c6   accounting-service-accounting-service    "docker-entrypoint.s…"   24 hours ago    Up 24 hours (healthy)    0.0.0.0:3001->3001/tcp, [::]:3001->3001/tcp, 0.0.0.0:9229->9229/tcp, [::]:9229->9229/tcp   accounting-service
+d5f58e98ab56   postgres:14-alpine                       "docker-entrypoint.s…"   24 hours ago    Up 24 hours              0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp                                                postgres-accounting
+d144f54051c0   auth-service-auth-service                "docker-entrypoint.s…"   24 hours ago    Up 24 hours              0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp                                                auth-service
+b65db8deb99d   mongo:6.0                                "docker-entrypoint.s…"   24 hours ago    Up 24 hours (healthy)    0.0.0.0:27017->27017/tcp, [::]:27017->27017/tcp                                            mongodb-auth
+439a9f14e223   mailhog/mailhog:latest                   "MailHog"                24 hours ago    Up 24 hours              0.0.0.0:1025->1025/tcp, [::]:1025->1025/tcp, 0.0.0.0:8025->8025/tcp, [::]:8025->8025/tcp   auth-mailhog
+ff4d09501774   flowiseai/flowise:latest                 "flowise start"          26 hours ago    Up 26 hours (healthy)    0.0.0.0:3002->3002/tcp, [::]:3002->3002/tcp                                                flowise
+ba841a87eff5   postgres:15-alpine                       "docker-entrypoint.s…"   26 hours ago    Up 26 hours (healthy)    0.0.0.0:5433->5432/tcp, [::]:5433->5432/tcp                                                flowise-postgres
+
+=== docker stats --no-stream ===
+CONTAINER ID   NAME                  CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+c902d98a023c   flowise-proxy         0.16%     62.71MiB / 62.53GiB   0.10%     120kB / 65kB      22.4MB / 406kB    10
+d4429d593d0a   bridge-ui             0.00%     3.527MiB / 62.53GiB   0.01%     29.5kB / 1.35MB   6.41MB / 12.3kB   2
+731be6e2a788   mongodb-proxy         0.47%     182.5MiB / 62.53GiB   0.29%     4.73MB / 9.65MB   230MB / 0B        36
+48c77399f7c6   accounting-service    0.00%     39.95MiB / 62.53GiB   0.06%     94.7kB / 62.9kB   3.37MB / 7.26MB   12
+d5f58e98ab56   postgres-accounting   0.00%     23.56MiB / 62.53GiB   0.04%     42.9kB / 76.5kB   4.33MB / 143MB    7
+d144f54051c0   auth-service          0.11%     341.2MiB / 62.53GiB   0.53%     6.87MB / 2.45MB   1.92MB / 352kB    33
+b65db8deb99d   mongodb-auth          0.42%     173.7MiB / 62.53GiB   0.27%     2.38MB / 6.84MB   509MB / 0B        35
+439a9f14e223   auth-mailhog          0.00%     2.805MiB / 62.53GiB   0.00%     2.03kB / 126B     8.45MB / 0B       8
+ff4d09501774   flowise               0.00%     403.2MiB / 62.53GiB   0.63%     2.98MB / 8.29MB   7.21MB / 41kB     11
+ba841a87eff5   flowise-postgres      0.00%     25.32MiB / 62.53GiB   0.04%     2.14MB / 2.57MB   23.4MB / 4.1kB    6
+
+==================================================================
+  3. CONTAINER HEALTH STATUS
+==================================================================
+ECHO is off.
+  --- flowise ---
+State=running  Health=healthy  Started=2026-03-09T07:46:11.301013466Z
+ECHO is off.
+  --- flowise-postgres ---
+State=running  Health=healthy  Started=2026-03-09T07:46:00.634346505Z
+ECHO is off.
+  --- auth-service ---
+State=running  Health=no-healthcheck  Started=2026-03-09T08:54:01.933643419Z
+ECHO is off.
+  --- mongodb-auth ---
+State=running  Health=healthy  Started=2026-03-09T08:54:01.720312008Z
+ECHO is off.
+  --- accounting-service ---
+State=running  Health=healthy  Started=2026-03-09T09:19:49.891314017Z
+ECHO is off.
+  --- postgres-accounting ---
+State=running  Health=no-healthcheck  Started=2026-03-09T09:19:49.726760818Z
+ECHO is off.
+  --- flowise-proxy ---
+State=running  Health=healthy  Started=2026-03-10T09:15:06.092503634Z
+ECHO is off.
+  --- mongodb-proxy ---
+State=running  Health=healthy  Started=2026-03-09T09:23:48.669880607Z
+ECHO is off.
+  --- bridge-ui ---
+State=running  Health=healthy  Started=2026-03-09T09:28:39.801119066Z
+ECHO is off.
+  --- auth-mailhog ---
+State=running  Health=no-healthcheck  Started=2026-03-09T08:54:01.734461543Z
+
+==================================================================
+  4. CONTAINER LOGS (last 100 lines each)
+==================================================================
+ECHO is off.
+  ========== LOG: auth-service ==========
+2026-03-09T09:20:08.957416549Z   "stack": "Error: connect ECONNREFUSED 127.0.0.1:1025\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)"
+2026-03-09T09:20:08.957418581Z }
+2026-03-09T09:20:08.957420307Z [2026-03-09T09:20:08.957Z] [32minfo[39m: User created: student3 {
+2026-03-09T09:20:08.957422470Z   "service": "auth-service"
+2026-03-09T09:20:08.957424340Z }
+2026-03-09T09:20:09.316819536Z [2026-03-09T09:20:09.316Z] [32minfo[39m: POST /api/auth/login {
+2026-03-09T09:20:09.316843584Z   "service": "auth-service"
+2026-03-09T09:20:09.316845338Z }
+2026-03-09T09:20:09.362348663Z [2026-03-09T09:20:09.362Z] [32minfo[39m: User logged in: student3 (enduser) {
+2026-03-09T09:20:09.362367757Z   "service": "auth-service"
+2026-03-09T09:20:09.362371232Z }
+2026-03-09T09:20:09.397546953Z [2026-03-09T09:20:09.397Z] [32minfo[39m: POST /api/auth/signup {
+2026-03-09T09:20:09.397568533Z   "service": "auth-service"
+2026-03-09T09:20:09.397570415Z }
+2026-03-09T09:20:09.445311928Z [2026-03-09T09:20:09.445Z] [31merror[39m: Error sending verification email: connect ECONNREFUSED 127.0.0.1:1025 {
+2026-03-09T09:20:09.445339682Z   "service": "auth-service",
+2026-03-09T09:20:09.445342756Z   "errno": -111,
+2026-03-09T09:20:09.445344516Z   "code": "ESOCKET",
+2026-03-09T09:20:09.445346209Z   "syscall": "connect",
+2026-03-09T09:20:09.445347676Z   "address": "127.0.0.1",
+2026-03-09T09:20:09.445349189Z   "port": 1025,
+2026-03-09T09:20:09.445350592Z   "command": "CONN",
+2026-03-09T09:20:09.445352050Z   "stack": "Error: connect ECONNREFUSED 127.0.0.1:1025\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)"
+2026-03-09T09:20:09.445353947Z }
+2026-03-09T09:20:09.445355529Z [2026-03-09T09:20:09.445Z] [32minfo[39m: User created: student4 {
+2026-03-09T09:20:09.445357282Z   "service": "auth-service"
+2026-03-09T09:20:09.445358872Z }
+2026-03-09T09:20:09.811826284Z [2026-03-09T09:20:09.811Z] [32minfo[39m: POST /api/auth/login {
+2026-03-09T09:20:09.811850486Z   "service": "auth-service"
+2026-03-09T09:20:09.811851915Z }
+2026-03-09T09:20:09.857838883Z [2026-03-09T09:20:09.857Z] [32minfo[39m: User logged in: student4 (enduser) {
+2026-03-09T09:20:09.857862940Z   "service": "auth-service"
+2026-03-09T09:20:09.857864569Z }
+2026-03-09T09:20:09.885365847Z [2026-03-09T09:20:09.885Z] [32minfo[39m: POST /api/auth/signup {
+2026-03-09T09:20:09.885376363Z   "service": "auth-service"
+2026-03-09T09:20:09.885377589Z }
+2026-03-09T09:20:09.932417321Z [2026-03-09T09:20:09.932Z] [31merror[39m: Error sending verification email: connect ECONNREFUSED 127.0.0.1:1025 {
+2026-03-09T09:20:09.932446711Z   "service": "auth-service",
+2026-03-09T09:20:09.932453779Z   "errno": -111,
+2026-03-09T09:20:09.932455899Z   "code": "ESOCKET",
+2026-03-09T09:20:09.932457480Z   "syscall": "connect",
+2026-03-09T09:20:09.932459118Z   "address": "127.0.0.1",
+2026-03-09T09:20:09.932460572Z   "port": 1025,
+2026-03-09T09:20:09.932461933Z   "command": "CONN",
+2026-03-09T09:20:09.932463592Z   "stack": "Error: connect ECONNREFUSED 127.0.0.1:1025\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1555:16)"
+2026-03-09T09:20:09.932465507Z }
+2026-03-09T09:20:09.932466959Z [2026-03-09T09:20:09.932Z] [32minfo[39m: User created: student5 {
+2026-03-09T09:20:09.932468979Z   "service": "auth-service"
+2026-03-09T09:20:09.932483250Z }
+2026-03-09T09:20:10.302108378Z [2026-03-09T09:20:10.301Z] [32minfo[39m: POST /api/auth/login {
+2026-03-09T09:20:10.302135376Z   "service": "auth-service"
+2026-03-09T09:20:10.302138341Z }
+2026-03-09T09:20:10.348314355Z [2026-03-09T09:20:10.348Z] [32minfo[39m: User logged in: student5 (enduser) {
+2026-03-09T09:20:10.348330068Z   "service": "auth-service"
+2026-03-09T09:20:10.348331390Z }
+2026-03-09T09:28:50.022675952Z [2026-03-09T09:28:50.022Z] [32minfo[39m: GET /health {
+2026-03-09T09:28:50.022706391Z   "service": "auth-service"
+2026-03-09T09:28:50.022709255Z }
+2026-03-09T09:28:50.078443894Z [2026-03-09T09:28:50.078Z] [32minfo[39m: POST /api/api/auth/login {
+2026-03-09T09:28:50.078466983Z   "service": "auth-service"
+2026-03-09T09:28:50.078471270Z }
+2026-03-10T08:36:39.130067401Z [2026-03-10T08:36:39.129Z] [32minfo[39m: POST /api/api/auth/login {
+2026-03-10T08:36:39.130309010Z   "service": "auth-service"
+2026-03-10T08:36:39.130312285Z }
+2026-03-10T08:36:52.097506518Z [2026-03-10T08:36:52.097Z] [32minfo[39m: POST /api/api/auth/login {
+2026-03-10T08:36:52.097539571Z   "service": "auth-service"
+2026-03-10T08:36:52.097543575Z }
+2026-03-10T08:36:53.383805655Z [2026-03-10T08:36:53.383Z] [32minfo[39m: POST /api/api/auth/login {
+2026-03-10T08:36:53.383832774Z   "service": "auth-service"
+2026-03-10T08:36:53.383837419Z }
+2026-03-10T08:47:39.507213668Z [2026-03-10T08:47:39.507Z] [32minfo[39m: GET /health {
+2026-03-10T08:47:39.507242445Z   "service": "auth-service"
+2026-03-10T08:47:39.507244191Z }
+2026-03-10T08:47:39.936112972Z [2026-03-10T08:47:39.935Z] [32minfo[39m: POST /api/auth/login {
+2026-03-10T08:47:39.936147553Z   "service": "auth-service"
+2026-03-10T08:47:39.936151503Z }
+2026-03-10T08:47:39.982551987Z [2026-03-10T08:47:39.982Z] [32minfo[39m: User logged in: admin (admin) {
+2026-03-10T08:47:39.982575958Z   "service": "auth-service"
+2026-03-10T08:47:39.982580015Z }
+2026-03-10T08:47:40.341228399Z [2026-03-10T08:47:40.341Z] [32minfo[39m: POST /api/api/auth/login {
+2026-03-10T08:47:40.341259178Z   "service": "auth-service"
+2026-03-10T08:47:40.341263149Z }
+2026-03-10T08:58:52.251796121Z [2026-03-10T08:58:52.251Z] [32minfo[39m: GET /health {
+2026-03-10T08:58:52.251836128Z   "service": "auth-service"
+2026-03-10T08:58:52.251840624Z }
+2026-03-10T08:58:52.664403508Z [2026-03-10T08:58:52.664Z] [32minfo[39m: POST /api/auth/login {
+2026-03-10T08:58:52.664438529Z   "service": "auth-service"
+2026-03-10T08:58:52.664461684Z }
+2026-03-10T08:58:52.709140159Z [2026-03-10T08:58:52.709Z] [32minfo[39m: User logged in: admin (admin) {
+2026-03-10T08:58:52.709159277Z   "service": "auth-service"
+2026-03-10T08:58:52.709161128Z }
+2026-03-10T08:58:53.098175899Z [2026-03-10T08:58:53.098Z] [32minfo[39m: POST /api/api/auth/login {
+2026-03-10T08:58:53.098193577Z   "service": "auth-service"
+2026-03-10T08:58:53.098194861Z }
+2026-03-10T09:15:51.144578331Z [2026-03-10T09:15:51.144Z] [32minfo[39m: POST /api/auth/login {
+2026-03-10T09:15:51.144602486Z   "service": "auth-service"
+2026-03-10T09:15:51.144604326Z }
+2026-03-10T09:15:51.191002173Z [2026-03-10T09:15:51.190Z] [32minfo[39m: User logged in: admin (admin) {
+2026-03-10T09:15:51.191036003Z   "service": "auth-service"
+2026-03-10T09:15:51.191039700Z }
+ECHO is off.
+  ========== LOG: accounting-service ==========
+2026-03-10T09:00:57.840968802Z 2026-03-10 09:00:57 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:00:57.841034197Z 2026-03-10 09:00:57 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:01:27.902541564Z 2026-03-10 09:01:27 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:01:27.902697829Z 2026-03-10 09:01:27 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:01:57.954865634Z 2026-03-10 09:01:57 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:01:57.954920944Z 2026-03-10 09:01:57 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:02:28.001197717Z 2026-03-10 09:02:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:02:28.001222042Z 2026-03-10 09:02:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:02:58.024395838Z 2026-03-10 09:02:58 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:02:58.024475760Z 2026-03-10 09:02:58 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:03:28.074526284Z 2026-03-10 09:03:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:03:28.074561879Z 2026-03-10 09:03:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:03:58.120339690Z 2026-03-10 09:03:58 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:03:58.120400339Z 2026-03-10 09:03:58 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:04:28.170737771Z 2026-03-10 09:04:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:04:28.170809658Z 2026-03-10 09:04:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:04:58.239237121Z 2026-03-10 09:04:58 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:04:58.239463216Z 2026-03-10 09:04:58 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:05:28.279276785Z 2026-03-10 09:05:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:05:28.279334918Z 2026-03-10 09:05:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:05:58.328780195Z 2026-03-10 09:05:58 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:05:58.329070731Z 2026-03-10 09:05:58 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:06:28.379260485Z 2026-03-10 09:06:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:06:28.379470424Z 2026-03-10 09:06:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:06:58.428837555Z 2026-03-10 09:06:58 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:06:58.428906843Z 2026-03-10 09:06:58 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:07:28.464223056Z 2026-03-10 09:07:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:07:28.464311550Z 2026-03-10 09:07:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:07:58.523488690Z 2026-03-10 09:07:58 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:07:58.523564988Z 2026-03-10 09:07:58 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:08:28.564512092Z 2026-03-10 09:08:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:08:28.564639417Z 2026-03-10 09:08:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:08:58.605520229Z 2026-03-10 09:08:58 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:08:58.605545140Z 2026-03-10 09:08:58 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:09:28.647164871Z 2026-03-10 09:09:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:09:28.647724550Z 2026-03-10 09:09:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:09:58.696827861Z 2026-03-10 09:09:58 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:09:58.696942444Z 2026-03-10 09:09:58 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:10:28.744826047Z 2026-03-10 09:10:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:10:28.745128061Z 2026-03-10 09:10:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:10:58.813572118Z 2026-03-10 09:10:58 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:10:58.813640661Z 2026-03-10 09:10:58 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:11:28.857303572Z 2026-03-10 09:11:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:11:28.857380380Z 2026-03-10 09:11:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:11:58.912614028Z 2026-03-10 09:11:58 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:11:58.912661645Z 2026-03-10 09:11:58 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:12:28.966528971Z 2026-03-10 09:12:28 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:12:28.966624499Z 2026-03-10 09:12:28 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:12:59.018794138Z 2026-03-10 09:12:59 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:12:59.018812990Z 2026-03-10 09:12:59 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:13:29.092621899Z 2026-03-10 09:13:29 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:13:29.092759942Z 2026-03-10 09:13:29 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:13:59.144023432Z 2026-03-10 09:13:59 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:13:59.144115015Z 2026-03-10 09:13:59 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:14:29.208610883Z 2026-03-10 09:14:29 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:14:29.208668275Z 2026-03-10 09:14:29 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:14:59.246606056Z 2026-03-10 09:14:59 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:14:59.246687179Z 2026-03-10 09:14:59 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:15:29.297086985Z 2026-03-10 09:15:29 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:15:29.297167466Z 2026-03-10 09:15:29 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:15:56.648555459Z 2026-03-10 09:15:56 [34mdebug[39m: [Server Incoming Request] Path: /api/api/credits/total-balance, Method: GET, Headers: {"host":"accounting-service:3001","accept":"*/*","accept-encoding":"gzip, deflate","connection":"keep-alive","user-agent":"python-httpx/0.25.2","authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWFlOTBjNTlkZTJkZGNlZjgwMDJiZGUiLCJ1c2VybmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInR5cGUiOiJhY2Nlc3MiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzMxMzQxNTEsImV4cCI6MTc3MzEzNTA1MX0.FRCzqkWYU54-tkMR7wjFh4Wmm6YcG9IrrTnMws-S2nA"}
+2026-03-10T09:15:56.648574820Z 2026-03-10 09:15:56 [34mdebug[39m: [Server Request Body Parsed] Path: /api/api/credits/total-balance, Method: GET, Body: {}
+2026-03-10T09:15:58.448319852Z 2026-03-10 09:15:58 [34mdebug[39m: [Server Incoming Request] Path: /api/api/credits/total-balance, Method: GET, Headers: {"host":"accounting-service:3001","accept":"*/*","accept-encoding":"gzip, deflate","connection":"keep-alive","user-agent":"python-httpx/0.25.2","authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWFlOTBjNTlkZTJkZGNlZjgwMDJiZGUiLCJ1c2VybmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInR5cGUiOiJhY2Nlc3MiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzMxMzQxNTEsImV4cCI6MTc3MzEzNTA1MX0.FRCzqkWYU54-tkMR7wjFh4Wmm6YcG9IrrTnMws-S2nA"}
+2026-03-10T09:15:58.448356156Z 2026-03-10 09:15:58 [34mdebug[39m: [Server Request Body Parsed] Path: /api/api/credits/total-balance, Method: GET, Body: {}
+2026-03-10T09:15:59.336239445Z 2026-03-10 09:15:59 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:15:59.336330215Z 2026-03-10 09:15:59 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:16:01.897047142Z 2026-03-10 09:16:01 [34mdebug[39m: [Server Incoming Request] Path: /api/api/credits/total-balance, Method: GET, Headers: {"host":"accounting-service:3001","accept":"*/*","accept-encoding":"gzip, deflate","connection":"keep-alive","user-agent":"python-httpx/0.25.2","authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWFlOTBjNTlkZTJkZGNlZjgwMDJiZGUiLCJ1c2VybmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInR5cGUiOiJhY2Nlc3MiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzMxMzQxNTEsImV4cCI6MTc3MzEzNTA1MX0.FRCzqkWYU54-tkMR7wjFh4Wmm6YcG9IrrTnMws-S2nA"}
+2026-03-10T09:16:01.898347769Z 2026-03-10 09:16:01 [34mdebug[39m: [Server Request Body Parsed] Path: /api/api/credits/total-balance, Method: GET, Body: {}
+2026-03-10T09:16:04.180002744Z 2026-03-10 09:16:04 [34mdebug[39m: [Server Incoming Request] Path: /api/api/credits/total-balance, Method: GET, Headers: {"host":"accounting-service:3001","accept":"*/*","accept-encoding":"gzip, deflate","connection":"keep-alive","user-agent":"python-httpx/0.25.2","authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWFlOTBjNTlkZTJkZGNlZjgwMDJiZGUiLCJ1c2VybmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInR5cGUiOiJhY2Nlc3MiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzMxMzQxNTEsImV4cCI6MTc3MzEzNTA1MX0.FRCzqkWYU54-tkMR7wjFh4Wmm6YcG9IrrTnMws-S2nA"}
+2026-03-10T09:16:04.180035608Z 2026-03-10 09:16:04 [34mdebug[39m: [Server Request Body Parsed] Path: /api/api/credits/total-balance, Method: GET, Body: {}
+2026-03-10T09:16:29.380237794Z 2026-03-10 09:16:29 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:16:29.380329755Z 2026-03-10 09:16:29 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:16:59.438947843Z 2026-03-10 09:16:59 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:16:59.439200887Z 2026-03-10 09:16:59 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:17:29.490689041Z 2026-03-10 09:17:29 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:17:29.490718541Z 2026-03-10 09:17:29 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:17:59.530038967Z 2026-03-10 09:17:59 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:17:59.530074907Z 2026-03-10 09:17:59 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:18:29.596798818Z 2026-03-10 09:18:29 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:18:29.596835324Z 2026-03-10 09:18:29 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:18:59.661324189Z 2026-03-10 09:18:59 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:18:59.661360814Z 2026-03-10 09:18:59 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:19:29.718565229Z 2026-03-10 09:19:29 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:19:29.718601618Z 2026-03-10 09:19:29 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:19:59.757097604Z 2026-03-10 09:19:59 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:19:59.757145178Z 2026-03-10 09:19:59 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:20:29.801312172Z 2026-03-10 09:20:29 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:20:29.801364590Z 2026-03-10 09:20:29 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:20:59.851582459Z 2026-03-10 09:20:59 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:20:59.851647255Z 2026-03-10 09:20:59 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:21:29.902932575Z 2026-03-10 09:21:29 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:21:29.902973077Z 2026-03-10 09:21:29 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:21:59.953984979Z 2026-03-10 09:21:59 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:21:59.954149595Z 2026-03-10 09:21:59 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:22:29.995357433Z 2026-03-10 09:22:29 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:22:29.995395530Z 2026-03-10 09:22:29 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+2026-03-10T09:22:57.569214858Z 2026-03-10 09:22:57 [34mdebug[39m: [Server Incoming Request] Path: /api/api/credits/total-balance, Method: GET, Headers: {"host":"accounting-service:3001","accept":"*/*","accept-encoding":"gzip, deflate","connection":"keep-alive","user-agent":"python-httpx/0.25.2","authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWFlOTBjNTlkZTJkZGNlZjgwMDJiZGUiLCJ1c2VybmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInR5cGUiOiJhY2Nlc3MiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzMxMzQxNTEsImV4cCI6MTc3MzEzNTA1MX0.FRCzqkWYU54-tkMR7wjFh4Wmm6YcG9IrrTnMws-S2nA"}
+2026-03-10T09:22:57.569247734Z 2026-03-10 09:22:57 [34mdebug[39m: [Server Request Body Parsed] Path: /api/api/credits/total-balance, Method: GET, Body: {}
+2026-03-10T09:23:00.026110929Z 2026-03-10 09:23:00 [34mdebug[39m: [Server Incoming Request] Path: /health, Method: GET, Headers: {"host":"localhost:3001","user-agent":"Wget","accept":"*/*","connection":"close"}
+2026-03-10T09:23:00.026168143Z 2026-03-10 09:23:00 [34mdebug[39m: [Server Request Body Parsed] Path: /health, Method: GET, Body: {}
+ECHO is off.
+  ========== LOG: flowise ==========
+2026-03-09T07:46:13.807418708Z 2026-03-09 07:46:13 [INFO]: Starting Flowise...
+2026-03-09T07:46:14.020078558Z info: extension "uuid-ossp" already exists, skipping
+2026-03-09T07:46:14.020377672Z 2026-03-09 07:46:14 [INFO]: 📦 [server]: Data Source initialized successfully
+2026-03-09T07:46:14.209138982Z 2026-03-09 07:46:14 [INFO]: 🔄 [server]: Database migrations completed successfully
+2026-03-09T07:46:14.209692633Z 2026-03-09 07:46:14 [INFO]: 🔐 [server]: Identity Manager initialized successfully
+2026-03-09T07:46:15.449605777Z 2026-03-09 07:46:15 [INFO]: 🔧 [server]: Nodes pool initialized successfully
+2026-03-09T07:46:15.449803920Z 2026-03-09 07:46:15 [INFO]: ⏹️ [server]: Abort controllers pool initialized successfully
+2026-03-09T07:46:15.453493143Z 2026-03-09 07:46:15 [INFO]: 🔑 [server]: Encryption key initialized successfully
+2026-03-09T07:46:15.491473513Z 2026-03-09 07:46:15 [INFO]: 🚦 [server]: Rate limiters initialized successfully
+2026-03-09T07:46:15.491786007Z 2026-03-09 07:46:15 [INFO]: 💾 [server]: Cache pool initialized successfully
+2026-03-09T07:46:15.492393439Z 2026-03-09 07:46:15 [INFO]: 📊 [server]: Usage cache manager initialized successfully
+2026-03-09T07:46:15.492406588Z 2026-03-09 07:46:15 [INFO]: 📈 [server]: Telemetry initialized successfully
+2026-03-09T07:46:15.492492005Z 2026-03-09 07:46:15 [INFO]: 🌊 [server]: SSE Streamer initialized successfully
+2026-03-09T07:46:15.492614637Z 2026-03-09 07:46:15 [INFO]: 🎉 [server]: All initialization steps completed successfully!
+2026-03-09T07:46:15.496272525Z 2026-03-09 07:46:15 [INFO]: ⚡️ [server]: Flowise Server is listening at :3002
+2026-03-09T08:31:21.342517283Z 2026-03-09 08:31:21 [INFO]: ⬆️ POST /api/v1/auth/resolve
+2026-03-09T08:33:06.089144579Z 2026-03-09 08:33:06 [INFO]: ⬆️ POST /api/v1/account/register
+2026-03-09T08:33:07.497013913Z 2026-03-09 08:33:07 [INFO]: ⬆️ POST /api/v1/auth/login
+2026-03-09T08:33:32.477899048Z 2026-03-09 08:33:32 [INFO]: ⬆️ POST /api/v1/apikey
+2026-03-10T09:15:28.502418941Z 2026-03-10 09:15:28 [INFO]: ⬆️ POST /api/v1/auth/resolve
+ECHO is off.
+  ========== LOG: flowise-proxy ==========
+2026-03-10T09:16:01.331683879Z 2026-03-10 09:16:01,331 - flowise_proxy - ERROR - ❌ Local user not found for JWT: {'sub': '69ae90c59de2ddcef8002bde', 'username': 'admin', 'email': 'admin@example.com', 'type': 'access', 'role': 'admin', 'iat': 1773134151, 'exp': 1773135051, 'user_id': '69ae90c59de2ddcef8002bde', 'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWFlOTBjNTlkZTJkZGNlZjgwMDJiZGUiLCJ1c2VybmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInR5cGUiOiJhY2Nlc3MiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzMxMzQxNTEsImV4cCI6MTc3MzEzNTA1MX0.FRCzqkWYU54-tkMR7wjFh4Wmm6YcG9IrrTnMws-S2nA'}
+2026-03-10T09:16:01.331802295Z INFO:     172.19.0.1:37986 - "GET /api/v1/chatflows/my-chatflows HTTP/1.1" 200 OK
+2026-03-10T09:16:01.900244226Z INFO:httpx:HTTP Request: GET http://accounting-service:3001/api/api/credits/total-balance "HTTP/1.1 404 Not Found"
+2026-03-10T09:16:01.900627841Z Accounting service error (check_user_credits for 69ae90c59de2ddcef8002bde): 404 - <!DOCTYPE html>
+2026-03-10T09:16:01.900636516Z <html lang="en">
+2026-03-10T09:16:01.900638903Z <head>
+2026-03-10T09:16:01.900640606Z <meta charset="utf-8">
+2026-03-10T09:16:01.900642165Z <title>Error</title>
+2026-03-10T09:16:01.900643657Z </head>
+2026-03-10T09:16:01.900644936Z <body>
+2026-03-10T09:16:01.900646251Z <pre>Cannot GET /api/api/credits/total-balance</pre>
+2026-03-10T09:16:01.900647991Z </body>
+2026-03-10T09:16:01.900649425Z </html>
+2026-03-10T09:16:01.900650743Z 
+2026-03-10T09:16:01.900652287Z INFO:     172.19.0.1:37986 - "GET /api/v1/chat/credits HTTP/1.1" 404 Not Found
+2026-03-10T09:16:02.508336360Z INFO:     172.19.0.1:37990 - "GET /api/v1/chat/sessions HTTP/1.1" 200 OK
+2026-03-10T09:16:02.508539983Z 2026-03-10 09:16:02,508 - flowise_proxy - ERROR - ❌ Local user not found for JWT: {'sub': '69ae90c59de2ddcef8002bde', 'username': 'admin', 'email': 'admin@example.com', 'type': 'access', 'role': 'admin', 'iat': 1773134151, 'exp': 1773135051, 'user_id': '69ae90c59de2ddcef8002bde', 'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWFlOTBjNTlkZTJkZGNlZjgwMDJiZGUiLCJ1c2VybmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInR5cGUiOiJhY2Nlc3MiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzMxMzQxNTEsImV4cCI6MTc3MzEzNTA1MX0.FRCzqkWYU54-tkMR7wjFh4Wmm6YcG9IrrTnMws-S2nA'}
+2026-03-10T09:16:02.508548104Z INFO:     172.19.0.1:37986 - "GET /api/v1/chatflows/my-chatflows HTTP/1.1" 200 OK
+2026-03-10T09:16:02.508555957Z ERROR:flowise_proxy:❌ Local user not found for JWT: {'sub': '69ae90c59de2ddcef8002bde', 'username': 'admin', 'email': 'admin@example.com', 'type': 'access', 'role': 'admin', 'iat': 1773134151, 'exp': 1773135051, 'user_id': '69ae90c59de2ddcef8002bde', 'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWFlOTBjNTlkZTJkZGNlZjgwMDJiZGUiLCJ1c2VybmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInR5cGUiOiJhY2Nlc3MiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzMxMzQxNTEsImV4cCI6MTc3MzEzNTA1MX0.FRCzqkWYU54-tkMR7wjFh4Wmm6YcG9IrrTnMws-S2nA'}
+2026-03-10T09:16:04.180786842Z INFO:httpx:HTTP Request: GET http://accounting-service:3001/api/api/credits/total-balance "HTTP/1.1 404 Not Found"
+2026-03-10T09:16:04.181295798Z Accounting service error (check_user_credits for 69ae90c59de2ddcef8002bde): 404 - <!DOCTYPE html>
+2026-03-10T09:16:04.181300512Z <html lang="en">
+2026-03-10T09:16:04.181301642Z <head>
+2026-03-10T09:16:04.181302400Z <meta charset="utf-8">
+2026-03-10T09:16:04.181303154Z <title>Error</title>
+2026-03-10T09:16:04.181303920Z </head>
+2026-03-10T09:16:04.181304706Z <body>
+2026-03-10T09:16:04.181305335Z <pre>Cannot GET /api/api/credits/total-balance</pre>
+2026-03-10T09:16:04.181306084Z </body>
+2026-03-10T09:16:04.181306632Z </html>
+2026-03-10T09:16:04.181307185Z 
+2026-03-10T09:16:04.181307887Z INFO:     172.19.0.1:37986 - "GET /api/v1/chat/credits HTTP/1.1" 404 Not Found
+2026-03-10T09:16:11.419381086Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:16:11.421518157Z =ok=
+2026-03-10T09:16:11.421530039Z INFO:     127.0.0.1:36282 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:16:41.465748768Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:16:41.467762947Z =ok=
+2026-03-10T09:16:41.467780094Z INFO:     127.0.0.1:45760 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:17:11.513510908Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:17:11.515370150Z =ok=
+2026-03-10T09:17:11.515378252Z INFO:     127.0.0.1:58778 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:17:41.565610076Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:17:41.567682763Z =ok=
+2026-03-10T09:17:41.567704089Z INFO:     127.0.0.1:39952 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:18:06.923399019Z 2026-03-10 09:18:06,923 - flowise_proxy - INFO - Starting scheduled chatflow sync
+2026-03-10T09:18:06.923406271Z INFO:flowise_proxy:Starting scheduled chatflow sync
+2026-03-10T09:18:07.010834444Z INFO:httpx:HTTP Request: GET http://flowise:3002/api/v1/chatflows "HTTP/1.1 200 OK"
+2026-03-10T09:18:07.012587522Z 2026-03-10 09:18:07,012 - flowise_proxy - INFO - Scheduled chatflow sync completed: 0 added, 0 updated, 0 deleted.
+2026-03-10T09:18:07.012591762Z INFO:flowise_proxy:Scheduled chatflow sync completed: 0 added, 0 updated, 0 deleted.
+2026-03-10T09:18:11.613959165Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:18:11.615933686Z =ok=
+2026-03-10T09:18:11.615949684Z INFO:     127.0.0.1:35180 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:18:41.680008912Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:18:41.682246338Z =ok=
+2026-03-10T09:18:41.682259160Z INFO:     127.0.0.1:37640 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:19:11.753976473Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:19:11.755437604Z =ok=
+2026-03-10T09:19:11.755445479Z INFO:     127.0.0.1:54400 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:19:41.813434224Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:19:41.815487565Z =ok=
+2026-03-10T09:19:41.815501212Z INFO:     127.0.0.1:36872 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:20:11.886281218Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:20:11.888152046Z =ok=
+2026-03-10T09:20:11.888164079Z INFO:     127.0.0.1:35532 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:20:41.946777002Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:20:41.948642448Z =ok=
+2026-03-10T09:20:41.948653549Z INFO:     127.0.0.1:57482 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:21:07.015187031Z 2026-03-10 09:21:07,014 - flowise_proxy - INFO - Starting scheduled chatflow sync
+2026-03-10T09:21:07.015193199Z INFO:flowise_proxy:Starting scheduled chatflow sync
+2026-03-10T09:21:07.092219505Z INFO:httpx:HTTP Request: GET http://flowise:3002/api/v1/chatflows "HTTP/1.1 200 OK"
+2026-03-10T09:21:07.093483863Z 2026-03-10 09:21:07,093 - flowise_proxy - INFO - Scheduled chatflow sync completed: 0 added, 0 updated, 0 deleted.
+2026-03-10T09:21:07.093502155Z INFO:flowise_proxy:Scheduled chatflow sync completed: 0 added, 0 updated, 0 deleted.
+2026-03-10T09:21:12.003947736Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:21:12.005627704Z =ok=
+2026-03-10T09:21:12.005641168Z INFO:     127.0.0.1:50658 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:21:42.052847446Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:21:42.054968267Z =ok=
+2026-03-10T09:21:42.054977737Z INFO:     127.0.0.1:42862 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:22:12.121540008Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:22:12.123477543Z =ok=
+2026-03-10T09:22:12.123543393Z INFO:     127.0.0.1:36730 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:22:42.182998471Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:22:42.184797538Z =ok=
+2026-03-10T09:22:42.184810089Z INFO:     127.0.0.1:46792 - "GET /health HTTP/1.1" 200 OK
+2026-03-10T09:22:57.569856199Z INFO:httpx:HTTP Request: GET http://accounting-service:3001/api/api/credits/total-balance "HTTP/1.1 404 Not Found"
+2026-03-10T09:22:57.570317822Z Accounting service error (check_user_credits for 69ae90c59de2ddcef8002bde): 404 - <!DOCTYPE html>
+2026-03-10T09:22:57.570324755Z <html lang="en">
+2026-03-10T09:22:57.570326354Z <head>
+2026-03-10T09:22:57.570335725Z <meta charset="utf-8">
+2026-03-10T09:22:57.570336578Z <title>Error</title>
+2026-03-10T09:22:57.570337414Z </head>
+2026-03-10T09:22:57.570337957Z <body>
+2026-03-10T09:22:57.570338653Z <pre>Cannot GET /api/api/credits/total-balance</pre>
+2026-03-10T09:22:57.570339365Z </body>
+2026-03-10T09:22:57.570339935Z </html>
+2026-03-10T09:22:57.570340498Z 
+2026-03-10T09:22:57.570341171Z INFO:     172.19.0.1:59100 - "GET /api/v1/chat/credits HTTP/1.1" 404 Not Found
+2026-03-10T09:23:12.251545626Z INFO:app.main:Health check /health called (PID: 1)
+2026-03-10T09:23:12.257352938Z =ok=
+2026-03-10T09:23:12.257370628Z INFO:     127.0.0.1:53482 - "GET /health HTTP/1.1" 200 OK
+ECHO is off.
+  ========== LOG: bridge-ui ==========
+2026-03-10T08:36:19.908180885Z 172.23.0.1 - - [10/Mar/2026:08:36:19 +0000] "GET /assets/index-DQ3P1g1z.css HTTP/1.1" 200 909 "http://localhost:3082/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0" "-"
+2026-03-10T08:36:20.060961844Z 172.23.0.1 - - [10/Mar/2026:08:36:20 +0000] "GET /b.svg HTTP/1.1" 200 2582 "http://localhost:3082/chat" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0" "-"
+2026-03-10T08:36:20.078114627Z 172.23.0.1 - - [10/Mar/2026:08:36:20 +0000] "GET /assets/aidcec-DAn-y4Hm.png HTTP/1.1" 200 20631 "http://localhost:3082/login" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0" "-"
+2026-03-10T08:36:40.087013159Z 127.0.0.1 - - [10/Mar/2026:08:36:40 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:37:10.130893873Z 127.0.0.1 - - [10/Mar/2026:08:37:10 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:37:40.174976205Z 127.0.0.1 - - [10/Mar/2026:08:37:40 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:38:10.212532156Z 127.0.0.1 - - [10/Mar/2026:08:38:10 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:38:40.273271230Z 127.0.0.1 - - [10/Mar/2026:08:38:40 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:39:10.329088476Z 127.0.0.1 - - [10/Mar/2026:08:39:10 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:39:40.377462028Z 127.0.0.1 - - [10/Mar/2026:08:39:40 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:40:10.434506712Z 127.0.0.1 - - [10/Mar/2026:08:40:10 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:40:40.501555621Z 127.0.0.1 - - [10/Mar/2026:08:40:40 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:41:10.571430268Z 127.0.0.1 - - [10/Mar/2026:08:41:10 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:41:40.608117208Z 127.0.0.1 - - [10/Mar/2026:08:41:40 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:42:10.657717846Z 127.0.0.1 - - [10/Mar/2026:08:42:10 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:42:40.705215611Z 127.0.0.1 - - [10/Mar/2026:08:42:40 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:43:10.742121967Z 127.0.0.1 - - [10/Mar/2026:08:43:10 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:43:40.790490886Z 127.0.0.1 - - [10/Mar/2026:08:43:40 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:44:10.847476586Z 127.0.0.1 - - [10/Mar/2026:08:44:10 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:44:40.902771307Z 127.0.0.1 - - [10/Mar/2026:08:44:40 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:45:10.954115820Z 127.0.0.1 - - [10/Mar/2026:08:45:10 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:45:40.999932028Z 127.0.0.1 - - [10/Mar/2026:08:45:40 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:46:11.062865892Z 127.0.0.1 - - [10/Mar/2026:08:46:11 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:46:41.110858008Z 127.0.0.1 - - [10/Mar/2026:08:46:41 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:47:11.154763310Z 127.0.0.1 - - [10/Mar/2026:08:47:11 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:47:39.634953266Z 172.23.0.1 - - [10/Mar/2026:08:47:39 +0000] "GET / HTTP/1.1" 200 720 "-" "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.7705" "-"
+2026-03-10T08:47:41.204471615Z 127.0.0.1 - - [10/Mar/2026:08:47:41 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:48:11.257777254Z 127.0.0.1 - - [10/Mar/2026:08:48:11 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:48:41.309292036Z 127.0.0.1 - - [10/Mar/2026:08:48:41 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:49:11.347094040Z 127.0.0.1 - - [10/Mar/2026:08:49:11 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:49:41.393662423Z 127.0.0.1 - - [10/Mar/2026:08:49:41 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:50:11.434235818Z 127.0.0.1 - - [10/Mar/2026:08:50:11 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:50:41.469743499Z 127.0.0.1 - - [10/Mar/2026:08:50:41 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:51:11.528118904Z 127.0.0.1 - - [10/Mar/2026:08:51:11 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:51:41.585770217Z 127.0.0.1 - - [10/Mar/2026:08:51:41 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:52:11.643616732Z 127.0.0.1 - - [10/Mar/2026:08:52:11 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:52:41.686264534Z 127.0.0.1 - - [10/Mar/2026:08:52:41 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:53:11.723662406Z 127.0.0.1 - - [10/Mar/2026:08:53:11 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:53:41.777919599Z 127.0.0.1 - - [10/Mar/2026:08:53:41 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:54:11.830605186Z 127.0.0.1 - - [10/Mar/2026:08:54:11 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:54:41.877227195Z 127.0.0.1 - - [10/Mar/2026:08:54:41 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:55:11.923338373Z 127.0.0.1 - - [10/Mar/2026:08:55:11 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:55:41.974522107Z 127.0.0.1 - - [10/Mar/2026:08:55:41 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:56:12.024370733Z 127.0.0.1 - - [10/Mar/2026:08:56:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:56:42.067148148Z 127.0.0.1 - - [10/Mar/2026:08:56:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:57:12.109173144Z 127.0.0.1 - - [10/Mar/2026:08:57:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:57:42.169179169Z 127.0.0.1 - - [10/Mar/2026:08:57:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:58:12.207250323Z 127.0.0.1 - - [10/Mar/2026:08:58:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:58:42.253266637Z 127.0.0.1 - - [10/Mar/2026:08:58:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:58:52.336983340Z 172.23.0.1 - - [10/Mar/2026:08:58:52 +0000] "GET / HTTP/1.1" 200 720 "-" "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.7705" "-"
+2026-03-10T08:59:12.302050274Z 127.0.0.1 - - [10/Mar/2026:08:59:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T08:59:42.350314709Z 127.0.0.1 - - [10/Mar/2026:08:59:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:00:12.403680808Z 127.0.0.1 - - [10/Mar/2026:09:00:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:00:42.476044342Z 127.0.0.1 - - [10/Mar/2026:09:00:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:01:12.520416596Z 127.0.0.1 - - [10/Mar/2026:09:01:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:01:42.555788513Z 127.0.0.1 - - [10/Mar/2026:09:01:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:02:12.592866129Z 127.0.0.1 - - [10/Mar/2026:09:02:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:02:42.637443384Z 127.0.0.1 - - [10/Mar/2026:09:02:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:03:12.670675254Z 127.0.0.1 - - [10/Mar/2026:09:03:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:03:42.723872486Z 127.0.0.1 - - [10/Mar/2026:09:03:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:04:12.780943980Z 127.0.0.1 - - [10/Mar/2026:09:04:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:04:42.831172413Z 127.0.0.1 - - [10/Mar/2026:09:04:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:05:12.854048590Z 127.0.0.1 - - [10/Mar/2026:09:05:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:05:42.912744000Z 127.0.0.1 - - [10/Mar/2026:09:05:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:06:12.964954541Z 127.0.0.1 - - [10/Mar/2026:09:06:12 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:06:43.007044093Z 127.0.0.1 - - [10/Mar/2026:09:06:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:07:13.067395499Z 127.0.0.1 - - [10/Mar/2026:09:07:13 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:07:43.121235590Z 127.0.0.1 - - [10/Mar/2026:09:07:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:08:13.163099415Z 127.0.0.1 - - [10/Mar/2026:09:08:13 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:08:43.204955579Z 127.0.0.1 - - [10/Mar/2026:09:08:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:09:13.249554148Z 127.0.0.1 - - [10/Mar/2026:09:09:13 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:09:43.303735775Z 127.0.0.1 - - [10/Mar/2026:09:09:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:10:13.361382281Z 127.0.0.1 - - [10/Mar/2026:09:10:13 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:10:43.403053206Z 127.0.0.1 - - [10/Mar/2026:09:10:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:11:13.464090412Z 127.0.0.1 - - [10/Mar/2026:09:11:13 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:11:43.526164682Z 127.0.0.1 - - [10/Mar/2026:09:11:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:12:13.567659452Z 127.0.0.1 - - [10/Mar/2026:09:12:13 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:12:43.616850410Z 127.0.0.1 - - [10/Mar/2026:09:12:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:13:13.661304301Z 127.0.0.1 - - [10/Mar/2026:09:13:13 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:13:43.700471487Z 127.0.0.1 - - [10/Mar/2026:09:13:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:14:13.751482260Z 127.0.0.1 - - [10/Mar/2026:09:14:13 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:14:43.793969960Z 127.0.0.1 - - [10/Mar/2026:09:14:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:15:13.852036586Z 127.0.0.1 - - [10/Mar/2026:09:15:13 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:15:43.898803181Z 127.0.0.1 - - [10/Mar/2026:09:15:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:16:13.952254185Z 127.0.0.1 - - [10/Mar/2026:09:16:13 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:16:43.993579981Z 127.0.0.1 - - [10/Mar/2026:09:16:43 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:17:14.037964218Z 127.0.0.1 - - [10/Mar/2026:09:17:14 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:17:44.096374908Z 127.0.0.1 - - [10/Mar/2026:09:17:44 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:18:14.147348466Z 127.0.0.1 - - [10/Mar/2026:09:18:14 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:18:44.190974031Z 127.0.0.1 - - [10/Mar/2026:09:18:44 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:19:14.241335020Z 127.0.0.1 - - [10/Mar/2026:09:19:14 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:19:44.281116669Z 127.0.0.1 - - [10/Mar/2026:09:19:44 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:20:14.328876207Z 127.0.0.1 - - [10/Mar/2026:09:20:14 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:20:44.374756101Z 127.0.0.1 - - [10/Mar/2026:09:20:44 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:21:14.424207541Z 127.0.0.1 - - [10/Mar/2026:09:21:14 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:21:44.486439659Z 127.0.0.1 - - [10/Mar/2026:09:21:44 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:22:14.508562176Z 127.0.0.1 - - [10/Mar/2026:09:22:14 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:22:44.564678818Z 127.0.0.1 - - [10/Mar/2026:09:22:44 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+2026-03-10T09:22:57.444979446Z 172.23.0.1 - - [10/Mar/2026:09:22:57 +0000] "GET /dashboard HTTP/1.1" 200 720 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0" "-"
+2026-03-10T09:23:14.610598296Z 127.0.0.1 - - [10/Mar/2026:09:23:14 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Wget/1.25.0" "-"
+
+==================================================================
+  5. HTTP HEALTH CHECKS
+==================================================================
+  [OK  ] Auth Service (http://localhost:3000/health) -> HTTP 200
+  [OK  ] Accounting Service (http://localhost:3001/health) -> HTTP 200
+  [FAIL] Flowise (http://localhost:3002/api/v1/health) -> The remote server returned an error: (401) Unauthorized.
+  [OK  ] Flowise Proxy (http://localhost:8000/health) -> HTTP 200
+  [OK  ] Bridge UI (http://localhost:3082) -> HTTP 200
+
+==================================================================
+  6. ADMIN LOGIN TEST - Auth Service (port 3000)
+==================================================================
+  Endpoint : POST http://localhost:3000/api/auth/login
+  Username : admin
+  Password : admin@admin
+ECHO is off.
+  [OK  ] Login SUCCESS  accessToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ...
+
+==================================================================
+  7. PROXY AUTHENTICATE TEST - Flowise Proxy (port 8000)
+==================================================================
+  Endpoint : POST http://localhost:8000/api/v1/chat/authenticate
+  Username : admin
+  Password : admin@admin
+ECHO is off.
+  [OK  ] Proxy auth SUCCESS  access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ...
+  [WARN] Could not fetch credits: The remote server returned an error: (404) Not Found.
+
+==================================================================
+  8. MONGODB: ADMIN USER DOCUMENT
+==================================================================
+  Container: mongodb-auth  DB: auth_db
+ECHO is off.
