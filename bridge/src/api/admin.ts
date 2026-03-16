@@ -9,7 +9,7 @@
  */
 
 import apiClient from './client';
-import type { BulkAssignmentResult } from '../types/admin';
+import type { BulkAssignmentResult, AdminUser, CreditAllocation, AllocateCreditsPayload, SetCreditsPayload, RemoveCreditsPayload, AdjustCreditsPayload, SystemStats, CreateUserPayload, BatchCreateUsersPayload } from '../types/admin';
 import type { Chatflow, ChatflowStats, ChatflowUser} from '../types/chatflow';
 
 /**
@@ -114,5 +114,88 @@ export const syncUserByEmail = async (email: string): Promise<{ message: string;
   const response = await apiClient.post('/api/v1/admin/users/sync-by-email', {
     email
   });
+  return response.data;
+};
+
+// =============================================================================
+// User Management
+// =============================================================================
+
+export const listUsers = async (): Promise<AdminUser[]> => {
+  const response = await apiClient.get('/api/v1/admin/users');
+  // auth-service returns { users: [...] } or an array directly
+  return Array.isArray(response.data) ? response.data : (response.data.users ?? []);
+};
+
+export const createUser = async (payload: CreateUserPayload): Promise<{ message: string; user: AdminUser }> => {
+  const response = await apiClient.post('/api/v1/admin/users', payload);
+  return response.data;
+};
+
+export const createUsersBatch = async (payload: BatchCreateUsersPayload): Promise<{ message: string; results: any[] }> => {
+  const response = await apiClient.post('/api/v1/admin/users/batch', payload);
+  return response.data;
+};
+
+export const verifyUser = async (userId: string): Promise<{ message: string }> => {
+  const response = await apiClient.post(`/api/v1/admin/users/${userId}/verify`);
+  return response.data;
+};
+
+export const deleteUser = async (userId: string): Promise<{ message: string }> => {
+  const response = await apiClient.delete(`/api/v1/admin/users/${userId}`);
+  return response.data;
+};
+
+export const updateUserRole = async (userId: string, role: string): Promise<{ message: string }> => {
+  const response = await apiClient.put(`/api/v1/admin/users/${userId}/role`, { role });
+  return response.data;
+};
+
+// =============================================================================
+// Credit Management
+// =============================================================================
+
+export const listAllCredits = async (): Promise<CreditAllocation[]> => {
+  const response = await apiClient.get('/api/v1/admin/credits');
+  return Array.isArray(response.data) ? response.data : (response.data.allocations ?? []);
+};
+
+export const getUserCreditBalance = async (userId: string): Promise<CreditAllocation> => {
+  const response = await apiClient.get(`/api/v1/admin/credits/balance/${userId}`);
+  return response.data;
+};
+
+export const allocateCredits = async (payload: AllocateCreditsPayload): Promise<{ message: string }> => {
+  const response = await apiClient.post('/api/v1/admin/credits/allocate', payload);
+  return response.data;
+};
+
+export const setCredits = async (payload: SetCreditsPayload): Promise<{ message: string }> => {
+  const response = await apiClient.post('/api/v1/admin/credits/set', payload);
+  return response.data;
+};
+
+export const removeCredits = async (payload: RemoveCreditsPayload): Promise<{ message: string }> => {
+  const response = await apiClient.delete('/api/v1/admin/credits/remove', { data: payload });
+  return response.data;
+};
+
+export const adjustCredits = async (payload: AdjustCreditsPayload): Promise<{ message: string }> => {
+  const response = await apiClient.put('/api/v1/admin/credits/adjust', payload);
+  return response.data;
+};
+
+// =============================================================================
+// Usage / Token Stats
+// =============================================================================
+
+export const getSystemStats = async (): Promise<SystemStats> => {
+  const response = await apiClient.get('/api/v1/admin/usage/system-stats');
+  return response.data;
+};
+
+export const getUserUsageStats = async (userId: string): Promise<any> => {
+  const response = await apiClient.get(`/api/v1/admin/usage/stats/${userId}`);
   return response.data;
 };

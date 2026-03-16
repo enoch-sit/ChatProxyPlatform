@@ -2,12 +2,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Box, Button, Typography, Sheet, Table, Modal, ModalDialog,
-  ModalClose, Input, Textarea, CircularProgress, Alert, Chip
+  ModalClose, Input, Textarea, CircularProgress, Alert, Chip,
+  Tabs, TabList, Tab, TabPanel,
 } from '@mui/joy';
 import { useAdminStore } from '../store/adminStore';
 import type { Chatflow } from '../types/chatflow';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '../hooks/usePermissions';
+import AdminUsersPanel from '../components/admin/AdminUsersPanel';
+import AdminCreditsPanel from '../components/admin/AdminCreditsPanel';
+import AdminUsagePanel from '../components/admin/AdminUsagePanel';
 
 const AdminPage: React.FC = () => {
   const { t } = useTranslation();
@@ -41,6 +45,7 @@ const AdminPage: React.FC = () => {
 
   // Local UI state
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('chatflows');
   const [showUserModal, setShowUserModal] = useState(false);
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
   const [userEmail, setUserEmail] = useState('');
@@ -200,17 +205,12 @@ const AdminPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography level="h2">{t('admin.pageTitle')}</Typography>
-        {canSyncChatflows && (
-          <Button onClick={handleSync} disabled={isLoading}>
-            {isLoading ? t('admin.syncing') : t('admin.syncChatflows')}
-          </Button>
-        )}
       </Box>
 
       {/* Error Alert */}
       {error && (
-        <Alert 
-          color="danger" 
+        <Alert
+          color="danger"
           sx={{ mb: 2 }}
           endDecorator={
             <Button size="sm" variant="plain" onClick={handleCloseError}>
@@ -221,11 +221,11 @@ const AdminPage: React.FC = () => {
           {error}
         </Alert>
       )}
-      
+
       {/* Success Alert */}
       {successMessage && (
-        <Alert 
-          color="success" 
+        <Alert
+          color="success"
           sx={{ mb: 2 }}
           endDecorator={
             <Button size="sm" variant="plain" onClick={handleCloseSuccess}>
@@ -237,95 +237,124 @@ const AdminPage: React.FC = () => {
         </Alert>
       )}
 
-      {canManageChatflows && (
-        <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', maxWidth: '100%' }}>
-          <Table aria-label="Chatflow management table" sx={{ minWidth: '800px' }}>
-            <thead>
-              <tr>
-                <th style={{ minWidth: '120px' }}>{t('admin.chatflowName')}</th>
-                <th style={{ minWidth: '280px' }}>{t('admin.chatflowId')}</th>
-                <th style={{ minWidth: '80px' }}>Status</th>
-                <th style={{ minWidth: '80px' }}>Deployed</th>
-                <th style={{ minWidth: '70px' }}>Public</th>
-                <th style={{ minWidth: '80px' }}>Type</th>
-                {canManageUsers && <th style={{ minWidth: '120px' }}>{t('admin.chatflowActions')}</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {chatflows.length === 0 ? (
-                <tr key="ChatflowInfo">
-                  <td 
-                    colSpan={canManageUsers ? 7 : 6} 
-                    style={{ textAlign: 'center', padding: '20px' }}
-                  >
-                    {isLoading ? 'Loading...' : 'No chatflows found'}
-                  </td>
-                </tr>
-              ) : (
-                chatflows.map((flow, idx) => (
-                  <tr key={`${flow.flowise_id}-${idx}`}>
-                    <td style={{ maxWidth: '150px' }}>
-                      <Typography 
-                        level="body-sm" 
-                        sx={{ 
-                          fontWeight: 'bold',
-                          wordBreak: 'break-word',
-                          whiteSpace: 'normal'
-                        }}
-                      >
-                        {flow.name}
-                      </Typography>
-                    </td>
-                    <td style={{ maxWidth: '300px' }}>
-                      <Typography 
-                        level="body-xs" 
-                        sx={{ 
-                          fontFamily: 'monospace', 
-                          fontSize: '11px',
-                          wordBreak: 'break-all',
-                          whiteSpace: 'normal',
-                          lineHeight: 1.2
-                        }}
-                      >
-                        {flow.flowise_id}
-                      </Typography>
-                    </td>
-                    <td>
-                      <Chip size="sm" color={flow.sync_status === 'active' ? 'success' : 'danger'}>
-                        {getStatusDisplay(flow.sync_status)}
-                      </Chip>
-                    </td>
-                    <td>
-                      <Chip size="sm" color={flow.deployed ? 'success' : 'neutral'}>
-                        {flow.deployed ? t('common.active') : t('common.inactive')}
-                      </Chip>
-                    </td>
-                    <td>
-                      <Chip size="sm" color={flow.is_public ? 'warning' : 'neutral'}>
-                        {flow.is_public ? 'Public' : 'Private'}
-                      </Chip>
-                    </td>
-                    <td>
-                      <Typography level="body-sm">
-                        {flow.type}
-                      </Typography>
-                    </td>
-                    {canManageUsers && (
-                      <td>
-                        <Button size="sm" onClick={() => handleManageUsers(flow)}>
-                          {t('admin.userManagement')}
-                        </Button>
-                      </td>
-                    )}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </Table>
-        </Sheet>
-      )}
+      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v as string)}>
+        <TabList sx={{ mb: 2 }}>
+          {canManageChatflows && <Tab value="chatflows">Chatflows</Tab>}
+          {canManageUsers && <Tab value="users">Users</Tab>}
+          {canManageUsers && <Tab value="credits">Credits</Tab>}
+          {canViewAnalytics && <Tab value="usage">Token Usage</Tab>}
+        </TabList>
 
-      {/* User Management Modal */}
+        {/* ---- Chatflows Tab (existing functionality) ---- */}
+        {canManageChatflows && (
+          <TabPanel value="chatflows" sx={{ p: 0 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+              {canSyncChatflows && (
+                <Button onClick={handleSync} disabled={isLoading}>
+                  {isLoading ? t('admin.syncing') : t('admin.syncChatflows')}
+                </Button>
+              )}
+            </Box>
+
+            <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', maxWidth: '100%' }}>
+              <Table aria-label="Chatflow management table" sx={{ minWidth: '800px' }}>
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: '120px' }}>{t('admin.chatflowName')}</th>
+                    <th style={{ minWidth: '280px' }}>{t('admin.chatflowId')}</th>
+                    <th style={{ minWidth: '80px' }}>Status</th>
+                    <th style={{ minWidth: '80px' }}>Deployed</th>
+                    <th style={{ minWidth: '70px' }}>Public</th>
+                    <th style={{ minWidth: '80px' }}>Type</th>
+                    {canManageUsers && <th style={{ minWidth: '120px' }}>{t('admin.chatflowActions')}</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {chatflows.length === 0 ? (
+                    <tr key="ChatflowInfo">
+                      <td colSpan={canManageUsers ? 7 : 6} style={{ textAlign: 'center', padding: '20px' }}>
+                        {isLoading ? 'Loading...' : 'No chatflows found'}
+                      </td>
+                    </tr>
+                  ) : (
+                    chatflows.map((flow, idx) => (
+                      <tr key={`${flow.flowise_id}-${idx}`}>
+                        <td style={{ maxWidth: '150px' }}>
+                          <Typography level="body-sm" sx={{ fontWeight: 'bold', wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                            {flow.name}
+                          </Typography>
+                        </td>
+                        <td style={{ maxWidth: '300px' }}>
+                          <Typography level="body-xs" sx={{ fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all', whiteSpace: 'normal', lineHeight: 1.2 }}>
+                            {flow.flowise_id}
+                          </Typography>
+                        </td>
+                        <td>
+                          <Chip size="sm" color={flow.sync_status === 'active' ? 'success' : 'danger'}>
+                            {getStatusDisplay(flow.sync_status)}
+                          </Chip>
+                        </td>
+                        <td>
+                          <Chip size="sm" color={flow.deployed ? 'success' : 'neutral'}>
+                            {flow.deployed ? t('common.active') : t('common.inactive')}
+                          </Chip>
+                        </td>
+                        <td>
+                          <Chip size="sm" color={flow.is_public ? 'warning' : 'neutral'}>
+                            {flow.is_public ? 'Public' : 'Private'}
+                          </Chip>
+                        </td>
+                        <td>
+                          <Typography level="body-sm">{flow.type}</Typography>
+                        </td>
+                        {canManageUsers && (
+                          <td>
+                            <Button size="sm" onClick={() => handleManageUsers(flow)}>
+                              {t('admin.userManagement')}
+                            </Button>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </Table>
+            </Sheet>
+
+            {canViewAnalytics && stats && (
+              <Box sx={{ mt: 3 }}>
+                <Typography level="h3" sx={{ mb: 2 }}>{t('admin.statsTitle')}</Typography>
+                <Sheet variant="outlined" sx={{ p: 2, borderRadius: 'sm' }}>
+                  <pre>{JSON.stringify(stats, null, 2)}</pre>
+                </Sheet>
+              </Box>
+            )}
+          </TabPanel>
+        )}
+
+        {/* ---- Users Tab ---- */}
+        {canManageUsers && (
+          <TabPanel value="users" sx={{ p: 0 }}>
+            <AdminUsersPanel />
+          </TabPanel>
+        )}
+
+        {/* ---- Credits Tab ---- */}
+        {canManageUsers && (
+          <TabPanel value="credits" sx={{ p: 0 }}>
+            <AdminCreditsPanel />
+          </TabPanel>
+        )}
+
+        {/* ---- Usage / Token Stats Tab ---- */}
+        {canViewAnalytics && (
+          <TabPanel value="usage" sx={{ p: 0 }}>
+            <AdminUsagePanel />
+          </TabPanel>
+        )}
+      </Tabs>
+
+      {/* Chatflow User Management Modal */}
       <Modal open={showUserModal} onClose={handleCloseUserModal}>
         <ModalDialog sx={{ minWidth: '400px' }}>
           <ModalClose />
@@ -345,10 +374,7 @@ const AdminPage: React.FC = () => {
               <Button onClick={handleAddUser} disabled={isLoading || !userEmail.trim()}>
                 {t('admin.assignButton')}
               </Button>
-              <Button
-                variant="outlined"
-                onClick={() => setShowBulkAssignModal(true)}
-              >
+              <Button variant="outlined" onClick={() => setShowBulkAssignModal(true)}>
                 {t('admin.bulkAssign')}
               </Button>
             </Box>
@@ -375,12 +401,7 @@ const AdminPage: React.FC = () => {
                       <td>{user.email}</td>
                       {canManageUsers && (
                         <td>
-                          <Button
-                            size="sm"
-                            variant="outlined"
-                            color="danger"
-                            onClick={() => handleRemoveUser(user.email)}
-                          >
+                          <Button size="sm" variant="outlined" color="danger" onClick={() => handleRemoveUser(user.email)}>
                             {t('admin.removeButton')}
                           </Button>
                         </td>
@@ -415,15 +436,6 @@ const AdminPage: React.FC = () => {
           </Button>
         </ModalDialog>
       </Modal>
-
-      {canViewAnalytics && stats && (
-        <Box sx={{ mt: 3 }}>
-          <Typography level="h3" sx={{ mb: 2 }}>{t('admin.statsTitle')}</Typography>
-          <Sheet variant="outlined" sx={{ p: 2, borderRadius: 'sm' }}>
-            <pre>{JSON.stringify(stats, null, 2)}</pre>
-          </Sheet>
-        </Box>
-      )}
     </Box>
   );
 };

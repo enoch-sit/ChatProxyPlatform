@@ -8,18 +8,20 @@ const MessageList: React.FC = () => {
   const isStreaming = useChatStore((state) => state.isStreaming);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive or streaming updates
+  // Auto-scroll to bottom when new messages arrive or streaming updates.
+  // Scroll only the dedicated chat scroll container to avoid moving page/main.
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      const container = messagesEndRef.current.closest('[data-chat-scroll-container="true"]') as HTMLElement | null;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
     }
   }, [messages, isStreaming]);
 
   return (
     <Box sx={{ 
       height: '100%',
-      overflowY: 'auto',
-      overflowX: 'hidden',
       p: 2,
     }}>
       {messages.map((msg, idx) => (

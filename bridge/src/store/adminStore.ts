@@ -7,19 +7,41 @@ import {
   getChatflowUsers,
   addUserToChatflow,
   removeUserFromChatflow,
+  listUsers,
+  createUser,
+  createUsersBatch,
+  verifyUser,
+  deleteUser,
+  updateUserRole,
+  listAllCredits,
+  allocateCredits,
+  setCredits,
+  removeCredits,
+  adjustCredits,
+  getSystemStats,
 } from '../api/admin';
 import type { Chatflow, ChatflowUser, ChatflowStats } from '../types/chatflow';
+import type { AdminUser, CreditAllocation, AllocateCreditsPayload, SetCreditsPayload, RemoveCreditsPayload, AdjustCreditsPayload, SystemStats, CreateUserPayload, BatchCreateUsersPayload } from '../types/admin';
 
 interface AdminState {
+  // Chatflow
   chatflows: Chatflow[];
   stats: ChatflowStats | null;
   selectedChatflow: Chatflow | null;
   chatflowUsers: ChatflowUser[];
+  // Users
+  users: AdminUser[];
+  // Credits
+  creditAllocations: CreditAllocation[];
+  // Usage
+  systemStats: SystemStats | null;
+  // Shared
   isLoading: boolean;
   error: string | null;
 }
 
 interface AdminActions {
+  // Chatflow
   fetchChatflows: () => Promise<void>;
   fetchStats: () => Promise<void>;
   fetchChatflowDetails: (flowiseId: string) => Promise<void>;
@@ -28,9 +50,25 @@ interface AdminActions {
   removeUserFromChatflow: (flowiseId: string, userEmail: string) => Promise<void>;
   bulkAddUsersToChatflow: (flowiseId: string, userEmails: string[]) => Promise<{ successful: number; failed: string[] }>;
   syncChatflows: () => Promise<void>;
-  clearError: () => void;
   setSelectedChatflow: (chatflow: Chatflow | null) => void;
   clearChatflowUsers: () => void;
+  // Users
+  fetchUsers: () => Promise<void>;
+  createUser: (payload: CreateUserPayload) => Promise<void>;
+  createUsersBatch: (payload: BatchCreateUsersPayload) => Promise<{ message: string; results: any[] }>;
+  verifyUser: (userId: string) => Promise<void>;
+  deleteUser: (userId: string) => Promise<void>;
+  updateUserRole: (userId: string, role: string) => Promise<void>;
+  // Credits
+  fetchAllCredits: () => Promise<void>;
+  allocateCredits: (payload: AllocateCreditsPayload) => Promise<void>;
+  setCredits: (payload: SetCreditsPayload) => Promise<void>;
+  removeCredits: (payload: RemoveCreditsPayload) => Promise<void>;
+  adjustCredits: (payload: AdjustCreditsPayload) => Promise<void>;
+  // Usage
+  fetchSystemStats: () => Promise<void>;
+  // Shared
+  clearError: () => void;
 }
 
 export const useAdminStore = create<AdminState & AdminActions>((set) => ({
@@ -39,6 +77,9 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
   stats: null,
   selectedChatflow: null,
   chatflowUsers: [],
+  users: [],
+  creditAllocations: [],
+  systemStats: null,
   isLoading: false,
   error: null,
 
@@ -180,4 +221,158 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
   },
 
   clearChatflowUsers: () => set({ chatflowUsers: [] }),
+
+  // -------------------------------------------------------------------------
+  // User Management
+  // -------------------------------------------------------------------------
+
+  fetchUsers: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const users = await listUsers();
+      set({ users, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to fetch users' });
+      throw error;
+    }
+  },
+
+  createUser: async (payload: CreateUserPayload) => {
+    set({ isLoading: true, error: null });
+    try {
+      await createUser(payload);
+      const users = await listUsers();
+      set({ users, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to create user' });
+      throw error;
+    }
+  },
+
+  createUsersBatch: async (payload: BatchCreateUsersPayload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await createUsersBatch(payload);
+      const users = await listUsers();
+      set({ users, isLoading: false });
+      return result;
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to batch create users' });
+      throw error;
+    }
+  },
+
+  verifyUser: async (userId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await verifyUser(userId);
+      const users = await listUsers();
+      set({ users, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to verify user' });
+      throw error;
+    }
+  },
+
+  deleteUser: async (userId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await deleteUser(userId);
+      const users = await listUsers();
+      set({ users, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to delete user' });
+      throw error;
+    }
+  },
+
+  updateUserRole: async (userId: string, role: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await updateUserRole(userId, role);
+      const users = await listUsers();
+      set({ users, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to update user role' });
+      throw error;
+    }
+  },
+
+  // -------------------------------------------------------------------------
+  // Credit Management
+  // -------------------------------------------------------------------------
+
+  fetchAllCredits: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const creditAllocations = await listAllCredits();
+      set({ creditAllocations, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to fetch credits' });
+      throw error;
+    }
+  },
+
+  allocateCredits: async (payload: AllocateCreditsPayload) => {
+    set({ isLoading: true, error: null });
+    try {
+      await allocateCredits(payload);
+      const creditAllocations = await listAllCredits();
+      set({ creditAllocations, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to allocate credits' });
+      throw error;
+    }
+  },
+
+  setCredits: async (payload: SetCreditsPayload) => {
+    set({ isLoading: true, error: null });
+    try {
+      await setCredits(payload);
+      const creditAllocations = await listAllCredits();
+      set({ creditAllocations, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to set credits' });
+      throw error;
+    }
+  },
+
+  removeCredits: async (payload: RemoveCreditsPayload) => {
+    set({ isLoading: true, error: null });
+    try {
+      await removeCredits(payload);
+      const creditAllocations = await listAllCredits();
+      set({ creditAllocations, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to remove credits' });
+      throw error;
+    }
+  },
+
+  adjustCredits: async (payload: AdjustCreditsPayload) => {
+    set({ isLoading: true, error: null });
+    try {
+      await adjustCredits(payload);
+      const creditAllocations = await listAllCredits();
+      set({ creditAllocations, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to adjust credits' });
+      throw error;
+    }
+  },
+
+  // -------------------------------------------------------------------------
+  // Usage / Token Stats
+  // -------------------------------------------------------------------------
+
+  fetchSystemStats: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const systemStats = await getSystemStats();
+      set({ systemStats, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to fetch system stats' });
+      throw error;
+    }
+  },
 }));

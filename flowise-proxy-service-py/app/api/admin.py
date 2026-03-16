@@ -1,10 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from app.auth.middleware import require_admin_role
 from app.models.chatflow import Chatflow
 from app.services.chatflow_service import ChatflowService
 from app.services.flowise_service import FlowiseService
 from app.core.logging import logger
+from app.config import settings
+from pydantic import BaseModel
+import httpx
 import traceback
 
 # Import all request/response schemas from the new central location
@@ -294,3 +297,229 @@ async def bulk_add_users_to_chatflow(
     except Exception as e:
         logger.error(f"Error in bulk add users to chatflow {flowise_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+# =================================================================================
+# Helper: forward a request to auth-service or accounting-service
+# =================================================================================
+
+AUTH_URL = settings.EXTERNAL_AUTH_URL.rstrip("/")
+ACCOUNTING_URL = settings.ACCOUNTING_SERVICE_URL.rstrip("/")
+PROXY_TIMEOUT = 15
+
+
+def _admin_headers(current_user: Dict) -> Dict[str, str]:
+    """Build Authorization header using the admin's token from the validated JWT context."""
+    token = current_user.get("access_token", "")
+    return {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+
+
+async def _proxy(method: str, url: str, headers: Dict, body: Any = None) -> Any:
+    """Generic httpx proxy helper. Raises HTTPException on non-2xx."""
+    try:
+        async with httpx.AsyncClient(timeout=PROXY_TIMEOUT) as client:
+            resp = await client.request(method, url, headers=headers, json=body)
+        if resp.status_code >= 400:
+            try:
+                detail = resp.json()
+            except Exception:
+                detail = resp.text
+            raise HTTPException(status_code=resp.status_code, detail=detail)
+        return resp.json()
+    except HTTPException:
+        raise
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="Upstream service unavailable")
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Upstream service timed out")
+    except Exception as e:
+        logger.error(f"Proxy error: {e}")
+        raise HTTPException(status_code=500, detail=f"Proxy error: {str(e)}")
+
+
+# =================================================================================
+# Request body schemas for user/credit management
+# =================================================================================
+
+class CreateUserRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+    role: Optional[str] = "user"
+    skipVerification: Optional[bool] = False
+
+
+class BatchCreateUsersRequest(BaseModel):
+    users: List[Dict[str, Any]]
+    skipVerification: Optional[bool] = False
+
+
+class AllocateCreditsRequest(BaseModel):
+    userId: str
+    credits: int
+    expiryDays: Optional[int] = None
+
+
+class SetCreditsRequest(BaseModel):
+    userId: str
+    credits: int
+
+
+class RemoveCreditsRequest(BaseModel):
+    userId: str
+
+
+class AdjustCreditsRequest(BaseModel):
+    userId: str
+    adjustment: int
+    reason: Optional[str] = None
+
+
+# =================================================================================
+# Admin User Management Routes (proxy → auth-service)
+# =================================================================================
+
+@router.get("/users")
+async def admin_list_users(
+    current_user: Dict = Depends(require_admin_role)
+):
+    """List all users (proxy → auth-service GET /api/admin/users)."""
+    return await _proxy("GET", f"{AUTH_URL}/api/admin/users", _admin_headers(current_user))
+
+
+@router.get("/users/{user_id}")
+async def admin_get_user(
+    user_id: str,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Get a user by ID (proxy → auth-service GET /api/admin/users/:id)."""
+    return await _proxy("GET", f"{AUTH_URL}/api/admin/users/{user_id}", _admin_headers(current_user))
+
+
+@router.post("/users")
+async def admin_create_user(
+    request: CreateUserRequest,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Create a single user (proxy → auth-service POST /api/admin/users)."""
+    return await _proxy("POST", f"{AUTH_URL}/api/admin/users", _admin_headers(current_user), request.dict())
+
+
+@router.post("/users/batch")
+async def admin_create_users_batch(
+    request: BatchCreateUsersRequest,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Batch create users (proxy → auth-service POST /api/admin/users/batch)."""
+    return await _proxy("POST", f"{AUTH_URL}/api/admin/users/batch", _admin_headers(current_user), request.dict())
+
+
+@router.post("/users/{user_id}/verify")
+async def admin_verify_user(
+    user_id: str,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Directly verify a user's email (proxy → auth-service POST /api/admin/users/:id/verify)."""
+    return await _proxy("POST", f"{AUTH_URL}/api/admin/users/{user_id}/verify", _admin_headers(current_user))
+
+
+@router.delete("/users/{user_id}")
+async def admin_delete_user(
+    user_id: str,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Delete a user (proxy → auth-service DELETE /api/admin/users/:id)."""
+    return await _proxy("DELETE", f"{AUTH_URL}/api/admin/users/{user_id}", _admin_headers(current_user))
+
+
+@router.put("/users/{user_id}/role")
+async def admin_update_user_role(
+    user_id: str,
+    body: Dict[str, Any],
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Update user role (proxy → auth-service PUT /api/admin/users/:id/role)."""
+    return await _proxy("PUT", f"{AUTH_URL}/api/admin/users/{user_id}/role", _admin_headers(current_user), body)
+
+
+# =================================================================================
+# Admin Credit Management Routes (proxy → accounting-service)
+# =================================================================================
+
+@router.get("/credits")
+async def admin_list_all_credits(
+    current_user: Dict = Depends(require_admin_role)
+):
+    """List all credit allocations (proxy → accounting-service GET /api/credits/allocations/all)."""
+    return await _proxy("GET", f"{ACCOUNTING_URL}/api/credits/allocations/all", _admin_headers(current_user))
+
+
+@router.get("/credits/balance/{user_id}")
+async def admin_get_user_credit_balance(
+    user_id: str,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Get a user's credit balance (proxy → accounting-service GET /api/credits/balance/:userId)."""
+    return await _proxy("GET", f"{ACCOUNTING_URL}/api/credits/balance/{user_id}", _admin_headers(current_user))
+
+
+@router.post("/credits/allocate")
+async def admin_allocate_credits(
+    request: AllocateCreditsRequest,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Allocate credits to a user (proxy → accounting-service POST /api/credits/allocate)."""
+    return await _proxy("POST", f"{ACCOUNTING_URL}/api/credits/allocate", _admin_headers(current_user), request.dict())
+
+
+@router.post("/credits/set")
+async def admin_set_credits(
+    request: SetCreditsRequest,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Set absolute credit balance (proxy → accounting-service POST /api/credits/set)."""
+    return await _proxy("POST", f"{ACCOUNTING_URL}/api/credits/set", _admin_headers(current_user), request.dict())
+
+
+@router.delete("/credits/remove")
+async def admin_remove_credits(
+    request: RemoveCreditsRequest,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Remove all credits from a user (proxy → accounting-service DELETE /api/credits/remove)."""
+    return await _proxy("DELETE", f"{ACCOUNTING_URL}/api/credits/remove", _admin_headers(current_user), request.dict())
+
+
+@router.put("/credits/adjust")
+async def admin_adjust_credits(
+    request: AdjustCreditsRequest,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Adjust credits for a user (proxy → accounting-service PUT /api/credits/adjust)."""
+    return await _proxy("PUT", f"{ACCOUNTING_URL}/api/credits/adjust", _admin_headers(current_user), request.dict())
+
+
+# =================================================================================
+# Admin Usage / Token Stats Routes (proxy → accounting-service)
+# =================================================================================
+
+@router.get("/usage/system-stats")
+async def admin_get_system_stats(
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Get system-wide usage stats (proxy → accounting-service GET /api/usage/system-stats)."""
+    return await _proxy("GET", f"{ACCOUNTING_URL}/api/usage/system-stats", _admin_headers(current_user))
+
+
+@router.get("/usage/stats/{user_id}")
+async def admin_get_user_stats(
+    user_id: str,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Get per-user usage stats (proxy → accounting-service GET /api/usage/stats/:userId)."""
+    return await _proxy("GET", f"{ACCOUNTING_URL}/api/usage/stats/{user_id}", _admin_headers(current_user))
+

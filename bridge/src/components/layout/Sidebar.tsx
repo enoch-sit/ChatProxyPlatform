@@ -49,7 +49,7 @@ const Sidebar: React.FC = () => {
         borderColor: 'divider',
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh'
+        height: '100%'
       }}
     >
       <List size="lg" sx={{ '--ListItem-radius': '8px', '--List-gap': '4px', flex: 1 }}>

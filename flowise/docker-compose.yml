@@ -82,7 +82,7 @@ services:
     ports:
     - "${POSTGRES_PORT:-5433}:5432"
     volumes:
-    - D:/DockerVolumes/flowise-postgres:/var/lib/postgresql/data
+    - postgres_data:/var/lib/postgresql/data
     networks:
     - flowise-network
     healthcheck:
@@ -95,8 +95,7 @@ networks:
   flowise-network:
     driver: bridge
   chatproxy-network:
-    driver: bridge
-    name: chatproxy-network
+    external: true
 
 volumes:
   flowise_data:

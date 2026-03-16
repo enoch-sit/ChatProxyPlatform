@@ -731,6 +731,46 @@ adminRouter.get('/reports', authenticate, requireSupervisor, (req: Request, res:
   });
 });
 
+// Directly verify a user's email (admin-level, no token required)
+adminRouter.post('/users/:userId/verify', authenticate, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { isVerified: true },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Delete any pending verification tokens for this user
+    await Verification.deleteMany({
+      userId: new mongoose.Types.ObjectId(userId),
+      type: VerificationType.EMAIL
+    });
+
+    res.status(200).json({
+      message: 'User verified successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        isVerified: user.isVerified
+      }
+    });
+  } catch (error: any) {
+    logger.error(`Admin verify user error: ${error.message}`);
+    res.status(500).json({ error: 'Failed to verify user' });
+  }
+});
+
 // =============================================================================
 // Testing Routes (previously in testing.routes.ts)
 // =============================================================================

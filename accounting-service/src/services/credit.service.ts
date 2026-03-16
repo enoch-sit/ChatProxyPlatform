@@ -94,13 +94,28 @@ export class CreditService {
    */
   async getAllAllocations(): Promise<any[]> {
     const allocations = await CreditAllocation.findAll({
-      include: [{
-        model: UserAccount,
-        attributes: ['username', 'email']
-      }],
       order: [['userId', 'ASC'], ['expiresAt', 'ASC']]
     });
-    return allocations;
+    return Promise.all(allocations.map(async (alloc) => {
+      let username: string | undefined;
+      let email: string | undefined;
+      try {
+        const ua = await UserAccount.findOne({ where: { userId: alloc.userId } });
+        username = ua?.username;
+        email = ua?.email;
+      } catch {}
+      return {
+        userId: alloc.userId,
+        username,
+        email,
+        totalCredits: alloc.totalCredits,
+        remainingCredits: alloc.remainingCredits,
+        usedCredits: alloc.totalCredits - alloc.remainingCredits,
+        expiresAt: alloc.expiresAt,
+        allocatedAt: alloc.allocatedAt,
+        allocatedBy: alloc.allocatedBy,
+      };
+    }));
   }
 
   // 20250523_test_flow
@@ -274,6 +289,12 @@ export class CreditService {
   async calculateCreditsForTokens(modelId: string, tokens: number, tokenType: 'input' | 'output' | 'both' = 'both'): Promise<number> {
     // Model pricing (in USD per 1000 tokens, which directly equals credits per 1000 tokens)
     const modelPricing: Record<string, { input: number, output: number }> = {
+      // Anthropic Claude models (via Amazon Bedrock)
+      'anthropic.claude-3-sonnet-20240229-v1:0': { input: 3, output: 3 },      // 3 credits per 1000 tokens
+      'anthropic.claude-3-haiku-20240307-v1:0': { input: 0.25, output: 0.25 }, // 0.25 credits per 1000 tokens
+      'anthropic.claude-3-opus-20240229-v1:0': { input: 15, output: 15 },
+      'anthropic.claude-3-5-sonnet-20241022-v2:0': { input: 3, output: 3 },
+      'anthropic.claude-3-5-haiku-20241022-v1:0': { input: 0.8, output: 0.8 },
       // Amazon models
       'amazon.nova-micro-v1:0': { input: 0.060, output: 0.060 },
       'amazon.nova-lite-v1:0': { input: 0.250, output: 0.800 },
