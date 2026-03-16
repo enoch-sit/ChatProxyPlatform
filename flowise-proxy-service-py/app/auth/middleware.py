@@ -14,7 +14,11 @@ security = HTTPBearer()
 ADMIN_ROLE = 'admin'
 USER_ROLE = 'user' # This seems to be used as a general 'non-admin' identifier in some places
 SUPERVISOR_ROLE = 'supervisor' # Added for the new function
+TEACHER_ROLE = 'teacher'  # Teacher role - elevated privileges for managing students
 ENDUSER_ROLE = 'enduser' # Assuming this is the most basic role
+
+# Roles with elevated (admin-level) access
+ELEVATED_ROLES = {ADMIN_ROLE, SUPERVISOR_ROLE, TEACHER_ROLE}
 
 # Role hierarchy constants (optional, but good for clarity if you have more complex rules
 #   ADMIN_ROLE = 'admin',        // Highest privilege level - full system access
@@ -201,13 +205,27 @@ async def require_admin_role(current_user: Dict = Depends(authenticate_user)) ->
 
 async def require_admin_or_supervisor_role(current_user: Dict = Depends(authenticate_user)) -> Dict:
     """
-    Dependency to enforce that the current user has either 'admin' or 'supervisor' role.
+    Dependency to enforce that the current user has either 'admin', 'supervisor', or 'teacher' role.
     """
     user_role = current_user.get('role')
-    if user_role not in [ADMIN_ROLE, SUPERVISOR_ROLE]:
+    if user_role not in [ADMIN_ROLE, SUPERVISOR_ROLE, TEACHER_ROLE]:
         raise HTTPException(
             status_code=403,
-            detail="Access denied. Administrator or Supervisor privileges required."
+            detail="Access denied. Administrator, Supervisor, or Teacher privileges required."
+        )
+    return current_user
+
+
+async def require_elevated_role(current_user: Dict = Depends(authenticate_user)) -> Dict:
+    """
+    Dependency that allows admin, supervisor, or teacher roles.
+    Use this for management endpoints that teachers should also access.
+    """
+    user_role = current_user.get('role')
+    if user_role not in ELEVATED_ROLES:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied. Elevated privileges (admin, supervisor, or teacher) required."
         )
     return current_user
 

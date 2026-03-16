@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs'; // Changed from bcrypt to bcryptjs
 export enum UserRole {
   ADMIN = 'admin',
   SUPERVISOR = 'supervisor',
+  TEACHER = 'teacher',
   ENDUSER = 'enduser',
   USER = 'user'  // Add USER as an alias for ENDUSER
 }

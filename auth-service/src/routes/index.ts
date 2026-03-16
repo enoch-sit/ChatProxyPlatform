@@ -1,6 +1,6 @@
 // src/routes/index.ts
 import { Router, Request, Response } from 'express';
-import { authenticate, isAdmin, requireAdmin, requireSupervisor, optionalAuth } from '../auth/auth.middleware'; // Added isAdmin
+import { authenticate, isAdmin, requireAdmin, requireAdminOrTeacher, requireSupervisor, optionalAuth } from '../auth/auth.middleware';
 import { User, UserRole } from '../models/user.model';
 import { authService } from '../auth/auth.service';
 import { passwordService } from '../services/password.service';
@@ -436,7 +436,7 @@ protectedRouter.get('/dashboard', authenticate, (req: Request, res: Response) =>
 // =============================================================================
 
 // Get all users (admin only)
-adminRouter.get('/users', authenticate, requireAdmin, async (req: Request, res: Response) => {
+adminRouter.get('/users', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const users = await User.find().select('-password');
     res.status(200).json({ users });
@@ -446,8 +446,8 @@ adminRouter.get('/users', authenticate, requireAdmin, async (req: Request, res: 
   }
 });
 
-// Get user by ID (Admin only)
-adminRouter.get('/users/:userId', authenticate, isAdmin, async (req: Request, res: Response) => {
+// Get user by ID (Admin or teacher)
+adminRouter.get('/users/:userId', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
@@ -480,8 +480,8 @@ adminRouter.get('/users/:userId', authenticate, isAdmin, async (req: Request, re
   }
 });
 
-// Get user by email (admin only)
-adminRouter.get('/users/by-email/:email', authenticate, requireAdmin, async (req: Request, res: Response) => {
+// Get user by email (admin or teacher)
+adminRouter.get('/users/by-email/:email', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   // GET /api/admin/users/by-email/:email
   try {
     const { email } = req.params;
@@ -504,8 +504,8 @@ adminRouter.get('/users/by-email/:email', authenticate, requireAdmin, async (req
 });
 
 
-// Create a new user (admin only)
-adminRouter.post('/users', authenticate, requireAdmin, async (req: Request, res: Response) => {
+// Create a new user (admin or teacher)
+adminRouter.post('/users', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const { username, email, password, role, skipVerification } = req.body;
     
@@ -549,8 +549,8 @@ adminRouter.post('/users', authenticate, requireAdmin, async (req: Request, res:
   }
 });
 
-// Create multiple users at once (admin only)
-adminRouter.post('/users/batch', authenticate, requireAdmin, async (req: Request, res: Response) => {
+// Create multiple users at once (admin or teacher)
+adminRouter.post('/users/batch', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const { users, skipVerification = true } = req.body;
     
@@ -634,8 +634,8 @@ adminRouter.put('/users/:userId/role', authenticate, requireAdmin, async (req: R
   }
 });
 
-// Delete a specific user (admin only)
-adminRouter.delete('/users/:userId', authenticate, requireAdmin, async (req: Request, res: Response) => {
+// Delete a specific user (admin or teacher)
+adminRouter.delete('/users/:userId', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     
@@ -731,8 +731,42 @@ adminRouter.get('/reports', authenticate, requireSupervisor, (req: Request, res:
   });
 });
 
-// Directly verify a user's email (admin-level, no token required)
-adminRouter.post('/users/:userId/verify', authenticate, requireAdmin, async (req: Request, res: Response) => {
+// Admin/teacher password reset - set a user's password directly
+adminRouter.put('/users/:userId/password', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { newPassword } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Prevent teachers from resetting admin or other teacher accounts
+    if (req.user?.role === UserRole.TEACHER && (user.role === UserRole.ADMIN || user.role === UserRole.TEACHER || user.role === UserRole.SUPERVISOR)) {
+      return res.status(403).json({ error: 'Teachers can only reset passwords for student accounts' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    logger.info(`Password reset for user ${user.username} by ${req.user?.username}`);
+    res.status(200).json({ message: 'Password reset successfully' });
+  } catch (error: any) {
+    logger.error(`Admin password reset error: ${error.message}`);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// Directly verify a user's email (admin or teacher)
+adminRouter.post('/users/:userId/verify', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 

@@ -126,6 +126,22 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction) =>
 };
 
 /**
+ * Middleware to restrict access to admin and teacher users
+ * Teachers have elevated privileges to manage student accounts
+ */
+export const requireAdminOrTeacher = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  if (req.user.role !== UserRole.ADMIN && req.user.role !== UserRole.TEACHER) {
+    return res.status(403).json({ error: 'Admin or teacher access required' });
+  }
+  
+  next();
+};
+
+/**
  * Middleware to restrict access to supervisors and admins
  */
 export const requireSupervisor = (req: Request, res: Response, next: NextFunction) => {
@@ -133,7 +149,7 @@ export const requireSupervisor = (req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: 'Authentication required' });
   }
   
-  if (req.user.role !== UserRole.SUPERVISOR && req.user.role !== UserRole.ADMIN) {
+  if (req.user.role !== UserRole.SUPERVISOR && req.user.role !== UserRole.ADMIN && req.user.role !== UserRole.TEACHER) {
     return res.status(403).json({ error: 'Supervisor access required' });
   }
   

@@ -49,6 +49,14 @@ const ROLE_PERMISSIONS: Record<User['role'], string[]> = {
     'view_all_sessions',
     'view_all_messages',
   ],
+  teacher: [
+    'manage_users',
+    'manage_chatflows',
+    'view_analytics',
+    'access_admin_panel',
+    'view_all_sessions',
+    'view_all_messages',
+  ],
   enduser: [
     'create_sessions',
     'send_messages',

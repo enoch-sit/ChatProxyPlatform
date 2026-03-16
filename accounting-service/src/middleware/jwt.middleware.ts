@@ -251,7 +251,7 @@ export const requireSupervisor = async (req: Request, res: Response, next: NextF
     }
     
     // Check if user has admin role
-    if (decoded.role !== 'admin' && decoded.role !== 'supervisor') {
+    if (decoded.role !== 'admin' && decoded.role !== 'supervisor' && decoded.role !== 'teacher') {
       return res.status(403).json({ message: 'Admin access required' });
     }
     

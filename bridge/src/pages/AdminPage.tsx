@@ -12,6 +12,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import AdminUsersPanel from '../components/admin/AdminUsersPanel';
 import AdminCreditsPanel from '../components/admin/AdminCreditsPanel';
 import AdminUsagePanel from '../components/admin/AdminUsagePanel';
+import AdminChatHistoryPanel from '../components/admin/AdminChatHistoryPanel';
 
 const AdminPage: React.FC = () => {
   const { t } = useTranslation();
@@ -243,6 +244,7 @@ const AdminPage: React.FC = () => {
           {canManageUsers && <Tab value="users">Users</Tab>}
           {canManageUsers && <Tab value="credits">Credits</Tab>}
           {canViewAnalytics && <Tab value="usage">Token Usage</Tab>}
+          {canManageUsers && <Tab value="student-chats">Student Chats</Tab>}
         </TabList>
 
         {/* ---- Chatflows Tab (existing functionality) ---- */}
@@ -350,6 +352,13 @@ const AdminPage: React.FC = () => {
         {canViewAnalytics && (
           <TabPanel value="usage" sx={{ p: 0 }}>
             <AdminUsagePanel />
+          </TabPanel>
+        )}
+
+        {/* ---- Student Chat History Tab ---- */}
+        {canManageUsers && (
+          <TabPanel value="student-chats" sx={{ p: 0 }}>
+            <AdminChatHistoryPanel />
           </TabPanel>
         )}
       </Tabs>

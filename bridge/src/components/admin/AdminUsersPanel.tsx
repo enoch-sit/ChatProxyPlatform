@@ -1,4 +1,4 @@
-// src/components/admin/AdminUsersPanel.tsx
+﻿// src/components/admin/AdminUsersPanel.tsx
 import React, { useEffect, useState } from 'react';
 import {
   Box, Button, Typography, Sheet, Table, Modal, ModalDialog, ModalClose,
@@ -7,9 +7,17 @@ import {
 } from '@mui/joy';
 import { useAdminStore } from '../../store/adminStore';
 import { useAuth } from '../../hooks/useAuth';
+import { resetUserPassword } from '../../api/admin';
 import type { AdminUser } from '../../types/admin';
 
-const ROLE_OPTIONS = ['user', 'enduser', 'supervisor', 'admin'];
+const ROLE_OPTIONS = ['user', 'enduser', 'teacher', 'supervisor', 'admin'];
+
+function roleColor(role: string): 'danger' | 'warning' | 'success' | 'primary' | 'neutral' {
+  if (role === 'admin') return 'danger';
+  if (role === 'supervisor') return 'warning';
+  if (role === 'teacher') return 'primary';
+  return 'neutral';
+}
 
 const AdminUsersPanel: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -23,6 +31,7 @@ const AdminUsersPanel: React.FC = () => {
     verifyUser,
     deleteUser,
     updateUserRole,
+    allocateCredits,
     clearError,
   } = useAdminStore();
 
@@ -30,12 +39,14 @@ const AdminUsersPanel: React.FC = () => {
 
   // Create user modal
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ username: '', email: '', password: '', role: 'user', skipVerification: false });
+  const [createForm, setCreateForm] = useState({ username: '', email: '', password: '', role: 'enduser', skipVerification: true });
 
   // Batch create modal
   const [showBatch, setShowBatch] = useState(false);
-  const [batchInput, setBatchInput] = useState('');
-  const [batchSkipVerification, setBatchSkipVerification] = useState(false);
+  const [batchLines, setBatchLines] = useState('');
+  const [batchDefaultPassword, setBatchDefaultPassword] = useState('');
+  const [batchDefaultCredits, setBatchDefaultCredits] = useState('0');
+  const [batchSkipVerification, setBatchSkipVerification] = useState(true);
   const [batchError, setBatchError] = useState<string | null>(null);
 
   // Role change modal
@@ -43,59 +54,79 @@ const AdminUsersPanel: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [newRole, setNewRole] = useState('user');
 
+  // Reset password modal
+  const [showResetPwd, setShowResetPwd] = useState(false);
+  const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchUsers().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const flash = (msg: string) => {
     setSuccess(msg);
-    setTimeout(() => setSuccess(null), 3000);
+    setTimeout(() => setSuccess(null), 3500);
   };
 
   const handleCreate = async () => {
     try {
       await createUser(createForm);
       setShowCreate(false);
-      setCreateForm({ username: '', email: '', password: '', role: 'user', skipVerification: false });
+      setCreateForm({ username: '', email: '', password: '', role: 'enduser', skipVerification: true });
       flash('User created successfully');
-    } catch (e: any) {
-      // error shown via store
-    }
+    } catch { /* error shown via store */ }
   };
 
   const handleBatch = async () => {
     setBatchError(null);
-    let users: any[];
-    try {
-      users = JSON.parse(batchInput);
-      if (!Array.isArray(users)) throw new Error('Must be a JSON array');
-    } catch {
-      setBatchError('Invalid JSON — must be an array of user objects like [{"username":"...","email":"...","password":"..."}]');
+    if (!batchDefaultPassword || batchDefaultPassword.length < 8) {
+      setBatchError('Default password must be at least 8 characters.');
       return;
     }
-    try {
-      const result = await createUsersBatch({ users, skipVerification: batchSkipVerification });
-      setShowBatch(false);
-      setBatchInput('');
-      flash(`Batch complete: ${result.results?.length ?? users.length} users processed`);
-    } catch (e: any) {
-      // error shown via store
+    const lines = batchLines.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) {
+      setBatchError('Enter at least one email.');
+      return;
     }
+    const usersPayload = lines.map((line) => {
+      const parts = line.split(/[\s,]+/);
+      const email = parts[0];
+      const username = parts[1] || email.split('@')[0];
+      const password = parts[2] || batchDefaultPassword;
+      return { email, username, password, role: 'enduser' };
+    });
+    try {
+      const result = await createUsersBatch({ users: usersPayload, skipVerification: batchSkipVerification });
+      const defaultCredits = parseInt(batchDefaultCredits, 10);
+      if (defaultCredits > 0 && result?.results) {
+        for (const r of (result.results as Array<{ success: boolean; userId?: string }>) ) {
+          if (r.success && r.userId) {
+            await allocateCredits({ userId: r.userId, credits: defaultCredits }).catch(() => {});
+          }
+        }
+      }
+      setShowBatch(false);
+      setBatchLines('');
+      flash(`Batch complete: ${usersPayload.length} users processed`);
+    } catch { /* error shown via store */ }
   };
 
-  const handleVerify = async (user: AdminUser) => {
+  const handleVerify = async (u: AdminUser) => {
     try {
-      await verifyUser(user._id);
-      flash(`${user.username} verified`);
-    } catch {}
+      await verifyUser(u._id);
+      flash(`${u.username} verified`);
+    } catch { /* noop */ }
   };
 
-  const handleDelete = async (user: AdminUser) => {
-    if (!window.confirm(`Delete user "${user.username}" (${user.email})? This cannot be undone.`)) return;
+  const handleDelete = async (u: AdminUser) => {
+    if (!window.confirm(`Delete user "${u.username}" (${u.email})? This cannot be undone.`)) return;
     try {
-      await deleteUser(user._id);
-      flash(`User ${user.username} deleted`);
-    } catch {}
+      await deleteUser(u._id);
+      flash(`User ${u.username} deleted`);
+    } catch { /* noop */ }
   };
 
   const handleRoleChange = async () => {
@@ -104,13 +135,36 @@ const AdminUsersPanel: React.FC = () => {
       await updateUserRole(selectedUser._id, newRole);
       setShowRoleModal(false);
       flash(`Role updated to ${newRole}`);
-    } catch {}
+    } catch { /* noop */ }
   };
 
-  const openRoleModal = (user: AdminUser) => {
-    setSelectedUser(user);
-    setNewRole(user.role);
+  const openRoleModal = (u: AdminUser) => {
+    setSelectedUser(u);
+    setNewRole(u.role);
     setShowRoleModal(true);
+  };
+
+  const openResetPwd = (u: AdminUser) => {
+    setResetTarget(u);
+    setNewPassword('');
+    setResetError(null);
+    setShowResetPwd(true);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetTarget || newPassword.length < 8) return;
+    setResetLoading(true);
+    setResetError(null);
+    try {
+      await resetUserPassword(resetTarget._id, newPassword);
+      setShowResetPwd(false);
+      flash(`Password reset for ${resetTarget.username}`);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setResetError(e?.response?.data?.message || e?.message || 'Password reset failed');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   return (
@@ -141,7 +195,7 @@ const AdminUsersPanel: React.FC = () => {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center' }}><CircularProgress size="sm" /></td></tr>
+              <tr><td colSpan={6} align="center"><CircularProgress size="sm" /></td></tr>
             ) : users.length === 0 ? (
               <tr><td colSpan={6}>No users found.</td></tr>
             ) : users.map((u) => (
@@ -149,12 +203,7 @@ const AdminUsersPanel: React.FC = () => {
                 <td>{u.username}</td>
                 <td>{u.email}</td>
                 <td>
-                  <Chip
-                    size="sm"
-                    color={u.role === 'admin' ? 'danger' : u.role === 'supervisor' ? 'warning' : 'neutral'}
-                  >
-                    {u.role}
-                  </Chip>
+                  <Chip size="sm" color={roleColor(u.role)}>{u.role}</Chip>
                 </td>
                 <td>
                   <Chip size="sm" color={u.isVerified ? 'success' : 'warning'}>
@@ -163,11 +212,12 @@ const AdminUsersPanel: React.FC = () => {
                 </td>
                 <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}</td>
                 <td>
-                  <Stack direction="row" spacing={0.5}>
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap">
                     {!u.isVerified && (
                       <Button size="sm" variant="outlined" color="success" onClick={() => handleVerify(u)}>Verify</Button>
                     )}
                     <Button size="sm" variant="outlined" color="neutral" onClick={() => openRoleModal(u)}>Role</Button>
+                    <Button size="sm" variant="outlined" color="warning" onClick={() => openResetPwd(u)}>Reset Pwd</Button>
                     {u._id !== currentUser?.id && (
                       <Button size="sm" variant="outlined" color="danger" onClick={() => handleDelete(u)}>Delete</Button>
                     )}
@@ -216,20 +266,43 @@ const AdminUsersPanel: React.FC = () => {
       </Modal>
 
       {/* Batch Create Modal */}
-      <Modal open={showBatch} onClose={() => setShowBatch(false)}>
-        <ModalDialog sx={{ minWidth: 480 }}>
+      <Modal open={showBatch} onClose={() => { setShowBatch(false); setBatchError(null); }}>
+        <ModalDialog sx={{ minWidth: 500 }}>
           <ModalClose />
-          <Typography level="h4">Batch Create Users</Typography>
+          <Typography level="h4">Batch Create Students</Typography>
           <Typography level="body-sm" sx={{ mb: 1 }}>
-            Paste a JSON array of users: <code>[&#123;"username":"...", "email":"...", "password":"...", "role":"user"&#125;]</code>
+            One entry per line. Formats accepted:
+          </Typography>
+          <Typography level="body-xs" sx={{ mb: 1.5, color: 'text.tertiary' }}>
+            <code>email</code> &nbsp;|&nbsp; <code>email username</code> &nbsp;|&nbsp; <code>email username password</code>
           </Typography>
           {batchError && <Alert color="danger" sx={{ mb: 1 }}>{batchError}</Alert>}
           <Textarea
-            minRows={6}
-            placeholder='[{"username":"alice","email":"alice@example.com","password":"Secret1!"}]'
-            value={batchInput}
-            onChange={(e) => setBatchInput(e.target.value)}
+            minRows={5}
+            placeholder={'alice@school.edu\nbob@school.edu bob_student\ncarol@school.edu carol Pass@word1'}
+            value={batchLines}
+            onChange={(e) => setBatchLines(e.target.value)}
           />
+          <Stack direction="row" spacing={2} sx={{ mt: 1.5 }}>
+            <FormControl sx={{ flex: 1 }}>
+              <FormLabel>Default Password (min 8 chars)</FormLabel>
+              <Input
+                type="password"
+                placeholder="Used when not specified per-row"
+                value={batchDefaultPassword}
+                onChange={(e) => setBatchDefaultPassword(e.target.value)}
+              />
+            </FormControl>
+            <FormControl sx={{ width: 120 }}>
+              <FormLabel>Default Credits</FormLabel>
+              <Input
+                type="number"
+                slotProps={{ input: { min: 0 } }}
+                value={batchDefaultCredits}
+                onChange={(e) => setBatchDefaultCredits(e.target.value)}
+              />
+            </FormControl>
+          </Stack>
           <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
             <Checkbox
               checked={batchSkipVerification}
@@ -237,8 +310,8 @@ const AdminUsersPanel: React.FC = () => {
             />
             <Typography level="body-sm">Skip email verification for all</Typography>
           </Box>
-          <Button sx={{ mt: 2 }} onClick={handleBatch} loading={isLoading} disabled={!batchInput.trim()}>
-            Create Users
+          <Button sx={{ mt: 2 }} onClick={handleBatch} loading={isLoading} disabled={!batchLines.trim() || !batchDefaultPassword}>
+            Create Students
           </Button>
         </ModalDialog>
       </Modal>
@@ -257,6 +330,36 @@ const AdminUsersPanel: React.FC = () => {
             {ROLE_OPTIONS.map((r) => <Option key={r} value={r}>{r}</Option>)}
           </Select>
           <Button sx={{ mt: 2 }} onClick={handleRoleChange} loading={isLoading}>Save</Button>
+        </ModalDialog>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal open={showResetPwd} onClose={() => setShowResetPwd(false)}>
+        <ModalDialog sx={{ minWidth: 340 }}>
+          <ModalClose />
+          <Typography level="h4">Reset Password</Typography>
+          {resetTarget && (
+            <Typography level="body-sm" sx={{ mb: 2 }}>
+              Set new password for <strong>{resetTarget.username}</strong>
+            </Typography>
+          )}
+          {resetError && <Alert color="danger" sx={{ mb: 1 }}>{resetError}</Alert>}
+          <FormControl>
+            <FormLabel>New Password (min 8 chars)</FormLabel>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </FormControl>
+          <Button
+            sx={{ mt: 2 }}
+            onClick={handleResetPassword}
+            loading={resetLoading}
+            disabled={newPassword.length < 8}
+          >
+            Reset Password
+          </Button>
         </ModalDialog>
       </Modal>
     </Box>

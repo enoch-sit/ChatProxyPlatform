@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Dict, List
-from app.auth.middleware import authenticate_user
+from app.auth.middleware import authenticate_user, ELEVATED_ROLES
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
 from app.api.chat_models import (
@@ -64,11 +64,16 @@ async def get_chat_history(
     session_id: str, current_user: Dict = Depends(authenticate_user)
 ):
     user_id = current_user.get("user_id")
+    user_role = current_user.get("role", "")
+    is_elevated = user_role in ELEVATED_ROLES
 
-    # 1. Verify the session exists and belongs to the user
-    session = await ChatSession.find_one(
-        ChatSession.session_id == session_id, ChatSession.user_id == user_id
-    )
+    # 1. Verify the session exists; elevated roles (admin/supervisor/teacher) bypass ownership check
+    if is_elevated:
+        session = await ChatSession.find_one(ChatSession.session_id == session_id)
+    else:
+        session = await ChatSession.find_one(
+            ChatSession.session_id == session_id, ChatSession.user_id == user_id
+        )
     if not session:
         raise HTTPException(
             status_code=404, detail="Chat session not found or access denied"

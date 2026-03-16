@@ -199,3 +199,44 @@ export const getUserUsageStats = async (userId: string): Promise<any> => {
   const response = await apiClient.get(`/api/v1/admin/usage/stats/${userId}`);
   return response.data;
 };
+
+// =============================================================================
+// Password Reset (admin/teacher)
+// =============================================================================
+
+export const resetUserPassword = async (userId: string, newPassword: string): Promise<{ message: string }> => {
+  const response = await apiClient.put(`/api/v1/admin/users/${userId}/password`, { newPassword });
+  return response.data;
+};
+
+// =============================================================================
+// Admin Chat History
+// =============================================================================
+
+export interface AdminChatUser {
+  user_id: string;
+  username: string;
+  email: string;
+  role: string;
+  session_count: number;
+}
+
+export interface AdminChatSession {
+  session_id: string;
+  chatflow_id: string;
+  topic: string | null;
+  is_active: boolean;
+  created_at: string | null;
+  last_activity_at: string | null;
+  message_count: number;
+}
+
+export const adminListChatUsers = async (): Promise<AdminChatUser[]> => {
+  const response = await apiClient.get('/api/v1/admin/chat/users');
+  return response.data;
+};
+
+export const adminGetUserSessions = async (userId: string): Promise<AdminChatSession[]> => {
+  const response = await apiClient.get(`/api/v1/admin/chat/users/${userId}/sessions`);
+  return response.data;
+};

@@ -20,7 +20,7 @@ export interface AdminUser {
   _id: string;
   username: string;
   email: string;
-  role: 'admin' | 'supervisor' | 'user' | 'enduser';
+  role: 'admin' | 'supervisor' | 'teacher' | 'user' | 'enduser';
   isVerified: boolean;
   createdAt: string;
   updatedAt?: string;
