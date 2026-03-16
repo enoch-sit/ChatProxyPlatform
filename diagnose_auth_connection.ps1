@@ -156,13 +156,13 @@ $loginCode = docker exec flowise-proxy curl -s -o /dev/null -w "%{http_code}" `
 
 switch ($loginCode) {
     { $_ -in "400","401","422" } {
-        Write-Ok "Login endpoint reachable (HTTP $loginCode — wrong credentials but server is UP)"
+        Write-Ok "Login endpoint reachable (HTTP $loginCode - wrong credentials but server is UP)"
     }
     "200" {
         Write-Ok "Login endpoint reachable and returned 200"
     }
     "404" {
-        Write-Fail "Login endpoint returned 404 — path /api/auth/login may be wrong"
+        Write-Fail "Login endpoint returned 404 ??path /api/auth/login may be wrong"
         Write-Info "Probing alternate paths..."
         $paths = @("/api/v1/auth/login", "/auth/login", "/login", "/api/login")
         foreach ($path in $paths) {
