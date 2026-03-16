@@ -68,8 +68,8 @@ if ($mongoRunning -match "mongodb-auth") {
 Write-Host ""
 Write-Host "--- 2. Verify network shared between auth-service and mongodb-auth ---"
 
-$authNetworks  = docker inspect auth-service  --format "{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}} {{end}}" 2>&1
-$mongoNetworks = docker inspect mongodb-auth  --format "{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}} {{end}}" 2>&1
+$authNetworks  = (docker inspect auth-service  --format "{{json .NetworkSettings.Networks}}" 2>&1 | ConvertFrom-Json).PSObject.Properties.Name -join " "
+$mongoNetworks = (docker inspect mongodb-auth --format "{{json .NetworkSettings.Networks}}" 2>&1 | ConvertFrom-Json).PSObject.Properties.Name -join " "
 
 Write-Info "auth-service  networks: $authNetworks"
 Write-Info "mongodb-auth  networks: $mongoNetworks"
