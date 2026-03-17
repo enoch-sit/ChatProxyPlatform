@@ -143,6 +143,8 @@ def run_command(cmd, cwd: Optional[str] = None, shell: bool = False, timeout: Op
                 shell=True,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=timeout
             )
         else:
@@ -151,6 +153,8 @@ def run_command(cmd, cwd: Optional[str] = None, shell: bool = False, timeout: Op
                 cwd=cwd,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=timeout
             )
         _log("debug", f"  exit={result.returncode}")
@@ -685,8 +689,9 @@ def start_service(service_name: str, wait_time: int = 10) -> bool:
     )
     
     if code != 0:
-        print_warning(f"  Docker start had issues: {stderr}")
-        # Make a best effort attempt with the batch file if direct docker fail, 
+        err_msg = (stderr or "").strip() or "(no error output)"
+        print_warning(f"  Docker start had issues: {err_msg}")
+        # Make a best effort attempt with the batch file if direct docker fail,
         # but try to assume it might work.
     
     print_info(f"  Waiting {wait_time} seconds for {service_name} to initialize...")
