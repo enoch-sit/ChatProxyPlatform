@@ -1,6 +1,11 @@
 # ChatProxy Platform - Git Ignore Rules
 
 # ============================================
+# Personal Deployment Records (never commit)
+# ============================================
+web-record.md
+
+# ============================================
 # Environment & Secrets
 # ============================================
 .env
