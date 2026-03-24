@@ -106,7 +106,8 @@ This gives your site the padlock icon and encrypts all traffic. AWS provides thi
 3. Click **"Request a certificate"**
 4. Choose **"Request a public certificate"** → click **"Next"**
 5. Under **"Fully qualified domain name"**, type: `*.mychatbot.com` (replace with your domain)
-   - Click **"Add another name"** and also add: `mychatbot.com` (without the `*`)
+   - Click **"Add another name to this certificate"** and also add: `mychatbot.com` (without the `*`)
+   - ⚠️ **Both names are required** — `*.mychatbot.com` covers subdomains, `mychatbot.com` covers the bare domain. Missing either one will cause a browser certificate error.
 6. Under **"Validation method"**, choose **"DNS validation"**
 7. Click **"Request"**
 8. You will see status **"Pending validation"** — click on the certificate
@@ -115,6 +116,27 @@ This gives your site the padlock icon and encrypts all traffic. AWS provides thi
 > ⏱️ **Wait 5–10 minutes** — the status will change from "Pending validation" to "Issued" ✅
 
 10. Once it says **"Issued"**, copy the **Certificate ARN** (looks like `arn:aws:acm:us-east-1:123456789:certificate/abc-123`) — save it in a text file
+
+### Troubleshooting — Still "Pending Validation" after 30+ minutes?
+
+The "Create records in Route 53" button sometimes fails silently. Fix it via CLI:
+
+**Step 1 — Get the required CNAME values:**
+```powershell
+aws acm describe-certificate --region us-east-1 `
+  --certificate-arn YOUR_CERTIFICATE_ARN `
+  --query "Certificate.DomainValidationOptions"
+```
+Note the `Name` and `Value` under `ResourceRecord`.
+
+**Step 2 — Add the CNAME to Route 53 manually:**
+```powershell
+aws route53 change-resource-record-sets `
+  --hosted-zone-id YOUR_HOSTED_ZONE_ID `
+  --change-batch '{\"Changes\":[{\"Action\":\"UPSERT\",\"ResourceRecordSet\":{\"Name\":\"CNAME_NAME_HERE.\",\"Type\":\"CNAME\",\"TTL\":300,\"ResourceRecords\":[{\"Value\":\"CNAME_VALUE_HERE.\"}]}}]}'
+```
+Replace `CNAME_NAME_HERE` and `CNAME_VALUE_HERE` with the values from Step 1.
+The certificate will validate within 5–30 minutes after the record is in place.
 
 ---
 
