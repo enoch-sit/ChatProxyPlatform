@@ -66,7 +66,7 @@
 | Status | Task | Time | Notes |
 |--------|------|------|-------|
 | ✅ | 4.1 Create Flowise admin account | 2 min | Email: ecysit@eduhk.hk |
-| ✅ | 4.2 Generate Flowise API key | 1 min | Key: x1LLhKIW8TGesY2f... |
+| ✅ | 4.2 Generate Flowise API key | 1 min | Key: <redacted — rotate via Flowise UI after AWS deployment> |
 | ✅ | 4.3 Add key to .env file | 1 min | File updated: ✅ |
 | ✅ | 4.4 Restart flowise-proxy | 1 min | Restarted: ✅ |
 
@@ -190,22 +190,11 @@ Multiple sessions over development period
 
 ### Credentials (Store Securely!)
 
-**Flowise Admin:**
-- Email: ecysit@eduhk.hk
-- Password: Admin@2026
+> **All credentials have been redacted. Secrets are stored in AWS Secrets Manager.**
+> - Flowise admin password → reset via Flowise UI after AWS deployment
+> - Auth service admin password → managed via auth-service admin panel
+> - Flowise API key → rotate via Flowise UI after AWS deployment, store in /chatproxy/dev/flowise/api-key
 
-**Auth Service Admin:**
-- Username: admin
-- Email: admin@example.com
-- Password: admin@admin
-
-**Flowise API Key:**
-```
-x1LLhKIW8TGesY2fJDJonjPMZL_wqzKTL-eM8wqmrAM
-- Password: admin@admin
-
-**Flowise API Key:**
-```
 ___________________________________✅ RESPONDING
 - Flowise: http://localhost:3002 ✅ RESPONDING
 - Auth API: http://localhost:3000 ✅ RESPONDING

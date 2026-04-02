@@ -1,5 +1,5 @@
 // src/routes/index.ts
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, isAdmin, requireAdmin, requireAdminOrTeacher, requireSupervisor, optionalAuth } from '../auth/auth.middleware';
 import { User, UserRole } from '../models/user.model';
 import { authService } from '../auth/auth.service';
@@ -507,7 +507,7 @@ adminRouter.get('/users/by-email/:email', authenticate, requireAdminOrTeacher, a
 // Create a new user (admin or teacher)
 adminRouter.post('/users', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
-    const { username, email, password, role, skipVerification } = req.body;
+    const { username, email, password, role, skipVerification = true } = req.body;
     
     // Validate required fields
     if (!username || !email || !password) {
@@ -531,7 +531,7 @@ adminRouter.post('/users', authenticate, requireAdminOrTeacher, async (req: Requ
       email,
       password,
       role || UserRole.ENDUSER,
-      skipVerification === true
+      skipVerification !== false
     );
     
     if (!result.success) {
@@ -589,7 +589,7 @@ adminRouter.post('/users/batch', authenticate, requireAdminOrTeacher, async (req
     // Create the users in batch
     const result = await authService.adminCreateBatchUsers(
       users,
-      skipVerification === true
+      skipVerification !== false
     );
     
     logger.info(`Batch user creation by admin ${req.user?.username}. Created: ${result.summary.successful}, Failed: ${result.summary.failed}, Total: ${result.summary.total}`);
@@ -809,6 +809,23 @@ adminRouter.post('/users/:userId/verify', authenticate, requireAdminOrTeacher, a
 // Testing Routes (previously in testing.routes.ts)
 // =============================================================================
 
+// Security guard: all testing endpoints are blocked in production unless
+// TESTING_SECRET_TOKEN env var is set AND the caller supplies a matching
+// x-testing-token header.  Without the env var the routes are fully disabled.
+testingRouter.use((req: Request, res: Response, next: NextFunction) => {
+  if (process.env.NODE_ENV === 'production') {
+    const testingToken = process.env.TESTING_SECRET_TOKEN;
+    if (!testingToken) {
+      return res.status(403).json({ error: 'Testing endpoints are disabled in production' });
+    }
+    const providedToken = req.headers['x-testing-token'];
+    if (!providedToken || providedToken !== testingToken) {
+      return res.status(403).json({ error: 'Forbidden: invalid or missing testing token' });
+    }
+  }
+  return next();
+});
+
 // Get verification token for a user (development/testing only)
 testingRouter.get('/verification-token/:userId/:type?', async (req: Request, res: Response) => {
   try {
@@ -888,6 +905,45 @@ testingRouter.post('/verify-user/:userId', async (req: Request, res: Response) =
   } catch (error: any) {
     logger.error(`Testing route error: ${error.message}`);
     res.status(500).json({ error: 'Failed to verify user' });
+  }
+});
+
+// Promote a user to admin without auth (development/testing bootstrap only)
+testingRouter.post('/promote-admin/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { role: UserRole.ADMIN, isVerified: true },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({
+      message: 'User promoted to admin successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isVerified,
+      },
+    });
+  } catch (error: any) {
+    logger.error(`Testing route error: ${error.message}`);
+    res.status(500).json({ error: 'Failed to promote user to admin' });
   }
 });
 

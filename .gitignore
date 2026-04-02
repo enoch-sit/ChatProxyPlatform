@@ -56,6 +56,14 @@ secrets/
 *.pfx
 *.p12
 
+# Temporary credential output files
+new_ses_credentials.json
+new_*_credentials.json
+*_credentials.json
+
+# One-time secret population scripts (contain real values)
+create_secrets.ps1
+
 # ============================================
 # Dependencies
 # ============================================

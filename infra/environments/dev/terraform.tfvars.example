@@ -39,3 +39,21 @@ ses_from_email = "noreply@yourdomain.com"
 
 # ─── Service Discovery ────────────────────────────────────────────────────────
 service_discovery_namespace = "chatproxy.dev.local"
+
+# ─── Platform VPC (separate CIDR from flowise VPC 10.0.x.x) ─────────────────
+platform_public_subnet_cidrs  = ["10.1.1.0/24", "10.1.2.0/24"]
+platform_private_subnet_cidrs = ["10.1.11.0/24", "10.1.12.0/24"]
+
+# ─── Container Images ─────────────────────────────────────────────────────────
+# Use versioned tags (e.g. v1.2.3) — NOT :latest.
+# The deploy-service.ps1 script updates these automatically on each release.
+# To roll back: change the tag here and run terraform apply -target=<module>.
+auth_service_image          = "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/chatproxy/auth-service:v1.0.0"
+accounting_service_image    = "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/chatproxy/accounting-service:v1.0.0"
+flowise_proxy_service_image = "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/chatproxy/flowise-proxy:v1.0.0"
+bridge_image                = "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/chatproxy/bridge:v1.0.0"
+
+# ─── Flowise ──────────────────────────────────────────────────────────────────
+flowise_subdomain   = "flowise"
+flowise_image       = "flowiseai/flowise:3.0.0"   # pin third-party images too
+flowise_desired_count = 1

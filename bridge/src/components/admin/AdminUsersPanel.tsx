@@ -181,7 +181,7 @@ const AdminUsersPanel: React.FC = () => {
       {success && <Alert color="success" sx={{ mb: 2 }}>{success}</Alert>}
       {error && <Alert color="danger" sx={{ mb: 2 }} endDecorator={<Button size="sm" variant="plain" color="danger" onClick={clearError}>Dismiss</Button>}>{error}</Alert>}
 
-      <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto' }}>
+      <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', maxHeight: '60vh' }}>
         <Table stickyHeader>
           <thead>
             <tr>

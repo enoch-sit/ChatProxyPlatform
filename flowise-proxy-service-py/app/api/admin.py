@@ -350,12 +350,12 @@ class CreateUserRequest(BaseModel):
     email: str
     password: str
     role: Optional[str] = "user"
-    skipVerification: Optional[bool] = False
+    skipVerification: Optional[bool] = True
 
 
 class BatchCreateUsersRequest(BaseModel):
     users: List[Dict[str, Any]]
-    skipVerification: Optional[bool] = False
+    skipVerification: Optional[bool] = True
 
 
 class AllocateCreditsRequest(BaseModel):
@@ -473,7 +473,10 @@ async def admin_allocate_credits(
     current_user: Dict = Depends(require_elevated_role)
 ):
     """Allocate credits to a user (proxy → accounting-service POST /api/credits/allocate)."""
-    return await _proxy("POST", f"{ACCOUNTING_URL}/api/credits/allocate", _admin_headers(current_user), request.dict())
+    # Use exclude_none=True so that optional fields like expiryDays are omitted when not
+    # provided. Sending null would override the TypeScript default (30 days) in the
+    # accounting-service, causing credits to expire immediately.
+    return await _proxy("POST", f"{ACCOUNTING_URL}/api/credits/allocate", _admin_headers(current_user), request.dict(exclude_none=True))
 
 
 @router.post("/credits/set")
@@ -500,7 +503,7 @@ async def admin_adjust_credits(
     current_user: Dict = Depends(require_elevated_role)
 ):
     """Adjust credits for a user (proxy → accounting-service PUT /api/credits/adjust)."""
-    return await _proxy("PUT", f"{ACCOUNTING_URL}/api/credits/adjust", _admin_headers(current_user), request.dict())
+    return await _proxy("PUT", f"{ACCOUNTING_URL}/api/credits/adjust", _admin_headers(current_user), request.dict(exclude_none=True))
 
 
 # =================================================================================

@@ -370,7 +370,7 @@ export class AuthService {
    * @param email - The email address of the new user.
    * @param password - The password for the new user (will be hashed before storage).
    * @param role - The role to assign to the new user.
-   * @param skipVerification - Whether to mark the user as verified immediately (optional).
+   * @param skipVerification - Whether to mark the user as verified immediately (defaults to true for immediate login).
    * @returns A Promise that resolves to a SignupResult object indicating the success or failure of the user creation.
    */
   async adminCreateUser(
@@ -378,7 +378,7 @@ export class AuthService {
     email: string, 
     password: string, 
     role: UserRole = UserRole.USER,
-    skipVerification: boolean = false
+    skipVerification: boolean = true
   ): Promise<SignupResult> {
     try {
       // Check if the provided username already exists in the database

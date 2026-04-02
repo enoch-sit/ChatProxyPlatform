@@ -4,6 +4,7 @@ from typing import Dict, Optional
 from datetime import datetime
 from app.config import settings
 from app.auth.jwt_handler import JWTHandler
+from app.auth.middleware import ELEVATED_ROLES
 from app.models.user import User
 from app.models.chatflow import Chatflow, UserChatflow
 from app.models.refresh_token import RefreshToken
@@ -15,9 +16,26 @@ class AuthService:
         self.logger = logging.getLogger(__name__)
         logging.basicConfig(level=logging.INFO)
 
-    async def validate_user_permissions(self, user_id: str, chatflow_id: str) -> bool:
-        """Validate if user has access to specific chatflow using MongoDB"""
+    async def validate_user_permissions(self, user_id: str, chatflow_id: str, user_role: str = None) -> bool:
+        """Validate if user has access to specific chatflow using MongoDB.
+        
+        Elevated roles (admin/supervisor/teacher) are granted access to all chatflows
+        without requiring an explicit UserChatflow assignment.
+        
+        user_role: role from the JWT payload (preferred); falls back to DB lookup if not provided.
+        """
         try:
+            # 0. Check if user has an elevated role — bypass assignment check entirely
+            # Prefer role from JWT (already trusted/validated); fall back to DB lookup
+            effective_role = user_role
+            if not effective_role:
+                local_user = await User.find_one(User.external_id == user_id)
+                effective_role = local_user.role if local_user else None
+
+            if effective_role in ELEVATED_ROLES:
+                self.logger.info(f"ACCESS GRANTED (elevated role '{effective_role}'): User '{user_id}' bypasses assignment check for chatflow '{chatflow_id}'")
+                return True
+
             # The chatflow_id passed here is the flowise_id from the API request
             flowise_chatflow_id = chatflow_id
 

@@ -12,6 +12,34 @@
 
 ---
 
+## Security Concepts (Read This First)
+
+Before running setup, understand these 4 concepts:
+
+1. **Identity vs secret**
+  - Identity = who can call AWS APIs (IAM user/role)
+  - Secret = sensitive value (password, JWT key, DB URL)
+  - Identities should be short-lived (roles when possible), secrets should be stored in **AWS Secrets Manager** only.
+
+2. **Source of truth**
+  - `terraform.tfvars` and `.env.example` are templates.
+  - Real secrets should only live in Secrets Manager paths like:
+    - `/chatproxy/dev/jwt`
+    - `/chatproxy/dev/db/accounting`
+    - `/chatproxy/dev/mongodb/auth`
+    - `/chatproxy/dev/mongodb/proxy`
+    - `/chatproxy/dev/ses`
+
+3. **Rotation**
+  - Rotation means creating a new secret value, updating running services, and invalidating old credentials.
+  - Rotation should happen after any exposure and on a schedule (for example every 30-90 days).
+
+4. **Blast radius**
+  - If one secret leaks, impact should be limited.
+  - Use different passwords for each system (Mongo auth user, Mongo proxy user, Postgres user, admin user).
+
+---
+
 ## Before You Start — What You Will Need
 
 | What | Why |
@@ -298,9 +326,32 @@ enable_execute_command = true    # allows debug access (fine for dev)
 
 ---
 
-## Part 9 — Set Up Your Databases (MongoDB Atlas — Free Option Available)
+## Part 9 — Set Up Your Databases
 
-The platform uses **MongoDB** for storing users and chat history. The easiest option is **MongoDB Atlas**, which has a free tier.
+For this repository's current AWS deployment, your databases are:
+- **PostgreSQL on AWS RDS** (used by accounting-service)
+- **MongoDB on AWS EC2** (used by auth-service and flowise-proxy)
+
+MongoDB Atlas is an optional alternative. Use it only if you intentionally want managed MongoDB outside your AWS VPC.
+
+### Which one should I use?
+
+- Use **AWS-native (recommended for this repo)** if you are following the Terraform modules in `infra/`.
+- Use **Atlas (optional)** only if you specifically choose external MongoDB.
+
+### Option A — AWS-native MongoDB (Recommended for this setup)
+
+No separate manual database signup is required for MongoDB.
+Terraform provisions a MongoDB EC2 instance and writes connection strings into Secrets Manager:
+- `/chatproxy/dev/mongodb/auth`
+- `/chatproxy/dev/mongodb/proxy`
+
+You only need to ensure your RDS/accounting secret exists before apply:
+- `/chatproxy/dev/db/accounting`
+
+### Option B — MongoDB Atlas (Optional)
+
+If you choose Atlas, follow the steps below and then write those Atlas URLs to Secrets Manager.
 
 ### Step 9.1 — Create a free MongoDB Atlas account
 
@@ -518,12 +569,119 @@ Open PowerShell and run:
 ```powershell
 $BASE_URL = "https://mychatbot.com"   # ← replace with your domain
 
+# Generate a strong random admin password (store in your password manager)
+$ADMIN_PASSWORD = [System.Web.Security.Membership]::GeneratePassword(24,6)
+$ADMIN_PASSWORD
+
 Invoke-RestMethod -Method POST "$BASE_URL/api/auth/register" `
   -ContentType "application/json" `
-  -Body '{"email":"admin@mychatbot.com","password":"Admin@2026","name":"Admin User"}'
+  -Body (@{ email = "admin@mychatbot.com"; password = $ADMIN_PASSWORD; name = "Admin User" } | ConvertTo-Json)
 ```
 
 Then log in to the Bridge UI at `https://mychatbot.com` with those credentials.
+
+---
+
+## Secret Exposure Check and Rotation (Production Runbook)
+
+Use this whenever you suspect a leak, or before a fresh relaunch.
+
+### Step A - Identify what may be exposed
+
+Check for these common leak locations:
+- docs and old reports (for example copied JWTs, passwords in markdown)
+- backup folders (`backup_*`, `config_backup_*`)
+- local `.env` files accidentally copied
+- shell history and CI logs
+
+If any real secret appears in Git history, treat it as compromised and rotate immediately.
+
+### Step B - Rotate JWT secrets
+
+This invalidates active access/refresh tokens and forces re-login.
+
+```powershell
+$ACCESS  = [System.Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$REFRESH = [System.Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+
+aws secretsmanager put-secret-value `
+  --secret-id /chatproxy/dev/jwt `
+  --secret-string "{`"JWT_ACCESS_SECRET`":`"$ACCESS`",`"JWT_REFRESH_SECRET`":`"$REFRESH`"}"
+```
+
+Redeploy services that consume JWTs:
+- `auth-service`
+- `accounting-service`
+- `flowise-proxy`
+
+### Step C - Rotate database credentials
+
+1. Create new DB users/passwords (Mongo Atlas and RDS).
+2. Update corresponding Secrets Manager values.
+3. Redeploy affected services.
+4. Verify health endpoints.
+5. Disable old DB credentials.
+
+### Step D - Rotate admin account password
+
+Preferred method (API, no direct DB edits):
+1. Login as admin.
+2. Call `POST /api/protected/change-password` with:
+  - `currentPassword`
+  - `newPassword` (strong random value)
+3. Store the new password in your password manager.
+
+If admin login is lost:
+1. Create a temporary recovery admin via bootstrap script.
+2. Change original admin password.
+3. Remove recovery admin.
+
+### Step E - Verify rotation succeeded
+
+1. Old tokens fail with `401`.
+2. New login works.
+3. Admin pages load.
+4. `/api/auth/health`, `/api/accounting/health`, `/api/v1/chat/health` return healthy responses.
+
+---
+
+## Fresh Setup Again (Clean Rebuild Sequence)
+
+If you want to set up from scratch again, follow this order:
+
+1. **Prepare account and tooling**
+  - AWS account, domain, certificate, AWS CLI, Terraform, Docker.
+
+2. **Prepare Terraform backend**
+  - S3 backend bucket + DynamoDB lock table.
+
+3. **Prepare secrets first**
+  - Generate fresh JWT and DB credentials.
+  - Store all values in Secrets Manager before deploying workloads.
+
+4. **Deploy base infrastructure**
+  - VPC, subnets, security groups, ALB, ECS cluster, RDS.
+
+5. **Build and push images**
+  - auth, accounting, flowise-proxy, bridge to ECR.
+
+6. **Deploy application services**
+  - ECS services wired to ALB path rules.
+
+7. **Initialize and verify data plane**
+  - Confirm accounting DB schema is created.
+  - Confirm Mongo connections for auth and proxy.
+
+8. **Create first admin with random password**
+  - No default/static admin passwords.
+
+9. **Run smoke tests**
+  - Login, admin users, credits, usage, chat endpoints.
+
+10. **Lock down security**
+  - Remove temporary/testing routes.
+  - Restrict network rules.
+  - Set cost alarms and rotation reminders.
 
 ---
 
