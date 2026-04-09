@@ -1,0 +1,10 @@
+# Force Windows line endings for batch/PowerShell scripts on all platforms
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+*.ps1           text eol=crlf
+
+# Force LF for shell scripts
+*.sh            text eol=lf
+
+# Auto-detect text files and normalize
+*               text=auto
