@@ -32,7 +32,10 @@ class ExternalAuthService:
             logger.info(f"Attempting authentication to: {auth_url}")
             logger.info(f"Username: {username}")
 
-            async with httpx.AsyncClient() as client:
+            # Use verify=False for internal VPC calls through ALB to avoid
+            # SSL certificate issues when calling via internal DNS
+            verify_ssl = not self.auth_url.startswith("http://")
+            async with httpx.AsyncClient(verify=verify_ssl) as client:
                 response = await client.post(
                     auth_url, json=auth_payload, headers=headers, timeout=self.timeout
                 )
@@ -63,8 +66,14 @@ class ExternalAuthService:
                     #   }
                     # }
                 elif response.status_code == 401:
+                    error_detail = "Invalid credentials"
+                    try:
+                        error_data = response.json()
+                        error_detail = error_data.get("error", error_data.get("message", error_detail))
+                    except Exception:
+                        pass
                     logger.warning(
-                        f"Authentication failed for {username}: Invalid credentials"
+                        f"Authentication failed for {username}: {error_detail}"
                     )
                     return None
                 else:
