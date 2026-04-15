@@ -6,6 +6,7 @@ import {
   refreshToken as apiRefreshToken,
   logout as apiLogout,
 } from '../api/auth';
+import { navigateTo } from '../api/navigationService';
 import type { AuthState, LoginCredentials, User, AuthTokens, LoginResponse } from '../types/auth';
 import { jwtDecode } from 'jwt-decode';
 
@@ -143,6 +144,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         set(initialState);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        navigateTo('/login');
       },
       refreshToken: async (isBackground = false) => {
         // Don't show loading for background refreshes
