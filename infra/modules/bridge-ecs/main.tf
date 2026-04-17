@@ -113,7 +113,7 @@ resource "aws_ecs_service" "bridge" {
   }
 
   lifecycle {
-    ignore_changes = [task_definition, desired_count]
+    ignore_changes = [desired_count]
   }
 
   depends_on = [aws_lb_listener_rule.bridge, aws_iam_role_policy_attachment.task_exec_policy]

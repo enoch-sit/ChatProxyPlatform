@@ -15,6 +15,7 @@ export const useAuth = () => {
     user: store.user,
     tokens: store.tokens,
     isAuthenticated: store.isAuthenticated,
+    hasHydrated: store.hasHydrated,
     isLoading: store.isLoading,
     error: store.error,
 

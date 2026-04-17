@@ -10,7 +10,7 @@ services:
       - "3082:3082"
     restart: unless-stopped
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       # Change this to your Flowise Proxy API URL
       # Default: http://host.docker.internal:8000 (for local development)
       # Production: Change to your actual API URL

@@ -553,7 +553,7 @@ adminRouter.post('/users', authenticate, requireAdminOrTeacher, async (req: Requ
 adminRouter.post('/users/batch', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const { users, skipVerification = true } = req.body;
-    
+
     // Validate input
     if (!users || !Array.isArray(users) || users.length === 0) {
       return res.status(400).json({ error: 'A non-empty array of users is required' });
@@ -564,6 +564,13 @@ adminRouter.post('/users/batch', authenticate, requireAdminOrTeacher, async (req
       if (!user.username || !user.email) {
         return res.status(400).json({ 
           error: 'Each user must have a username and email',
+          invalidUser: user
+        });
+      }
+
+      if (user.password && typeof user.password === 'string' && user.password.length < 8) {
+        return res.status(400).json({
+          error: 'Provided batch password must be at least 8 characters',
           invalidUser: user
         });
       }
@@ -631,6 +638,72 @@ adminRouter.put('/users/:userId/role', authenticate, requireAdmin, async (req: R
   } catch (error) {
     logger.error('Error updating user role:', error);
     res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+// Update user roles in batch (admin only)
+adminRouter.put('/users/roles/batch', authenticate, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { updates } = req.body;
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: 'A non-empty updates array is required' });
+    }
+
+    const results: Array<{ userId: string; success: boolean; message: string; role?: string }> = [];
+    let successful = 0;
+    let failed = 0;
+
+    for (const update of updates) {
+      const { userId, role } = update || {};
+
+      if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        failed++;
+        results.push({ userId: userId || 'unknown', success: false, message: 'Invalid user ID' });
+        continue;
+      }
+
+      if (!Object.values(UserRole).includes(role)) {
+        failed++;
+        results.push({ userId, success: false, message: 'Invalid role' });
+        continue;
+      }
+
+      try {
+        const updatedUser = await User.findByIdAndUpdate(
+          userId,
+          { role },
+          { new: true }
+        ).select('-password');
+
+        if (!updatedUser) {
+          failed++;
+          results.push({ userId, success: false, message: 'User not found' });
+          continue;
+        }
+
+        successful++;
+        results.push({ userId, success: true, message: 'Role updated', role: updatedUser.role });
+      } catch (error) {
+        failed++;
+        logger.error(`Error updating role for user ${userId}:`, error);
+        results.push({ userId, success: false, message: 'Failed to update role' });
+      }
+    }
+
+    logger.info(`Batch role update by ${req.user?.username}. Successful: ${successful}, Failed: ${failed}, Total: ${updates.length}`);
+    res.status(200).json({
+      message: `${successful} of ${updates.length} user roles updated successfully`,
+      results,
+      summary: {
+        total: updates.length,
+        successful,
+        failed,
+      },
+    });
+  } catch (error) {
+    logger.error('Batch role update error:', error);
+    res.status(500).json({ error: 'Batch role update failed' });
   }
 });
 

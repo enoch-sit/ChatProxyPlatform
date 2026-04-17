@@ -9,7 +9,20 @@
  */
 
 import apiClient from './client';
-import type { BulkAssignmentResult, AdminUser, CreditAllocation, AllocateCreditsPayload, SetCreditsPayload, RemoveCreditsPayload, AdjustCreditsPayload, SystemStats, CreateUserPayload, BatchCreateUsersPayload } from '../types/admin';
+import type {
+  BulkAssignmentResult,
+  AdminUser,
+  CreditAllocation,
+  AllocateCreditsPayload,
+  SetCreditsPayload,
+  RemoveCreditsPayload,
+  AdjustCreditsPayload,
+  SystemStats,
+  CreateUserPayload,
+  BatchCreateUsersPayload,
+  BatchRoleUpdateItem,
+  BatchRoleUpdateResponse,
+} from '../types/admin';
 import type { Chatflow, ChatflowStats, ChatflowUser} from '../types/chatflow';
 
 /**
@@ -149,6 +162,11 @@ export const deleteUser = async (userId: string): Promise<{ message: string }> =
 
 export const updateUserRole = async (userId: string, role: string): Promise<{ message: string }> => {
   const response = await apiClient.put(`/api/v1/admin/users/${userId}/role`, { role });
+  return response.data;
+};
+
+export const updateUsersRolesBatch = async (updates: BatchRoleUpdateItem[]): Promise<BatchRoleUpdateResponse> => {
+  const response = await apiClient.put('/api/v1/admin/users/roles/batch', { updates });
   return response.data;
 };
 

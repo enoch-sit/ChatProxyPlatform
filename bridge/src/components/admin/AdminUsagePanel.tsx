@@ -47,7 +47,7 @@ const AdminUsagePanel: React.FC = () => {
   }
 
   return (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'auto' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography level="h3">Token Usage &amp; Stats</Typography>
         <Stack direction="row" spacing={1}>
@@ -117,7 +117,7 @@ const AdminUsagePanel: React.FC = () => {
           {byUser.length > 0 && (
             <>
               <Typography level="title-md" sx={{ mb: 1 }}>Per-User Breakdown</Typography>
-              <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto' }}>
+              <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', flex: 1, minHeight: 0 }}>
                 <Table stickyHeader>
                   <thead>
                     <tr>
@@ -173,9 +173,9 @@ const AdminUsagePanel: React.FC = () => {
           {byUser.length === 0 && !systemStats.totalRequests && (
             <Sheet variant="outlined" sx={{ p: 2, borderRadius: 'sm', mt: 2 }}>
               <Typography level="body-sm" sx={{ mb: 1 }}>Raw stats data:</Typography>
-              <pre style={{ margin: 0, fontSize: '0.75rem', overflow: 'auto' }}>
+              <Box component="pre" sx={{ m: 0, fontSize: '0.75rem', overflow: 'auto' }}>
                 {JSON.stringify(systemStats, null, 2)}
-              </pre>
+              </Box>
             </Sheet>
           )}
         </>

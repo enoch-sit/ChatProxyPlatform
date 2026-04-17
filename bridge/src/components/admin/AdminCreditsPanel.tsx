@@ -97,7 +97,7 @@ const AdminCreditsPanel: React.FC = () => {
   const submitDisabled = isLoading || !targetUserId || (needsAmount && (!creditAmount || isNaN(parseInt(creditAmount))));
 
   return (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <Typography level="h3" sx={{ mb: 2 }}>Credit Management</Typography>
 
       {success && <Alert color="success" sx={{ mb: 2 }}>{success}</Alert>}
@@ -145,7 +145,7 @@ const AdminCreditsPanel: React.FC = () => {
         <Button size="sm" variant="outlined" onClick={() => fetchAllCredits()}>Refresh</Button>
       </Box>
 
-      <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto' }}>
+      <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', flex: 1, minHeight: 0 }}>
         <Table stickyHeader>
           <thead>
             <tr>
@@ -159,7 +159,7 @@ const AdminCreditsPanel: React.FC = () => {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center' }}><CircularProgress size="sm" /></td></tr>
+              <tr><td colSpan={6} align="center"><CircularProgress size="sm" /></td></tr>
             ) : creditAllocations.length === 0 ? (
               <tr><td colSpan={6}>No credit allocations found.</td></tr>
             ) : creditAllocations.map((alloc) => (

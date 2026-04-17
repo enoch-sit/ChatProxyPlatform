@@ -6,6 +6,7 @@ import {
   getSpecificChatflow,
   getChatflowUsers,
   addUserToChatflow,
+  bulkAddUsersToChatflow as bulkAddUsersToChatflowApi,
   removeUserFromChatflow,
   listUsers,
   createUser,
@@ -13,6 +14,7 @@ import {
   verifyUser,
   deleteUser,
   updateUserRole,
+  updateUsersRolesBatch as updateUsersRolesBatchApi,
   listAllCredits,
   allocateCredits,
   setCredits,
@@ -21,7 +23,18 @@ import {
   getSystemStats,
 } from '../api/admin';
 import type { Chatflow, ChatflowUser, ChatflowStats } from '../types/chatflow';
-import type { AdminUser, CreditAllocation, AllocateCreditsPayload, SetCreditsPayload, RemoveCreditsPayload, AdjustCreditsPayload, SystemStats, CreateUserPayload, BatchCreateUsersPayload } from '../types/admin';
+import type {
+  AdminUser,
+  CreditAllocation,
+  AllocateCreditsPayload,
+  SetCreditsPayload,
+  RemoveCreditsPayload,
+  AdjustCreditsPayload,
+  SystemStats,
+  CreateUserPayload,
+  BatchCreateUsersPayload,
+  BatchRoleUpdateItem,
+} from '../types/admin';
 
 interface AdminState {
   // Chatflow
@@ -59,6 +72,7 @@ interface AdminActions {
   verifyUser: (userId: string) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   updateUserRole: (userId: string, role: string) => Promise<void>;
+  updateUsersRolesBatch: (updates: BatchRoleUpdateItem[]) => Promise<{ successful: number; failed: Array<{ userId: string; message: string }> }>;
   // Credits
   fetchAllCredits: () => Promise<void>;
   allocateCredits: (payload: AllocateCreditsPayload) => Promise<void>;
@@ -163,20 +177,11 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
   bulkAddUsersToChatflow: async (flowiseId: string, userEmails: string[]) => {
     set({ isLoading: true, error: null });
     try {
-      const results = await Promise.allSettled(
-        userEmails.map(email => addUserToChatflow(flowiseId, email))
-      );
-
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results
-        .filter((r) => r.status === 'rejected')
-        .map((r, index) => {
-          if (r.status === 'rejected') {
-            // Log the reason for debugging
-            console.error(`Failed to add user ${userEmails[index]}:`, r.reason);
-          }
-          return userEmails[index];
-        });
+      const result = await bulkAddUsersToChatflowApi(flowiseId, userEmails);
+      const successful = Array.isArray(result.successful_assignments)
+        ? result.successful_assignments.length
+        : Number(result.successful_assignments || 0);
+      const failed = (result.failed_assignments || []).map((assignment) => assignment.email);
 
       // 重新獲取用戶列表
       const users = await getChatflowUsers(flowiseId);
@@ -294,6 +299,27 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
       set({ users, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to update user role' });
+      throw error;
+    }
+  },
+
+  updateUsersRolesBatch: async (updates: BatchRoleUpdateItem[]) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await updateUsersRolesBatchApi(updates);
+      const users = await listUsers();
+      set({ users, isLoading: false });
+
+      const failed = result.results
+        .filter((item) => !item.success)
+        .map((item) => ({ userId: item.userId, message: item.message }));
+
+      return {
+        successful: result.summary.successful,
+        failed,
+      };
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to batch update user roles' });
       throw error;
     }
   },

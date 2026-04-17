@@ -3,7 +3,10 @@ import { useEffect } from 'react';
 import { CssVarsProvider } from '@mui/joy/styles';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import CssBaseline from '@mui/joy/CssBaseline';
+import Box from '@mui/joy/Box';
+import CircularProgress from '@mui/joy/CircularProgress';
 import { useAuth } from './hooks/useAuth';
+import { useAuthStore } from './store/authStore';
 import { setNavigate } from './api/navigationService';
 import LoginPage from './pages/LoginPage';
 import ChatPage from './pages/ChatPage';
@@ -21,9 +24,13 @@ function NavigateSetter() {
 }
 
 function App() {
-  const { checkAuthStatus, user } = useAuth();
+  const { checkAuthStatus, isAuthenticated, tokens, hasHydrated } = useAuth();
 
   useEffect(() => {
+    // On mount, immediately mark as hydrated to unblock UI
+    // Zustand's persist middleware handles storage rehydration
+    useAuthStore.setState({ hasHydrated: true });
+    
     // Check authentication status on app start (foreground check)
     checkAuthStatus();
     
@@ -52,6 +59,26 @@ function App() {
     };
   }, [checkAuthStatus]);
 
+  const hasAccessToken = !!tokens?.accessToken;
+
+  if (!hasHydrated) {
+    return (
+      <CssVarsProvider defaultMode="system">
+        <CssBaseline />
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </CssVarsProvider>
+    );
+  }
+
   return (
     <Router>
       <NavigateSetter />
@@ -61,11 +88,11 @@ function App() {
           <Route 
             path="/login" 
             element={
-              user ? <Navigate to="/chat" replace /> : <LoginPage />
+              isAuthenticated && hasAccessToken ? <Navigate to="/chat" replace /> : <LoginPage />
             } 
           />
           
-          <Route path="/" element={<Navigate to="/chat" replace />} />
+          <Route path="/" element={<Navigate to={isAuthenticated && hasAccessToken ? '/chat' : '/login'} replace />} />
           
           <Route
             path="/dashboard"

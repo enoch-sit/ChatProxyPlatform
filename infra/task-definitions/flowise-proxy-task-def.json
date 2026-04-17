@@ -1,0 +1,108 @@
+{
+    "family":  "chatproxy-dev-flowise-proxy-task",
+    "executionRoleArn":  "arn:aws:iam::168437900315:role/chatproxy-dev-flowise-proxy-task-exec-role",
+    "networkMode":  "awsvpc",
+    "containerDefinitions":  [
+                                 {
+                                     "name":  "flowise-proxy",
+                                     "image":  "168437900315.dkr.ecr.us-east-1.amazonaws.com/chatproxy/flowise-proxy:auth-nbf-fix-35dc12c",
+                                     "cpu":  0,
+                                     "portMappings":  [
+                                                          {
+                                                              "containerPort":  8000,
+                                                              "hostPort":  8000,
+                                                              "protocol":  "tcp"
+                                                          }
+                                                      ],
+                                     "essential":  true,
+                                     "environment":  [
+                                                         {
+                                                             "name":  "ACCOUNTING_SERVICE_URL",
+                                                             "value":  "https://aidcec-ai-agent.com"
+                                                         },
+                                                         {
+                                                             "name":  "EXTERNAL_AUTH_URL",
+                                                             "value":  "https://aidcec-ai-agent.com"
+                                                         },
+                                                         {
+                                                             "name":  "PORT",
+                                                             "value":  "8000"
+                                                         },
+                                                         {
+                                                             "name":  "ACCOUNTING_API_URL",
+                                                             "value":  "https://aidcec-ai-agent.com/api/accounting"
+                                                         },
+                                                         {
+                                                             "name":  "MONGODB_DATABASE_NAME",
+                                                             "value":  "proxy_db"
+                                                         },
+                                                         {
+                                                             "name":  "DEBUG",
+                                                             "value":  "false"
+                                                         },
+                                                         {
+                                                             "name":  "CORS_ORIGIN",
+                                                             "value":  "https://aidcec-ai-agent.com"
+                                                         },
+                                                         {
+                                                             "name":  "FLOWISE_API_URL",
+                                                             "value":  "https://flowise.aidcec-ai-agent.com"
+                                                         },
+                                                         {
+                                                             "name":  "AUTH_API_URL",
+                                                             "value":  "https://aidcec-ai-agent.com/api/auth"
+                                                         }
+                                                     ],
+                                     "mountPoints":  [
+
+                                                     ],
+                                     "volumesFrom":  [
+
+                                                     ],
+                                     "secrets":  [
+                                                     {
+                                                         "name":  "JWT_ACCESS_SECRET",
+                                                         "valueFrom":  "arn:aws:secretsmanager:us-east-1:168437900315:secret:/chatproxy/dev/jwt-DidFsL:JWT_ACCESS_SECRET::"
+                                                     },
+                                                     {
+                                                         "name":  "JWT_REFRESH_SECRET",
+                                                         "valueFrom":  "arn:aws:secretsmanager:us-east-1:168437900315:secret:/chatproxy/dev/jwt-DidFsL:JWT_REFRESH_SECRET::"
+                                                     },
+                                                     {
+                                                         "name":  "FLOWISE_API_KEY",
+                                                         "valueFrom":  "arn:aws:secretsmanager:us-east-1:168437900315:secret:/chatproxy/dev/flowise/api-key-FXb9Aq:FLOWISE_API_KEY::"
+                                                     },
+                                                     {
+                                                         "name":  "MONGODB_URL",
+                                                         "valueFrom":  "arn:aws:secretsmanager:us-east-1:168437900315:secret:/chatproxy/dev/mongodb/proxy-jYvFsH:MONGODB_URL::"
+                                                     }
+                                                 ],
+                                     "logConfiguration":  {
+                                                              "logDriver":  "awslogs",
+                                                              "options":  {
+                                                                              "awslogs-group":  "/ecs/chatproxy-dev-flowise-proxy",
+                                                                              "awslogs-region":  "us-east-1",
+                                                                              "awslogs-stream-prefix":  "flowise-proxy"
+                                                                          }
+                                                          },
+                                     "healthCheck":  {
+                                                         "command":  [
+                                                                         "CMD-SHELL",
+                                                                         "curl -sf http://localhost:8000/health || exit 1"
+                                                                     ],
+                                                         "interval":  30,
+                                                         "timeout":  5,
+                                                         "retries":  3,
+                                                         "startPeriod":  60
+                                                     },
+                                     "systemControls":  [
+
+                                                        ]
+                                 }
+                             ],
+    "requiresCompatibilities":  [
+                                    "FARGATE"
+                                ],
+    "cpu":  "512",
+    "memory":  "1024"
+}

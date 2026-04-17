@@ -1,0 +1,175 @@
+name: Fleet Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Fleet action to run"
+        required: true
+        type: choice
+        options:
+          - status
+          - patch
+          - health
+          - setup
+      target:
+        description: "Workstation name or 'all' (from fleet-inventory.json)"
+        required: false
+        default: "all"
+        type: string
+      patch_mode:
+        description: "Patch mode (only used with 'patch' action)"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - quick
+          - full
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  WG_INSTANCE_ID: i-021b5be52f91cc6fa
+
+jobs:
+  # ─── Preflight: verify WireGuard hub is reachable ──────────────────────────
+  preflight:
+    name: Preflight Check
+    runs-on: ubuntu-latest
+    outputs:
+      hub_status: ${{ steps.check.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::168437900315:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check WireGuard hub
+        id: check
+        run: |
+          STATUS=$(aws ec2 describe-instance-status \
+            --instance-ids ${{ env.WG_INSTANCE_ID }} \
+            --query 'InstanceStatuses[0].InstanceState.Name' \
+            --output text 2>/dev/null || echo "unknown")
+
+          echo "Hub instance status: $STATUS"
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+          if [ "$STATUS" != "running" ]; then
+            echo "::warning::WireGuard hub is not running ($STATUS)"
+          fi
+
+      - name: Validate fleet-inventory.json
+        run: |
+          python3 -c "
+          import json, sys
+          with open('fleet-inventory.json') as f:
+              inv = json.load(f)
+          ws = inv.get('workstations', [])
+          enabled = [w for w in ws if w.get('enabled', True)]
+          print(f'Fleet inventory: {len(ws)} workstations ({len(enabled)} enabled)')
+          for w in enabled:
+              print(f'  - {w[\"name\"]} @ {w[\"wireguardIp\"]}')
+          "
+
+  # ─── Execute fleet action via SSM on the WireGuard hub ────────────────────
+  fleet-action:
+    name: "${{ inputs.action }} → ${{ inputs.target }}"
+    needs: preflight
+    if: needs.preflight.outputs.hub_status == 'running'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::168437900315:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run fleet action via SSM
+        id: ssm
+        run: |
+          echo "Running: fleet.ps1 -Action ${{ inputs.action }} -Target ${{ inputs.target }} -PatchMode ${{ inputs.patch_mode }}"
+
+          # Send command to WireGuard hub which has SSH access to all workstations
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids ${{ env.WG_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=[
+              'cd /opt/chatproxy',
+              'python3 fleet_relay.py --action ${{ inputs.action }} --target ${{ inputs.target }} --patch-mode ${{ inputs.patch_mode }}'
+            ]" \
+            --timeout-seconds 300 \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM Command ID: $CMD_ID"
+          echo "command_id=$CMD_ID" >> "$GITHUB_OUTPUT"
+
+          # Wait for command to complete
+          echo "Waiting for command to complete..."
+          for i in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$CMD_ID" \
+              --instance-id ${{ env.WG_INSTANCE_ID }} \
+              --query 'Status' \
+              --output text 2>/dev/null || echo "Pending")
+
+            if [ "$STATUS" = "Success" ] || [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ]; then
+              break
+            fi
+            echo "  Status: $STATUS (attempt $i/60)"
+            sleep 5
+          done
+
+          echo "Final status: $STATUS"
+
+      - name: Collect results
+        if: always()
+        run: |
+          RESULT=$(aws ssm get-command-invocation \
+            --command-id "${{ steps.ssm.outputs.command_id }}" \
+            --instance-id ${{ env.WG_INSTANCE_ID }} \
+            --query '[Status, StandardOutputContent, StandardErrorContent]' \
+            --output json)
+
+          STATUS=$(echo "$RESULT" | jq -r '.[0]')
+          STDOUT=$(echo "$RESULT" | jq -r '.[1]')
+          STDERR=$(echo "$RESULT" | jq -r '.[2]')
+
+          echo "## Fleet ${{ inputs.action }} Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Action | \`${{ inputs.action }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Target | \`${{ inputs.target }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | \`$STATUS\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "$STDOUT" ]; then
+            echo "### Output" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$STDOUT" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ -n "$STDERR" ] && [ "$STDERR" != "" ]; then
+            echo "### Errors" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$STDERR" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Fail the job if the command failed
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::Fleet action failed with status: $STATUS"
+            exit 1
+          fi

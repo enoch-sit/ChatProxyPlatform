@@ -377,8 +377,12 @@ ChatProxy Platform/
 ├── setup.ps1                       ← One-command workstation setup
 ├── patch.ps1                       ← Pull updates & redeploy
 ├── diagnose.ps1                    ← Diagnostics & health checks
+├── fleet.ps1                       ← Fleet management (status, patch, health)
+├── wg-workstation-setup.ps1        ← WireGuard + OpenSSH onboarding
+├── generate_secrets.py             ← Secret generation (used by setup.ps1)
 ├── version.json                    ← Service version registry
 ├── workstation-manifest.json       ← Fleet metadata & deploy order
+├── fleet-inventory.json            ← WireGuard fleet inventory
 ├── .local-version                  ← This machine's deployed version
 │
 ├── .github/workflows/              ← CI/CD pipelines
@@ -387,11 +391,10 @@ ChatProxy Platform/
 │   └── rollback.yml                ← Manual rollback trigger
 │
 ├── infra/                          ← Terraform + deploy scripts
-│   ├── scripts/
-│   │   ├── deploy-service.ps1      ← AWS ECR → ECS deploy pipeline
-│   │   └── bump-version.ps1        ← Semver bumping + git tags
+│   ├── scripts/                    ← Deploy & version scripts
 │   ├── environments/dev/           ← Dev environment config
-│   └── modules/                    ← Terraform modules
+│   ├── modules/                    ← Terraform modules (incl. wireguard)
+│   └── task-definitions/           ← ECS task definition JSONs
 │
 ├── bridge/                         ← Frontend (React + TypeScript)
 ├── flowise/                        ← AI Flow Builder
@@ -399,8 +402,11 @@ ChatProxy Platform/
 ├── auth-service/                   ← Authentication (Node.js)
 ├── accounting-service/             ← Credit Management (Node.js)
 │
+├── scripts/                        ← Utility scripts (Python, BAT, JS)
+│   └── archive/                    ← Legacy scripts (kept for reference)
 ├── docs/                           ← Technical documentation
-└── scripts/archive/                ← Legacy .bat scripts (kept for reference)
+│   └── images/                     ← Screenshots & diagrams
+└── logs/                           ← Diagnostic & patch logs (gitignored)
 ```
 
 ---

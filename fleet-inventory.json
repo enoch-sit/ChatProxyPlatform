@@ -9,8 +9,8 @@
   },
   "workstations": [
     {
-      "name": "WS-PRIMARY",
-      "description": "Primary development workstation",
+      "name": "aidcec-demo-windows-workstation",
+      "description": "AIDCEC demo Windows workstation",
       "wireguardIp": "10.10.0.2",
       "sshUser": "admin",
       "sshPort": 22,

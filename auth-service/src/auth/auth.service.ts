@@ -449,7 +449,7 @@ export class AuthService {
    * @returns A Promise that resolves to an object containing success status, results for each user, and a summary.
    */
   async adminCreateBatchUsers(
-    users: Array<{username: string, email: string, role?: UserRole}>,
+    users: Array<{username: string, email: string, role?: UserRole, password?: string}>,
     skipVerification: boolean = true
   ): Promise<{
     success: boolean,
@@ -464,8 +464,20 @@ export class AuthService {
       // Process each user in the batch
       for (const userInfo of users) {
         try {
-          // Generate a random password
-          const password = this.generateRandomPassword();
+          // Respect client-provided password when present; otherwise generate one.
+          const passwordProvided = !!userInfo.password;
+          const password = userInfo.password || this.generateRandomPassword();
+
+          if (password.length < 8) {
+            failCount++;
+            results.push({
+              username: userInfo.username,
+              email: userInfo.email,
+              success: false,
+              message: 'Password must be at least 8 characters'
+            });
+            continue;
+          }
           
           // Create the user
           const result = await this.adminCreateUser(
@@ -489,7 +501,9 @@ export class AuthService {
               username: userInfo.username,
               email: userInfo.email,
               success: true,
-              message: 'User created successfully. Password sent via email.',
+              message: userInfo.password
+                ? 'User created successfully.'
+                : 'User created successfully. Password sent via email.',
               userId: result.userId
             });
           } else {

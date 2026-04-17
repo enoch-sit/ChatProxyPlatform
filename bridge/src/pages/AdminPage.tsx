@@ -39,6 +39,7 @@ const AdminPage: React.FC = () => {
     fetchStats,
     fetchChatflowUsers,
     addUserToChatflow,
+    bulkAddUsersToChatflow,
     removeUserFromChatflow,
     setSelectedChatflow,
     clearError,
@@ -136,16 +137,12 @@ const AdminPage: React.FC = () => {
     
     try {
       const emails = bulkUserEmails.split('\n').map(e => e.trim()).filter(Boolean);
-      
-      // Add users one by one (or implement bulk API if available)
-      const results = await Promise.allSettled(
-        emails.map(email => addUserToChatflow(selectedChatflow.flowise_id, email))
-      );
-      
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-      
-      setSuccessMessage(`${successful} users assigned. ${failed} failed.`);
+
+      const results = await bulkAddUsersToChatflow(selectedChatflow.flowise_id, emails);
+      const failedCount = results.failed.length;
+      const failedPreview = failedCount > 0 ? ` Failed: ${results.failed.slice(0, 3).join(', ')}${failedCount > 3 ? '...' : ''}` : '';
+
+      setSuccessMessage(`${results.successful} users assigned. ${failedCount} failed.${failedPreview}`);
       setBulkUserEmails('');
       setShowBulkAssignModal(false);
       
@@ -203,7 +200,7 @@ const AdminPage: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography level="h2">{t('admin.pageTitle')}</Typography>
       </Box>
@@ -238,18 +235,23 @@ const AdminPage: React.FC = () => {
         </Alert>
       )}
 
-      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v as string)}>
-        <TabList sx={{ mb: 2 }}>
+      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, v) => setActiveTab(v as string)}
+          sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+        >
+          <TabList sx={{ mb: 2, flexShrink: 0 }}>
           {canManageChatflows && <Tab value="chatflows">Chatflows</Tab>}
           {canManageUsers && <Tab value="users">Users</Tab>}
           {canManageUsers && <Tab value="credits">Credits</Tab>}
           {canViewAnalytics && <Tab value="usage">Token Usage</Tab>}
           {canManageUsers && <Tab value="student-chats">Student Chats</Tab>}
-        </TabList>
+          </TabList>
 
         {/* ---- Chatflows Tab (existing functionality) ---- */}
         {canManageChatflows && (
-          <TabPanel value="chatflows" sx={{ p: 0 }}>
+          <TabPanel value="chatflows" sx={{ p: 0, flex: 1, minHeight: 0, overflow: 'auto' }}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
               {canSyncChatflows && (
                 <Button onClick={handleSync} disabled={isLoading}>
@@ -259,34 +261,49 @@ const AdminPage: React.FC = () => {
             </Box>
 
             <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', maxWidth: '100%' }}>
-              <Table aria-label="Chatflow management table" sx={{ minWidth: '800px' }}>
+              <Table
+                aria-label="Chatflow management table"
+                sx={{
+                  minWidth: '800px',
+                  '& thead th:nth-of-type(1)': { minWidth: 120 },
+                  '& thead th:nth-of-type(2)': { minWidth: 280 },
+                  '& thead th:nth-of-type(3)': { minWidth: 80 },
+                  '& thead th:nth-of-type(4)': { minWidth: 80 },
+                  '& thead th:nth-of-type(5)': { minWidth: 70 },
+                  '& thead th:nth-of-type(6)': { minWidth: 80 },
+                  '& tbody td:nth-of-type(1)': { maxWidth: 150 },
+                  '& tbody td:nth-of-type(2)': { maxWidth: 300 },
+                }}
+              >
                 <thead>
                   <tr>
-                    <th style={{ minWidth: '120px' }}>{t('admin.chatflowName')}</th>
-                    <th style={{ minWidth: '280px' }}>{t('admin.chatflowId')}</th>
-                    <th style={{ minWidth: '80px' }}>Status</th>
-                    <th style={{ minWidth: '80px' }}>Deployed</th>
-                    <th style={{ minWidth: '70px' }}>Public</th>
-                    <th style={{ minWidth: '80px' }}>Type</th>
-                    {canManageUsers && <th style={{ minWidth: '120px' }}>{t('admin.chatflowActions')}</th>}
+                    <th>{t('admin.chatflowName')}</th>
+                    <th>{t('admin.chatflowId')}</th>
+                    <th>Status</th>
+                    <th>Deployed</th>
+                    <th>Public</th>
+                    <th>Type</th>
+                    {canManageUsers && <th>{t('admin.chatflowActions')}</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {chatflows.length === 0 ? (
                     <tr key="ChatflowInfo">
-                      <td colSpan={canManageUsers ? 7 : 6} style={{ textAlign: 'center', padding: '20px' }}>
-                        {isLoading ? 'Loading...' : 'No chatflows found'}
+                      <td colSpan={canManageUsers ? 7 : 6}>
+                        <Box sx={{ textAlign: 'center', py: 2.5 }}>
+                          {isLoading ? 'Loading...' : 'No chatflows found'}
+                        </Box>
                       </td>
                     </tr>
                   ) : (
                     chatflows.map((flow, idx) => (
                       <tr key={`${flow.flowise_id}-${idx}`}>
-                        <td style={{ maxWidth: '150px' }}>
+                        <td>
                           <Typography level="body-sm" sx={{ fontWeight: 'bold', wordBreak: 'break-word', whiteSpace: 'normal' }}>
                             {flow.name}
                           </Typography>
                         </td>
-                        <td style={{ maxWidth: '300px' }}>
+                        <td>
                           <Typography level="body-xs" sx={{ fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all', whiteSpace: 'normal', lineHeight: 1.2 }}>
                             {flow.flowise_id}
                           </Typography>
@@ -336,32 +353,33 @@ const AdminPage: React.FC = () => {
 
         {/* ---- Users Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="users" sx={{ p: 0 }}>
+          <TabPanel value="users" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <AdminUsersPanel />
           </TabPanel>
         )}
 
         {/* ---- Credits Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="credits" sx={{ p: 0 }}>
+          <TabPanel value="credits" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <AdminCreditsPanel />
           </TabPanel>
         )}
 
         {/* ---- Usage / Token Stats Tab ---- */}
         {canViewAnalytics && (
-          <TabPanel value="usage" sx={{ p: 0 }}>
+          <TabPanel value="usage" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <AdminUsagePanel />
           </TabPanel>
         )}
 
         {/* ---- Student Chat History Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="student-chats" sx={{ p: 0 }}>
+          <TabPanel value="student-chats" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <AdminChatHistoryPanel />
           </TabPanel>
         )}
-      </Tabs>
+        </Tabs>
+      </Box>
 
       {/* Chatflow User Management Modal */}
       <Modal open={showUserModal} onClose={handleCloseUserModal}>
@@ -389,7 +407,7 @@ const AdminPage: React.FC = () => {
             </Box>
           )}
 
-          <Sheet sx={{ maxHeight: '300px', overflow: 'auto' }}>
+          <Sheet sx={{ maxHeight: 'calc(100vh - 220px)', overflow: 'auto' }}>
             <Table aria-label="User list for chatflow">
               <thead>
                 <tr>
@@ -400,7 +418,7 @@ const AdminPage: React.FC = () => {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={canManageUsers ? 2 : 1} style={{ textAlign: 'center' }}>
+                    <td colSpan={canManageUsers ? 2 : 1} align="center">
                       <CircularProgress size="sm" />
                     </td>
                   </tr>

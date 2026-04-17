@@ -28,7 +28,7 @@
 
 .EXAMPLE
     .\fleet.ps1 -Action status
-    .\fleet.ps1 -Action patch -Target WS-PRIMARY -PatchMode quick
+    .\fleet.ps1 -Action patch -Target aidcec-demo-windows-workstation -PatchMode quick
     .\fleet.ps1 -Action health -Target all
     .\fleet.ps1 -Action run-command -Command "Get-Service docker"
 #>

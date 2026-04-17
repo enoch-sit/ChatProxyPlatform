@@ -9,6 +9,7 @@
       3. Update infra/environments/<env>/terraform.tfvars with the new image URI
       4. terraform apply -target=<module>  →  new ECS task-definition revision  →  rolling deploy
       5. Wait for ECS service to reach a stable state
+      6. Auto-rollback if health check fails (when -AutoRollback is set)
 
     WHY THIS MATTERS:
       :latest means ECS can't diff revisions. A versioned tag causes Terraform to
@@ -24,28 +25,38 @@
 
 .PARAMETER Tag
     Image version tag, e.g. v1.2.3 or a git short-SHA.
-    Tip: use  -Tag (git rev-parse --short HEAD)  in a bash-compatible shell,
-    or   -Tag (& git rev-parse --short HEAD)      in PowerShell.
+    If omitted, auto-generates from version.json + git SHA.
 
 .PARAMETER Environment
     Terraform environment subdirectory under infra/environments/ (default: dev).
 
 .PARAMETER SkipTerraform
     Push the image and update tfvars but do NOT run terraform apply.
-    Useful when you want to review the plan first, then apply manually.
+
+.PARAMETER DryRun
+    Show what would happen without executing anything.
+
+.PARAMETER AutoRollback
+    If the ECS service fails to stabilise, automatically revert to the previous task definition.
+
+.PARAMETER HealthTimeout
+    Seconds to wait for ECS service to stabilise (default: 300).
+
+.PARAMETER CommitTfvars
+    After deploy, git commit the updated terraform.tfvars.
 
 .EXAMPLE
-    # Deploy flowise-proxy as v1.1.0
-    .\infra\scripts\deploy-service.ps1 -Service flowise-proxy -Tag v1.1.0
+    # Deploy flowise-proxy with auto-generated version tag
+    .\infra\scripts\deploy-service.ps1 -Service flowise-proxy
 
-    # Deploy auth-service tagged with the current git SHA
-    .\infra\scripts\deploy-service.ps1 -Service auth-service -Tag (& git rev-parse --short HEAD)
+    # Deploy auth-service with explicit tag + auto-rollback
+    .\infra\scripts\deploy-service.ps1 -Service auth-service -Tag v1.1.0 -AutoRollback
 
-    # Push image + update tfvars only (apply manually later)
-    .\infra\scripts\deploy-service.ps1 -Service bridge -Tag v2.0.0 -SkipTerraform
+    # Dry run — see what would happen
+    .\infra\scripts\deploy-service.ps1 -Service bridge -DryRun
 
-    # Roll back flowise-proxy to a previously deployed version
-    .\infra\scripts\deploy-service.ps1 -Service flowise-proxy -Tag v1.0.0
+    # Deploy + commit tfvars to git
+    .\infra\scripts\deploy-service.ps1 -Service auth-service -Tag v1.1.0 -CommitTfvars
 #>
 [CmdletBinding()]
 param(
@@ -53,12 +64,19 @@ param(
     [ValidateSet("flowise-proxy", "auth-service", "accounting-service", "bridge")]
     [string]$Service,
 
-    [Parameter(Mandatory)]
     [string]$Tag,
 
     [string]$Environment = "dev",
 
-    [switch]$SkipTerraform
+    [switch]$SkipTerraform,
+
+    [switch]$DryRun,
+
+    [switch]$AutoRollback,
+
+    [int]$HealthTimeout = 300,
+
+    [switch]$CommitTfvars
 )
 
 Set-StrictMode -Version Latest
@@ -112,6 +130,22 @@ foreach ($p in @($tfvarsPath, $sourceDir)) {
     if (-not (Test-Path $p)) { throw "Path not found: $p" }
 }
 
+# ─── Auto-generate tag from version.json if not provided ─────────────────────
+if (-not $Tag) {
+    $versionFile = Join-Path $repoRoot "version.json"
+    if (Test-Path $versionFile) {
+        $versionData = Get-Content $versionFile -Raw | ConvertFrom-Json
+        $svcVersion = $versionData.services.$Service
+        if (-not $svcVersion) { $svcVersion = $versionData.version }
+        $gitSha = (& git -C $repoRoot rev-parse --short HEAD 2>$null)
+        if (-not $gitSha) { $gitSha = "unknown" }
+        $Tag = "v${svcVersion}-${gitSha}"
+        Write-Host "Auto-generated tag from version.json: $Tag" -ForegroundColor Cyan
+    } else {
+        throw "No -Tag provided and version.json not found. Provide a tag explicitly."
+    }
+}
+
 # ─── Resolve AWS account + region ────────────────────────────────────────────
 $region    = (aws configure get region 2>$null).Trim()
 if (-not $region) { $region = "us-east-1" }
@@ -128,8 +162,38 @@ Write-Host "  Service     : $Service"                         -ForegroundColor C
 Write-Host "  Tag         : $Tag"                             -ForegroundColor Cyan
 Write-Host "  Environment : $Environment"                     -ForegroundColor Cyan
 Write-Host "  Image       : $versionedImage"                  -ForegroundColor Cyan
+if ($DryRun)       { Write-Host "  Mode        : DRY RUN"    -ForegroundColor Yellow }
+if ($AutoRollback) { Write-Host "  AutoRollback: ON"         -ForegroundColor Yellow }
 Write-Host "================================================" -ForegroundColor Cyan
 Write-Host ""
+
+if ($DryRun) {
+    Write-Host "[DRY RUN] Would execute:" -ForegroundColor Yellow
+    Write-Host "  1. ECR login to $ecrBase"
+    Write-Host "  2. docker build -t $($cfg.EcrRepo):$Tag $sourceDir"
+    Write-Host "  3. docker push $versionedImage"
+    Write-Host "  4. Update $tfvarsPath : $($cfg.TfVar) = `"$versionedImage`""
+    Write-Host "  5. terraform apply -target=$($cfg.TfModule)"
+    if ($CommitTfvars) { Write-Host "  6. git commit terraform.tfvars" }
+    Write-Host ""
+    Write-Host "No changes made." -ForegroundColor Green
+    exit 0
+}
+
+# ─── Record current task definition for rollback ─────────────────────────────
+$previousTaskDef = $null
+if ($AutoRollback) {
+    try {
+        $svcJson = aws ecs describe-services --cluster $ecsCluster --services $ecsService --region $region --output json 2>$null
+        if ($svcJson) {
+            $svcInfo = $svcJson | ConvertFrom-Json
+            $previousTaskDef = $svcInfo.services[0].taskDefinition
+            Write-Host "Recorded current task def for rollback: $previousTaskDef" -ForegroundColor DarkGray
+        }
+    } catch {
+        Write-Warning "Could not record current task definition. Rollback will not be available."
+    }
+}
 
 # ─── Step 1: ECR login ────────────────────────────────────────────────────────
 Write-Host "[1/5] Logging into ECR..." -ForegroundColor Yellow
@@ -194,7 +258,7 @@ try {
 
 # ─── Wait for ECS stable ──────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "Waiting for ECS service to stabilise (timeout ~10 min)..." -ForegroundColor Yellow
+Write-Host "Waiting for ECS service to stabilise (timeout ${HealthTimeout}s)..." -ForegroundColor Yellow
 aws ecs wait services-stable `
     --cluster $ecsCluster `
     --services $ecsService `
@@ -205,6 +269,54 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "================================================" -ForegroundColor Green
     Write-Host "  DEPLOYED: $Service @ $Tag"                      -ForegroundColor Green
     Write-Host "================================================" -ForegroundColor Green
+
+    # ─── Commit tfvars ────────────────────────────────────────────────────────
+    if ($CommitTfvars) {
+        Write-Host ""
+        Write-Host "Committing terraform.tfvars..." -ForegroundColor Yellow
+        Push-Location $repoRoot
+        try {
+            git add $tfvarsPath
+            git commit -m "deploy($Service): $Tag [skip ci]"
+            Write-Host "Committed. Run 'git push' to sync." -ForegroundColor Green
+        } catch {
+            Write-Warning "git commit failed: $_"
+        } finally {
+            Pop-Location
+        }
+    }
 } else {
-    Write-Warning "ECS 'wait services-stable' timed out. Check the AWS console for deployment status."
+    Write-Warning "ECS 'wait services-stable' timed out or failed."
+
+    # ─── Auto-rollback ────────────────────────────────────────────────────────
+    if ($AutoRollback -and $previousTaskDef) {
+        Write-Host ""
+        Write-Host "AUTO-ROLLBACK: Reverting to previous task definition..." -ForegroundColor Red
+        Write-Host "  Previous: $previousTaskDef" -ForegroundColor Yellow
+        aws ecs update-service `
+            --cluster $ecsCluster `
+            --service $ecsService `
+            --task-definition $previousTaskDef `
+            --region $region `
+            --output text > $null
+
+        Write-Host "Waiting for rollback to stabilise..." -ForegroundColor Yellow
+        aws ecs wait services-stable `
+            --cluster $ecsCluster `
+            --services $ecsService `
+            --region $region
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Rollback successful. Service is running previous version." -ForegroundColor Green
+        } else {
+            Write-Host "CRITICAL: Rollback also failed. Manual intervention required." -ForegroundColor Red
+        }
+        exit 1
+    } elseif ($AutoRollback) {
+        Write-Host "Cannot rollback: no previous task definition was recorded." -ForegroundColor Red
+        exit 1
+    } else {
+        Write-Host "Check the AWS console for deployment status." -ForegroundColor Yellow
+        Write-Host "To rollback manually, re-run with an earlier tag." -ForegroundColor Yellow
+    }
 }

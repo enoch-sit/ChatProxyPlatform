@@ -5,11 +5,39 @@
  * This provides clear feedback to the admin on the success of the operation.
  */
 export interface BulkAssignmentResult {
-  successful_assignments: number;
+  successful_assignments: Array<{
+    email: string;
+    status: string;
+    message?: string;
+  }> | number;
   failed_assignments: Array<{ 
     email: string;
-    reason: string;
+    reason?: string;
+    status?: string;
+    message?: string;
   }>;
+}
+
+export interface BatchRoleUpdateItem {
+  userId: string;
+  role: string;
+}
+
+export interface BatchRoleUpdateResult {
+  userId: string;
+  success: boolean;
+  message: string;
+  role?: string;
+}
+
+export interface BatchRoleUpdateResponse {
+  message: string;
+  results: BatchRoleUpdateResult[];
+  summary: {
+    total: number;
+    successful: number;
+    failed: number;
+  };
 }
 
 // =============================================================================

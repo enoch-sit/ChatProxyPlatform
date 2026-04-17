@@ -358,6 +358,10 @@ class BatchCreateUsersRequest(BaseModel):
     skipVerification: Optional[bool] = True
 
 
+class BatchUpdateRolesRequest(BaseModel):
+    updates: List[Dict[str, Any]]
+
+
 class AllocateCreditsRequest(BaseModel):
     userId: str
     credits: int
@@ -415,7 +419,8 @@ async def admin_create_users_batch(
     current_user: Dict = Depends(require_elevated_role)
 ):
     """Batch create users (proxy → auth-service POST /api/admin/users/batch)."""
-    return await _proxy("POST", f"{AUTH_URL}/api/admin/users/batch", _admin_headers(current_user), request.dict())
+    payload = request.dict()
+    return await _proxy("POST", f"{AUTH_URL}/api/admin/users/batch", _admin_headers(current_user), payload)
 
 
 @router.post("/users/{user_id}/verify")
@@ -444,6 +449,15 @@ async def admin_update_user_role(
 ):
     """Update user role (proxy → auth-service PUT /api/admin/users/:id/role)."""
     return await _proxy("PUT", f"{AUTH_URL}/api/admin/users/{user_id}/role", _admin_headers(current_user), body)
+
+
+@router.put("/users/roles/batch")
+async def admin_update_user_roles_batch(
+    request: BatchUpdateRolesRequest,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Batch update user roles (proxy → auth-service PUT /api/admin/users/roles/batch)."""
+    return await _proxy("PUT", f"{AUTH_URL}/api/admin/users/roles/batch", _admin_headers(current_user), request.dict())
 
 
 # =================================================================================

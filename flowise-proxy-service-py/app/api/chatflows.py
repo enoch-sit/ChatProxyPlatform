@@ -39,7 +39,7 @@ async def validate_user_chatflow_access(local_user_id: str, chatflow_id: str) ->
         logger.error(f"Error validating user chatflow access: {e}")
         return False
 
-@router.get("/", response_model=List[Dict])
+@router.get("", response_model=List[Dict])
 async def list_chatflows(
     current_user: Dict = Depends(authenticate_user)
 ):

@@ -31,6 +31,7 @@ const AdminUsersPanel: React.FC = () => {
     verifyUser,
     deleteUser,
     updateUserRole,
+    updateUsersRolesBatch,
     allocateCredits,
     clearError,
   } = useAdminStore();
@@ -49,6 +50,12 @@ const AdminUsersPanel: React.FC = () => {
   const [batchSkipVerification, setBatchSkipVerification] = useState(true);
   const [batchError, setBatchError] = useState<string | null>(null);
 
+  // Batch role update state
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [showBatchRoleModal, setShowBatchRoleModal] = useState(false);
+  const [batchRole, setBatchRole] = useState('enduser');
+  const [batchRoleError, setBatchRoleError] = useState<string | null>(null);
+
   // Role change modal
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -65,6 +72,10 @@ const AdminUsersPanel: React.FC = () => {
     fetchUsers().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setSelectedUserIds((prev) => prev.filter((id) => users.some((u) => u._id === id)));
+  }, [users]);
 
   const flash = (msg: string) => {
     setSuccess(msg);
@@ -138,6 +149,43 @@ const AdminUsersPanel: React.FC = () => {
     } catch { /* noop */ }
   };
 
+  const toggleSelectAll = () => {
+    if (selectedUserIds.length === users.length) {
+      setSelectedUserIds([]);
+      return;
+    }
+    setSelectedUserIds(users.map((u) => u._id));
+  };
+
+  const toggleSelectUser = (userId: string, checked: boolean) => {
+    setSelectedUserIds((prev) => {
+      if (checked) {
+        return [...prev, userId];
+      }
+      return prev.filter((id) => id !== userId);
+    });
+  };
+
+  const handleBatchRoleUpdate = async () => {
+    setBatchRoleError(null);
+    if (selectedUserIds.length === 0) {
+      setBatchRoleError('Select at least one user.');
+      return;
+    }
+
+    try {
+      const result = await updateUsersRolesBatch(
+        selectedUserIds.map((userId) => ({ userId, role: batchRole }))
+      );
+
+      setShowBatchRoleModal(false);
+      setSelectedUserIds([]);
+      flash(`Batch role update completed. Success: ${result.successful}, Failed: ${result.failed.length}`);
+    } catch {
+      setBatchRoleError('Batch role update failed.');
+    }
+  };
+
   const openRoleModal = (u: AdminUser) => {
     setSelectedUser(u);
     setNewRole(u.role);
@@ -168,11 +216,23 @@ const AdminUsersPanel: React.FC = () => {
   };
 
   return (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography level="h3">User Management</Typography>
         <Stack direction="row" spacing={1}>
           <Button size="sm" variant="outlined" onClick={() => fetchUsers()}>Refresh</Button>
+          <Button
+            size="sm"
+            variant="outlined"
+            color="primary"
+            disabled={selectedUserIds.length === 0}
+            onClick={() => {
+              setBatchRoleError(null);
+              setShowBatchRoleModal(true);
+            }}
+          >
+            Batch Role ({selectedUserIds.length})
+          </Button>
           <Button size="sm" variant="outlined" color="neutral" onClick={() => setShowBatch(true)}>Batch Create</Button>
           <Button size="sm" onClick={() => setShowCreate(true)}>+ New User</Button>
         </Stack>
@@ -181,10 +241,17 @@ const AdminUsersPanel: React.FC = () => {
       {success && <Alert color="success" sx={{ mb: 2 }}>{success}</Alert>}
       {error && <Alert color="danger" sx={{ mb: 2 }} endDecorator={<Button size="sm" variant="plain" color="danger" onClick={clearError}>Dismiss</Button>}>{error}</Alert>}
 
-      <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', maxHeight: '60vh' }}>
+      <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', flex: 1, minHeight: 0 }}>
         <Table stickyHeader>
           <thead>
             <tr>
+              <th>
+                <Checkbox
+                  checked={users.length > 0 && selectedUserIds.length === users.length}
+                  indeterminate={selectedUserIds.length > 0 && selectedUserIds.length < users.length}
+                  onChange={() => toggleSelectAll()}
+                />
+              </th>
               <th>Username</th>
               <th>Email</th>
               <th>Role</th>
@@ -195,11 +262,17 @@ const AdminUsersPanel: React.FC = () => {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={6} align="center"><CircularProgress size="sm" /></td></tr>
+              <tr><td colSpan={7} align="center"><CircularProgress size="sm" /></td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={6}>No users found.</td></tr>
+              <tr><td colSpan={7}>No users found.</td></tr>
             ) : users.map((u) => (
               <tr key={u._id}>
+                <td>
+                  <Checkbox
+                    checked={selectedUserIds.includes(u._id)}
+                    onChange={(event) => toggleSelectUser(u._id, event.target.checked)}
+                  />
+                </td>
                 <td>{u.username}</td>
                 <td>{u.email}</td>
                 <td>
@@ -330,6 +403,26 @@ const AdminUsersPanel: React.FC = () => {
             {ROLE_OPTIONS.map((r) => <Option key={r} value={r}>{r}</Option>)}
           </Select>
           <Button sx={{ mt: 2 }} onClick={handleRoleChange} loading={isLoading}>Save</Button>
+        </ModalDialog>
+      </Modal>
+
+      <Modal open={showBatchRoleModal} onClose={() => setShowBatchRoleModal(false)}>
+        <ModalDialog sx={{ minWidth: 360 }}>
+          <ModalClose />
+          <Typography level="h4">Batch Role Update</Typography>
+          <Typography level="body-sm" sx={{ mb: 1 }}>
+            Update role for {selectedUserIds.length} selected users.
+          </Typography>
+          {batchRoleError && <Alert color="danger" sx={{ mb: 1 }}>{batchRoleError}</Alert>}
+          <FormControl>
+            <FormLabel>New Role</FormLabel>
+            <Select value={batchRole} onChange={(_, v) => setBatchRole(v as string)}>
+              {ROLE_OPTIONS.map((r) => <Option key={r} value={r}>{r}</Option>)}
+            </Select>
+          </FormControl>
+          <Button sx={{ mt: 2 }} onClick={handleBatchRoleUpdate} loading={isLoading}>
+            Apply Role
+          </Button>
         </ModalDialog>
       </Modal>
 
