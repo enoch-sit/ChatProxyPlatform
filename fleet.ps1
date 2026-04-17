@@ -101,6 +101,10 @@ function Invoke-FleetSSH {
     $port = if ($Workstation.sshPort) { $Workstation.sshPort } else { $defaults.sshPort }
     $user = $Workstation.sshUser
 
+    # Encode command as base64 for reliable transport (avoids shell escaping issues)
+    $bytes = [System.Text.Encoding]::Unicode.GetBytes($RemoteCommand)
+    $encoded = [Convert]::ToBase64String($bytes)
+
     $sshArgs = @(
         '-o', 'StrictHostKeyChecking=accept-new'
         '-o', 'ConnectTimeout=10'
@@ -108,7 +112,7 @@ function Invoke-FleetSSH {
         '-i', $sshKey
         '-p', $port
         "$user@$($Workstation.wireguardIp)"
-        $RemoteCommand
+        "powershell -NoProfile -EncodedCommand $encoded"
     )
 
     $result = & ssh @sshArgs 2>&1
@@ -132,8 +136,9 @@ function Invoke-Status {
     foreach ($ws in $workstations) {
         Write-Host "  Checking $($ws.name) ($($ws.wireguardIp))... " -NoNewline
 
-        # Check WireGuard reachability
-        $ping = Test-Connection -ComputerName $ws.wireguardIp -Count 1 -TimeoutSeconds 3 -Quiet -ErrorAction SilentlyContinue
+        # Check WireGuard reachability (ping -n 1 -w 3000 for PS 5.1 compat)
+        $pingResult = ping -n 1 -w 3000 $ws.wireguardIp 2>$null
+        $ping = $LASTEXITCODE -eq 0
 
         if (-not $ping) {
             Write-Fail "Unreachable"
@@ -148,11 +153,11 @@ function Invoke-Status {
         }
 
         # Get version + Docker status via SSH
-        $r = Invoke-FleetSSH -Workstation $ws -RemoteCommand @"
-`$v = if (Test-Path C:\chatproxy\.local-version) { Get-Content C:\chatproxy\.local-version } else { 'unknown' }
-`$d = (docker info --format '{{.ContainersRunning}} running' 2>`$null) ?? 'not-running'
-Write-Output "`$v|`$d"
-"@
+        $r = Invoke-FleetSSH -Workstation $ws -RemoteCommand @'
+$v = if (Test-Path C:\Users\aidcec\Documents\ChatProxyPlatform\.local-version) { Get-Content C:\Users\aidcec\Documents\ChatProxyPlatform\.local-version } else { 'unknown' }
+$d = try { docker info --format '{{.ContainersRunning}} running' 2>$null } catch { 'not-running' }; if (-not $d) { $d = 'not-running' }
+Write-Output "$v|$d"
+'@
 
         if ($r.Success) {
             $parts = $r.Output -split '\|', 2
@@ -192,7 +197,7 @@ function Invoke-Patch {
         Write-Step "Patching $($ws.name)"
 
         $r = Invoke-FleetSSH -Workstation $ws -RemoteCommand @"
-Set-Location C:\chatproxy
+Set-Location C:\Users\aidcec\Documents\ChatProxyPlatform
 .\patch.ps1 -Mode $PatchMode 2>&1
 "@
 
@@ -222,10 +227,10 @@ function Invoke-Health {
     foreach ($ws in $workstations) {
         Write-Host "`n  ─ $($ws.name) ─"
 
-        $r = Invoke-FleetSSH -Workstation $ws -RemoteCommand @"
-Set-Location C:\chatproxy
+        $r = Invoke-FleetSSH -Workstation $ws -RemoteCommand @'
+Set-Location C:\Users\aidcec\Documents\ChatProxyPlatform
 .\diagnose.ps1 -Quick 2>&1
-"@
+'@
 
         if ($r.Success) {
             Write-OK "$($ws.name) healthy"
@@ -250,10 +255,10 @@ function Invoke-Setup {
     foreach ($ws in $workstations) {
         Write-Step "Setting up $($ws.name)"
 
-        $r = Invoke-FleetSSH -Workstation $ws -RemoteCommand @"
-Set-Location C:\chatproxy
+        $r = Invoke-FleetSSH -Workstation $ws -RemoteCommand @'
+Set-Location C:\Users\aidcec\Documents\ChatProxyPlatform
 .\setup.ps1 -Unattended 2>&1
-"@
+'@
 
         if ($r.Success) {
             Write-OK "$($ws.name) setup complete"
