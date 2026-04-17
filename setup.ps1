@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    ChatProxyPlatform — Consolidated Setup Script for Windows Workstations.
+    ChatProxyPlatform -- Consolidated Setup Script for Windows Workstations.
 
 .DESCRIPTION
     Single entry point for fresh machine setup. Replaces:
@@ -77,7 +77,7 @@ function Test-ServiceHealth {
 # ─── Banner ───────────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Blue
-Write-Host "  ChatProxyPlatform — Workstation Setup" -ForegroundColor Blue
+Write-Host "  ChatProxyPlatform -- Workstation Setup" -ForegroundColor Blue
 Write-Host "================================================================" -ForegroundColor Blue
 Write-Host "  Machine : $env:COMPUTERNAME"
 Write-Host "  User    : $env:USERNAME"
@@ -129,7 +129,7 @@ if ($missing.Count -gt 0 -and -not $SkipPrereqs) {
         Write-Host "  Installing $name via winget..." -ForegroundColor Yellow
         winget install -e --id $p.Install --accept-source-agreements --accept-package-agreements 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
-            Write-Warn "$name installation may have failed — check manually"
+            Write-Warn "$name installation may have failed -- check manually"
         } else {
             Write-OK "$name installed"
         }
@@ -171,10 +171,10 @@ if ($SkipDriveConfig) {
             Write-Host "  D: drive detected. Running drive configuration..." -ForegroundColor Yellow
             python $configureDrivesScript 2>&1 | ForEach-Object { Write-Host "  $_" }
         } else {
-            Write-OK "Single drive setup — using defaults"
+            Write-OK "Single drive setup -- using defaults"
         }
     } else {
-        Write-OK "No drive configuration script found — using defaults"
+        Write-OK "No drive configuration script found -- using defaults"
     }
 }
 
@@ -190,10 +190,10 @@ if (Test-Path $generateScript) {
     if ($LASTEXITCODE -eq 0) {
         Write-OK "Secrets generated and .env files updated"
     } else {
-        Write-Warn "Secret generation had issues — check output above"
+        Write-Warn "Secret generation had issues -- check output above"
     }
 } else {
-    Write-Warn "generate_secrets.py not found — creating .env from templates"
+    Write-Warn "generate_secrets.py not found -- creating .env from templates"
     # Fallback: copy .env.example files
     $services = @("auth-service", "accounting-service", "flowise-proxy-service-py", "bridge", "flowise")
     foreach ($svc in $services) {
@@ -238,7 +238,7 @@ foreach ($svc in $deployOrder) {
 
     $composePath = Join-Path $scriptRoot "$dir\$composeFile"
     if (-not (Test-Path $composePath)) {
-        Write-Warn "Compose file not found: $dir/$composeFile — skipping $svc"
+        Write-Warn "Compose file not found: $dir/$composeFile -- skipping $svc"
         continue
     }
 
@@ -273,7 +273,7 @@ if ($SkipFlowise) {
     if ($hasApiKey) {
         Write-OK "Flowise API key already configured"
     } elseif ($Unattended) {
-        Write-Warn "Flowise API key not set — configure manually later via:"
+        Write-Warn "Flowise API key not set -- configure manually later via:"
         Write-Host "    python configure_flowise_api.py" -ForegroundColor DarkGray
     } else {
         Write-Host ""
@@ -301,7 +301,7 @@ if ($SkipFlowise) {
             }
             Write-OK "API key configured"
         } else {
-            Write-Warn "Skipped — configure later with: python configure_flowise_api.py"
+            Write-Warn "Skipped -- configure later with: python configure_flowise_api.py"
         }
     }
 }
