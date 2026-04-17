@@ -286,3 +286,6 @@ typedoc/
 !LICENSE
 !README.md
 !CONTRIBUTING.md
+
+# WireGuard config (contains private key)
+wg-fleet.conf
