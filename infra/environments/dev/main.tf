@@ -278,3 +278,25 @@ output "bridge_service_name" {
   value = module.bridge_ecs.service_name
 }
 
+# ── WireGuard VPN Hub (Fleet Management) ──────────────────────────────
+module "wireguard" {
+  source = "../../modules/wireguard"
+
+  project     = "chatproxy"
+  environment = var.environment
+  vpc_id      = module.platform.vpc_id
+  subnet_id   = module.platform.public_subnet_ids[0]
+  peers       = var.wireguard_peers
+
+  depends_on = [module.platform]
+}
+
+output "wireguard_public_ip" {
+  description = "WireGuard hub Elastic IP — use as Endpoint in workstation configs"
+  value       = module.wireguard.public_ip
+}
+
+output "wireguard_instance_id" {
+  description = "WireGuard EC2 instance ID (for SSM access)"
+  value       = module.wireguard.instance_id
+}

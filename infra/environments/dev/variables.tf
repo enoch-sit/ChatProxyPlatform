@@ -176,3 +176,15 @@ variable "bridge_image" {
   type        = string
 }
 
+# ── WireGuard Fleet Management ─────────────────────────────────────────
+
+variable "wireguard_peers" {
+  description = "WireGuard VPN peers (workstations). Add public keys after generating them on each workstation."
+  type = list(object({
+    name       = string
+    public_key = string
+    allowed_ip = string
+  }))
+  default = []
+}
+

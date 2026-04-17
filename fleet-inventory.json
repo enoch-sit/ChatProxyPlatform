@@ -1,0 +1,28 @@
+{
+  "$schema": "./fleet-inventory.schema.json",
+  "hub": {
+    "description": "AWS WireGuard VPN hub (managed by Terraform)",
+    "publicIp": "FILL_AFTER_TERRAFORM_APPLY",
+    "wireguardIp": "10.10.0.1",
+    "sshUser": "ec2-user",
+    "instanceId": "FILL_AFTER_TERRAFORM_APPLY"
+  },
+  "workstations": [
+    {
+      "name": "WS-PRIMARY",
+      "description": "Primary development workstation",
+      "wireguardIp": "10.10.0.2",
+      "sshUser": "admin",
+      "sshPort": 22,
+      "role": "dev",
+      "services": ["auth-service", "accounting-service", "bridge", "flowise", "flowise-proxy-service-py"],
+      "enabled": true
+    }
+  ],
+  "defaults": {
+    "sshPort": 22,
+    "sshKeyPath": "~/.ssh/fleet_ed25519",
+    "patchMode": "auto",
+    "healthTimeout": 30
+  }
+}
