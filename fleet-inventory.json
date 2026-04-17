@@ -12,7 +12,7 @@
       "name": "aidcec-demo-windows-workstation",
       "description": "AIDCEC demo Windows workstation",
       "wireguardIp": "10.10.0.2",
-      "sshUser": "admin",
+      "sshUser": "fleet",
       "sshPort": 22,
       "role": "dev",
       "services": ["auth-service", "accounting-service", "bridge", "flowise", "flowise-proxy-service-py"],
