@@ -1,7 +1,7 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    ChatProxyPlatform — Consolidated Patch Script for Windows Workstations.
+    ChatProxyPlatform -- Consolidated Patch Script for Windows Workstations.
 
 .DESCRIPTION
     Single entry point for updating a workstation. Replaces:
@@ -15,10 +15,10 @@
       - Rollback support: revert to previous git state
 
 .PARAMETER Mode
-    quick  — git pull + recreate containers (env/config changes only)
-    full   — git pull + rebuild images + recreate (code changes)
-    test   — run tests for changed services without deploying
-    status — show current version and what's changed
+    quick  -- git pull + recreate containers (env/config changes only)
+    full   -- git pull + rebuild images + recreate (code changes)
+    test   -- run tests for changed services without deploying
+    status -- show current version and what's changed
 
 .PARAMETER Service
     Patch a specific service only (default: all changed services).
@@ -27,7 +27,7 @@
     Revert to the previous version (uses git tag from .local-version).
 
 .PARAMETER Force
-    Skip change detection — rebuild/restart all services.
+    Skip change detection -- rebuild/restart all services.
 
 .EXAMPLE
     .\patch.ps1                          # Auto-detect mode (quick if no code changes, full otherwise)
@@ -106,7 +106,7 @@ $svcTestCmd = @{
 # ─── Banner ───────────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Blue
-Write-Host "  ChatProxyPlatform — Patch" -ForegroundColor Blue
+Write-Host "  ChatProxyPlatform -- Patch" -ForegroundColor Blue
 Write-Host "================================================================" -ForegroundColor Blue
 
 # ─── Read current version ─────────────────────────────────────────────────────
@@ -361,7 +361,7 @@ foreach ($svc in $manifest.deployOrder) {
     $composeFile = $manifest.services.$svc.composeFile
     $composePath = Join-Path $scriptRoot "$dir\$composeFile"
     if (-not (Test-Path $composePath)) {
-        Write-Log "Compose file not found for $svc — skipping" "WARN"
+        Write-Log "Compose file not found for $svc -- skipping" "WARN"
         continue
     }
 

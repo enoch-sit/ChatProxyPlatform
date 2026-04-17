@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Start AWS dev environment — bring all services back up for debugging.
+    Start AWS dev environment -- bring all services back up for debugging.
 
 .DESCRIPTION
     - Starts MongoDB EC2 instance and waits for it

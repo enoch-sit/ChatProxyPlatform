@@ -1,5 +1,5 @@
-# -------------------------------------------------------
-# SES SMTP Credential Rotation — Zero-Disclosure
+﻿# -------------------------------------------------------
+# SES SMTP Credential Rotation -- Zero-Disclosure
 # IAM user: chatproxy-ses-smtp
 # Derives SMTP password from IAM secret key (never printed)
 # -------------------------------------------------------
@@ -26,7 +26,7 @@ $newKeyId     = $newKeyData.AccessKey.AccessKeyId
 $newSecretKey = $newKeyData.AccessKey.SecretAccessKey
 Write-Host "New key ID created: $newKeyId"
 
-# Step 3: Derive SES SMTP password (AWS v4 SMTP derivation — secret never displayed)
+# Step 3: Derive SES SMTP password (AWS v4 SMTP derivation -- secret never displayed)
 function Get-SesSmtpPassword {
     param([string]$SecretKey, [string]$Region)
     function HMAC256([byte[]]$key, [byte[]]$data) {

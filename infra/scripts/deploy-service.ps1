@@ -1,11 +1,11 @@
-<#
+﻿<#
 .SYNOPSIS
     Build, tag, push, and deploy a versioned Docker image to ECS via Terraform.
 
 .DESCRIPTION
     Automates the full release cycle for any platform service:
       1. Docker build from the service's source directory
-      2. ECR push — versioned tag AND :latest
+      2. ECR push -- versioned tag AND :latest
       3. Update infra/environments/<env>/terraform.tfvars with the new image URI
       4. terraform apply -target=<module>  →  new ECS task-definition revision  →  rolling deploy
       5. Wait for ECS service to reach a stable state
@@ -52,7 +52,7 @@
     # Deploy auth-service with explicit tag + auto-rollback
     .\infra\scripts\deploy-service.ps1 -Service auth-service -Tag v1.1.0 -AutoRollback
 
-    # Dry run — see what would happen
+    # Dry run -- see what would happen
     .\infra\scripts\deploy-service.ps1 -Service bridge -DryRun
 
     # Deploy + commit tfvars to git
@@ -120,7 +120,7 @@ $ecsCluster = "chatproxy-${Environment}-cluster"
 $ecsService = "chatproxy-${Environment}-$($cfg.EcsSuffix)"
 
 # ─── Resolve paths ────────────────────────────────────────────────────────────
-# Script lives at infra/scripts/ — two levels up is the repo root.
+# Script lives at infra/scripts/ -- two levels up is the repo root.
 $repoRoot   = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 $tfDir      = Join-Path $repoRoot "infra\environments\$Environment"
 $tfvarsPath = Join-Path $tfDir    "terraform.tfvars"
@@ -231,7 +231,7 @@ $newLines = $lines | ForEach-Object {
 }
 
 if (-not $updated) {
-    Write-Warning "Variable '$tfVarName' not found in terraform.tfvars — file NOT changed."
+    Write-Warning "Variable '$tfVarName' not found in terraform.tfvars -- file NOT changed."
 } else {
     $newLines | Set-Content $tfvarsPath
     Write-Host "  $tfVarName = `"$versionedImage`"" -ForegroundColor Green

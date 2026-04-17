@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Run on the REMOTE workstation to diagnose SSH key authentication issues.
     Must be run as Administrator.
@@ -6,7 +6,7 @@
 
 $ErrorActionPreference = 'Continue'
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host " SSH Diagnostics — $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Cyan
+Write-Host " SSH Diagnostics -- $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Cyan
 Write-Host " Computer: $env:COMPUTERNAME  User: $env:USERNAME" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 

@@ -1,8 +1,8 @@
-# -------------------------------------------------------
-# MongoDB Secret Rotation — Zero-Disclosure
+﻿# -------------------------------------------------------
+# MongoDB Secret Rotation -- Zero-Disclosure
 # Rotates: /chatproxy/dev/mongodb/auth   → { MONGODB_URI }
 #          /chatproxy/dev/mongodb/proxy  → { MONGODB_URL }
-# EC2 MongoDB does NOT exist yet — updates Secrets Manager only.
+# EC2 MongoDB does NOT exist yet -- updates Secrets Manager only.
 # Reads current URI, replaces only the password portion, writes back.
 # -------------------------------------------------------
 
@@ -39,13 +39,13 @@ function Rotate-MongoSecret {
                 $scheme      = $Matches[1]
                 $user        = $Matches[2]
                 $hostAndRest = $Matches[4]
-                Write-Host "  Existing URI parsed — preserving host/dbname."
+                Write-Host "  Existing URI parsed -- preserving host/dbname."
             } else {
-                Write-Host "  No parseable existing URI — using placeholder host (update after EC2 provisioned)."
+                Write-Host "  No parseable existing URI -- using placeholder host (update after EC2 provisioned)."
             }
             $current = $null; $currentUri = $null
         } else {
-            Write-Host "  No existing value — writing initial placeholder URI (update host after EC2 provisioned)."
+            Write-Host "  No existing value -- writing initial placeholder URI (update host after EC2 provisioned)."
         }
 
         $newPass = New-MongoPassword

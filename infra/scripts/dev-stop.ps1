@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Scale AWS dev environment to zero — stop all services to save cost.
+    Scale AWS dev environment to zero -- stop all services to save cost.
     Run this when you're done debugging. Reduces cost from ~$176/mo to ~$52/mo.
 
 .DESCRIPTION

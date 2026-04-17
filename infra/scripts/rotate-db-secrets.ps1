@@ -1,8 +1,8 @@
-# -------------------------------------------------------
-# DB Secret Rotation — Zero-Disclosure
+﻿# -------------------------------------------------------
+# DB Secret Rotation -- Zero-Disclosure
 # Rotates: /chatproxy/dev/db/accounting
 #          /chatproxy/dev/db/flowise
-# RDS does NOT exist yet — updates Secrets Manager only.
+# RDS does NOT exist yet -- updates Secrets Manager only.
 # Passwords will be used when RDS is provisioned via Terraform.
 # -------------------------------------------------------
 

@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Fleet management script — centrally manage Windows workstations over WireGuard VPN.
+    Fleet management script -- centrally manage Windows workstations over WireGuard VPN.
 
 .DESCRIPTION
     Connects to workstations via SSH through the WireGuard tunnel and runs
@@ -67,7 +67,7 @@ $defaults = $inv.defaults
 # Resolve SSH key path
 $sshKey = $defaults.sshKeyPath -replace '^~', $env:USERPROFILE
 if (-not (Test-Path $sshKey)) {
-    Write-Warn "SSH key not found at $sshKey — some actions may fail"
+    Write-Warn "SSH key not found at $sshKey -- some actions may fail"
 }
 
 # ── Resolve Target Workstations ──────────────────────────────────────
@@ -336,7 +336,7 @@ function Invoke-RunCommand {
 # ── Dispatch ─────────────────────────────────────────────────────────
 
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host " Fleet Manager — ChatProxy Platform" -ForegroundColor Cyan
+Write-Host " Fleet Manager -- ChatProxy Platform" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 
 switch ($Action) {

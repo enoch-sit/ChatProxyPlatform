@@ -1,7 +1,7 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    ChatProxyPlatform — Consolidated Diagnostic Script for Windows Workstations.
+    ChatProxyPlatform -- Consolidated Diagnostic Script for Windows Workstations.
 
 .DESCRIPTION
     Single entry point for all diagnostics. Replaces:
@@ -83,7 +83,7 @@ function Test-Command { param([string]$Cmd) return [bool](Get-Command $Cmd -Erro
 # ─── Banner ───────────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Blue
-Write-Host "  ChatProxyPlatform — Diagnostics" -ForegroundColor Blue
+Write-Host "  ChatProxyPlatform -- Diagnostics" -ForegroundColor Blue
 Write-Host "================================================================" -ForegroundColor Blue
 Write-Host "  Machine : $env:COMPUTERNAME"
 Write-Host "  Date    : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
@@ -184,14 +184,14 @@ if ($Full -or $Quick) {
         try {
             $r = Invoke-WebRequest -Uri $ep.Url -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
             if ($r.StatusCode -eq 200) {
-                Write-Diag "$($ep.Name) ($($ep.Url)) — HTTP 200" "OK"
+                Write-Diag "$($ep.Name) ($($ep.Url)) -- HTTP 200" "OK"
                 Record-Result $true
             } else {
-                Write-Diag "$($ep.Name) — HTTP $($r.StatusCode)" "WARN"
+                Write-Diag "$($ep.Name) -- HTTP $($r.StatusCode)" "WARN"
                 Record-Result $false $true
             }
         } catch {
-            Write-Diag "$($ep.Name) — not responding" "FAIL"
+            Write-Diag "$($ep.Name) -- not responding" "FAIL"
             Record-Result $false
         }
     }
@@ -279,7 +279,7 @@ if ($Login) {
         Write-Diag "Auth service responding" "OK"
         Record-Result $true
     } catch {
-        Write-Diag "Auth service not responding — login will fail" "FAIL"
+        Write-Diag "Auth service not responding -- login will fail" "FAIL"
         Record-Result $false
     }
 
@@ -291,7 +291,7 @@ if ($Login) {
             Write-Diag "CORS_ORIGIN is configured in auth-service" "OK"
             Record-Result $true
         } else {
-            Write-Diag "CORS_ORIGIN not set — may cause browser login issues" "WARN"
+            Write-Diag "CORS_ORIGIN not set -- may cause browser login issues" "WARN"
             Record-Result $false $true
         }
     }
@@ -336,7 +336,7 @@ if ($Users) {
             Write-Diag "No users found or query failed" "WARN"
         }
     } else {
-        Write-Diag "MongoDB not running — cannot list users" "FAIL"
+        Write-Diag "MongoDB not running -- cannot list users" "FAIL"
     }
 }
 
