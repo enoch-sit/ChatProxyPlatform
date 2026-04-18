@@ -188,10 +188,10 @@ jobs:
         id: tf
         run: |
           case "${{ matrix.service }}" in
-            auth-service)       echo "module=auth-ecs"       ; echo "var=auth_service_image_tag" ;;
-            accounting-service) echo "module=accounting-ecs"  ; echo "var=accounting_service_image_tag" ;;
-            flowise-proxy)      echo "module=flowise-proxy-ecs" ; echo "var=flowise_proxy_image_tag" ;;
-            bridge)             echo "module=bridge-ecs"      ; echo "var=bridge_image_tag" ;;
+            auth-service)       echo "module=auth_ecs"         ; echo "var=auth_service_image" ;;
+            accounting-service) echo "module=accounting_ecs"   ; echo "var=accounting_service_image" ;;
+            flowise-proxy)      echo "module=flowise_proxy_ecs" ; echo "var=flowise_proxy_service_image" ;;
+            bridge)             echo "module=bridge_ecs"       ; echo "var=bridge_image" ;;
           esac >> "$GITHUB_OUTPUT"
 
       - name: Terraform init
@@ -208,7 +208,10 @@ jobs:
       - name: Wait for ECS stability
         run: |
           CLUSTER="chatproxy-${{ env.ENVIRONMENT }}-cluster"
-          SVC="chatproxy-${{ env.ENVIRONMENT }}-${{ matrix.service }}"
+          case "${{ matrix.service }}" in
+            flowise-proxy) SVC="chatproxy-${{ env.ENVIRONMENT }}-flowise-proxy-service" ;;
+            *)             SVC="chatproxy-${{ env.ENVIRONMENT }}-${{ matrix.service }}" ;;
+          esac
           aws ecs wait services-stable \
             --cluster "$CLUSTER" \
             --services "$SVC" \
