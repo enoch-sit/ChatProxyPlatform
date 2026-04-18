@@ -1,5 +1,5 @@
 // src/pages/AdminPage.tsx
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useLayoutEffect } from 'react';
 import {
   Box, Button, Typography, Sheet, Table, Modal, ModalDialog,
   ModalClose, Input, Textarea, CircularProgress, Alert, Chip,
@@ -9,6 +9,7 @@ import { useAdminStore } from '../store/adminStore';
 import type { Chatflow } from '../types/chatflow';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '../hooks/usePermissions';
+import { useLocation } from 'react-router-dom';
 import AdminUsersPanel from '../components/admin/AdminUsersPanel';
 import AdminCreditsPanel from '../components/admin/AdminCreditsPanel';
 import AdminUsagePanel from '../components/admin/AdminUsagePanel';
@@ -17,6 +18,7 @@ import AdminFlowiseSettingsPanel from '../components/admin/AdminFlowiseSettingsP
 
 const AdminPage: React.FC = () => {
   const { t } = useTranslation();
+  const location = useLocation();
   
   // Get permissions
   const permissions = usePermissions();
@@ -55,6 +57,20 @@ const AdminPage: React.FC = () => {
   const [bulkUserEmails, setBulkUserEmails] = useState('');
   const tabsContainerRef = useRef<HTMLDivElement | null>(null);
 
+  const resetAdminViewport = useCallback(() => {
+    // Reset every relevant scroll container to avoid opening admin views with displaced content.
+    window.scrollTo(0, 0);
+
+    const main = tabsContainerRef.current?.closest('main') as HTMLElement | null;
+    if (main) {
+      main.scrollTop = 0;
+    }
+
+    if (tabsContainerRef.current) {
+      tabsContainerRef.current.scrollTop = 0;
+    }
+  }, []);
+
   //console.log('AdminPage permissions:', permissions);
 
   // Fetch initial data
@@ -81,18 +97,21 @@ const AdminPage: React.FC = () => {
     loadAdminData();
   }, [loadAdminData, canAccessAdmin]);
 
+  useLayoutEffect(() => {
+    // Run on route entry and after layout to avoid browser/history scroll restoration artifacts.
+    resetAdminViewport();
+    requestAnimationFrame(resetAdminViewport);
+  }, [location.pathname, resetAdminViewport]);
+
   useEffect(() => {
-    // Keep each tab anchored to the top when switching tabs to avoid inherited scroll offsets.
-    const main = tabsContainerRef.current?.closest('main') as HTMLElement | null;
-    if (main) {
-      main.scrollTop = 0;
-    }
+    // Keep each tab anchored to the top when switching tabs.
+    resetAdminViewport();
 
     const panels = tabsContainerRef.current?.querySelectorAll('[role="tabpanel"]');
     panels?.forEach((panel) => {
       (panel as HTMLElement).scrollTop = 0;
     });
-  }, [activeTab]);
+  }, [activeTab, resetAdminViewport]);
 
   // Handle sync (placeholder - you might want to add this to the store)
   const handleSync = async () => {
@@ -215,7 +234,7 @@ const AdminPage: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography level="h2">{t('admin.pageTitle')}</Typography>
       </Box>
