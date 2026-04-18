@@ -15,17 +15,14 @@ if (Test-Path $configPath) {
     try { $existing = Get-Content $configPath -Raw | ConvertFrom-Json } catch {}
 }
 
-# Build config: remove credsStore so Docker falls back to plain auths in config.json
-$config = [ordered]@{}
+# Build config: completely omit credsStore so Docker uses auths{} only
+# An empty-string value still triggers the helper; the key must not exist.
 if ($existing -and $existing.auths) {
-    $config['auths'] = $existing.auths
+    $json = [ordered]@{ auths = $existing.auths } | ConvertTo-Json -Depth 5
+} else {
+    $json = '{}'
 }
-# Empty string disables the credential store
-$config['credsStore'] = ''
-
-$config | ConvertTo-Json -Depth 5 | ForEach-Object {
-    [System.IO.File]::WriteAllText($configPath, $_, [System.Text.UTF8Encoding]::new($false))
-}
+[System.IO.File]::WriteAllText($configPath, $json, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host "[OK] Docker credential store disabled for user $env:USERNAME"
 Write-Host "     Config written to: $configPath"
