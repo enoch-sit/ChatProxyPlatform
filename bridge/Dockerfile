@@ -12,7 +12,7 @@ ENV VITE_FLOWISE_PROXY_API_URL=$VITE_FLOWISE_PROXY_API_URL
 COPY package*.json ./
 
 # Install all dependencies (including dev dependencies needed for build)
-RUN npm ci
+RUN npm ci || npm install
 
 # Copy source code
 COPY . .
