@@ -82,7 +82,6 @@ const AdminFlowiseSettingsPanel: React.FC = () => {
         justifyContent: 'flex-start',
         alignItems: 'stretch',
         gap: 2,
-        flex: 1,
         minHeight: 0,
         overflow: 'auto',
       }}

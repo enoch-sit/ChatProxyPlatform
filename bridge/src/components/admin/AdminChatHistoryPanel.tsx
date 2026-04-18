@@ -91,7 +91,7 @@ const AdminChatHistoryPanel: React.FC = () => {
   });
 
   return (
-    <Box sx={{ display: 'flex', flex: 1, minHeight: 0, gap: 1 }}>
+    <Box sx={{ display: 'flex', minHeight: 0, gap: 1, overflow: 'hidden' }}>
       {/* Left pane: user list */}
       <Sheet
         variant="outlined"

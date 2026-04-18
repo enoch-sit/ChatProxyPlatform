@@ -47,7 +47,7 @@ const AdminUsagePanel: React.FC = () => {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'auto' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'auto' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography level="h3">Token Usage &amp; Stats</Typography>
         <Stack direction="row" spacing={1}>
