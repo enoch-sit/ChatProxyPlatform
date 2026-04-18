@@ -67,6 +67,7 @@ There are **3 scripts** that handle everything on a workstation:
 - **[DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md)** - Complete installation guide for beginners (START HERE)
 - **[DEPLOYMENT_AND_PATCHING_PLAN.md](DEPLOYMENT_AND_PATCHING_PLAN.md)** - Versioning, CI/CD, and fleet management plan
 - **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Service-specific setup instructions
+- **[docs/AWS_PATCH_PIPELINE_RUNBOOK.md](docs/AWS_PATCH_PIPELINE_RUNBOOK.md)** - Safe AWS dev patch procedure for ECS services
 
 ### Operations Scripts
 | Script | Description |

@@ -62,9 +62,54 @@ jobs:
           echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
           echo "Deploying: $SERVICES"
 
+  # ─── Preflight secret validation ───────────────────────────────────────────
+  validate-secrets:
+    needs: changes
+    if: needs.changes.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate Flowise API key secret for flowise-proxy deploys
+        env:
+          SERVICES_JSON: ${{ needs.changes.outputs.services }}
+        run: |
+          echo "Services selected: $SERVICES_JSON"
+
+          if ! echo "$SERVICES_JSON" | jq -e 'index("flowise-proxy")' >/dev/null; then
+            echo "flowise-proxy not in deployment set; skipping Flowise secret validation"
+            exit 0
+          fi
+
+          SECRET_ID="/chatproxy/${{ env.ENVIRONMENT }}/flowise/api-key"
+          echo "Validating required secret: $SECRET_ID"
+
+          aws secretsmanager describe-secret \
+            --secret-id "$SECRET_ID" \
+            --region "${{ env.AWS_REGION }}" >/dev/null
+
+          SECRET_STRING=$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRET_ID" \
+            --region "${{ env.AWS_REGION }}" \
+            --query 'SecretString' \
+            --output text)
+
+          FLOWISE_API_KEY=$(echo "$SECRET_STRING" | jq -r '.FLOWISE_API_KEY // empty')
+
+          if [ -z "$FLOWISE_API_KEY" ]; then
+            echo "::error::Secrets Manager value /chatproxy/${{ env.ENVIRONMENT }}/flowise/api-key is missing FLOWISE_API_KEY or it is empty"
+            exit 1
+          fi
+
+          echo "Flowise API key secret validation passed"
+
   # ─── Build & Push to ECR ───────────────────────────────────────────────────
   build-push:
-    needs: changes
+    needs: [changes, validate-secrets]
     if: needs.changes.outputs.services != '[]'
     runs-on: ubuntu-latest
     strategy:
@@ -113,7 +158,7 @@ jobs:
 
   # ─── Terraform Deploy ─────────────────────────────────────────────────────
   deploy:
-    needs: [changes, build-push]
+    needs: [changes, validate-secrets, build-push]
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 1
