@@ -402,21 +402,21 @@ const AdminPage: React.FC = () => {
 
         {/* ---- Usage / Token Stats Tab ---- */}
         {canViewAnalytics && (
-          <TabPanel value="usage" sx={{ p: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <TabPanel value="usage" sx={{ p: 0, minHeight: 0 }}>
             <AdminUsagePanel />
           </TabPanel>
         )}
 
         {/* ---- Student Chat History Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="student-chats" sx={{ p: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <TabPanel value="student-chats" sx={{ p: 0, minHeight: 0 }}>
             <AdminChatHistoryPanel />
           </TabPanel>
         )}
 
         {/* ---- Runtime Settings Tab ---- */}
         {canManageChatflows && (
-          <TabPanel value="settings" sx={{ p: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <TabPanel value="settings" sx={{ p: 0, minHeight: 0 }}>
             <AdminFlowiseSettingsPanel />
           </TabPanel>
         )}
