@@ -279,14 +279,14 @@ if ($SkipFlowise) {
     if ($hasApiKey) {
         Write-OK "Flowise API key already configured"
     } elseif ($Unattended) {
-        Write-Warn "Flowise API key not set -- configure manually later via:"
-        Write-Host "    python configure_flowise_api.py" -ForegroundColor DarkGray
+        Write-Warn "Flowise API key not set -- configure later in Bridge Admin > Settings"
+        Write-Host "    http://localhost:3082  (Admin tab: Settings > Flowise API Key)" -ForegroundColor DarkGray
     } else {
         Write-Host ""
         Write-Host "  Flowise should now be running at http://localhost:3002" -ForegroundColor Yellow
         Write-Host "  1. Open Flowise in your browser" -ForegroundColor Yellow
         Write-Host "  2. Go to Settings > API Keys > Create new key" -ForegroundColor Yellow
-        Write-Host "  3. Paste the key below" -ForegroundColor Yellow
+        Write-Host "  3. Paste the key below (or set it later in Bridge Admin > Settings)" -ForegroundColor Yellow
         Write-Host ""
         $apiKey = Read-Host "  Enter Flowise API key (or press Enter to skip)"
         if ($apiKey) {
@@ -307,7 +307,7 @@ if ($SkipFlowise) {
             }
             Write-OK "API key configured"
         } else {
-            Write-Warn "Skipped -- configure later with: python configure_flowise_api.py"
+            Write-Warn "Skipped -- configure later in Bridge Admin > Settings"
         }
     }
 }
