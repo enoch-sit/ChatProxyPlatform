@@ -98,7 +98,6 @@ Write-Step $step $totalSteps "Checking prerequisites..."
 $prereqs = @{
     "docker"  = @{ Check = "docker"; Install = "Docker.DockerDesktop"; Version = "docker --version" }
     "node"    = @{ Check = "node";   Install = "OpenJS.NodeJS.LTS";    Version = "node --version" }
-    "python"  = @{ Check = "python"; Install = "Python.Python.3.12";   Version = "python --version" }
     "git"     = @{ Check = "git";    Install = "Git.Git";              Version = "git --version" }
 }
 
@@ -184,16 +183,16 @@ if ($SkipDriveConfig) {
 $step++
 Write-Step $step $totalSteps "Generating secrets and .env files..."
 
-$generateScript = Join-Path $scriptRoot "generate_secrets.py"
-if (Test-Path $generateScript) {
-    python $generateScript 2>&1 | ForEach-Object { Write-Host "  $_" }
-    if ($LASTEXITCODE -eq 0) {
+$generateSecretsPs1 = Join-Path $scriptRoot "scripts\generate-secrets.ps1"
+if (Test-Path $generateSecretsPs1) {
+    & $generateSecretsPs1 -WorkspaceRoot $scriptRoot
+    if ($LASTEXITCODE -eq 0 -or $?) {
         Write-OK "Secrets generated and .env files updated"
     } else {
         Write-Warn "Secret generation had issues -- check output above"
     }
 } else {
-    Write-Warn "generate_secrets.py not found -- creating .env from templates"
+    Write-Warn "generate-secrets.ps1 not found -- creating .env from templates only"
     # Fallback: copy .env.example files
     $services = @("auth-service", "accounting-service", "flowise-proxy-service-py", "bridge", "flowise")
     foreach ($svc in $services) {
