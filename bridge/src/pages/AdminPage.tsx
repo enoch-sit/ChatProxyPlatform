@@ -1,5 +1,5 @@
 // src/pages/AdminPage.tsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Box, Button, Typography, Sheet, Table, Modal, ModalDialog,
   ModalClose, Input, Textarea, CircularProgress, Alert, Chip,
@@ -53,6 +53,7 @@ const AdminPage: React.FC = () => {
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [bulkUserEmails, setBulkUserEmails] = useState('');
+  const tabsContainerRef = useRef<HTMLDivElement | null>(null);
 
   //console.log('AdminPage permissions:', permissions);
 
@@ -79,6 +80,19 @@ const AdminPage: React.FC = () => {
     console.log('AdminPage useEffect triggered, canAccessAdmin:', canAccessAdmin);
     loadAdminData();
   }, [loadAdminData, canAccessAdmin]);
+
+  useEffect(() => {
+    // Keep each tab anchored to the top when switching tabs to avoid inherited scroll offsets.
+    const main = tabsContainerRef.current?.closest('main') as HTMLElement | null;
+    if (main) {
+      main.scrollTop = 0;
+    }
+
+    const panels = tabsContainerRef.current?.querySelectorAll('[role="tabpanel"]');
+    panels?.forEach((panel) => {
+      (panel as HTMLElement).scrollTop = 0;
+    });
+  }, [activeTab]);
 
   // Handle sync (placeholder - you might want to add this to the store)
   const handleSync = async () => {
@@ -236,7 +250,7 @@ const AdminPage: React.FC = () => {
         </Alert>
       )}
 
-      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <Box ref={tabsContainerRef} sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Tabs
           value={activeTab}
           onChange={(_, v) => setActiveTab(v as string)}
@@ -355,28 +369,28 @@ const AdminPage: React.FC = () => {
 
         {/* ---- Users Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="users" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <TabPanel value="users" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <AdminUsersPanel />
           </TabPanel>
         )}
 
         {/* ---- Credits Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="credits" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <TabPanel value="credits" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <AdminCreditsPanel />
           </TabPanel>
         )}
 
         {/* ---- Usage / Token Stats Tab ---- */}
         {canViewAnalytics && (
-          <TabPanel value="usage" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <TabPanel value="usage" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <AdminUsagePanel />
           </TabPanel>
         )}
 
         {/* ---- Student Chat History Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="student-chats" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <TabPanel value="student-chats" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <AdminChatHistoryPanel />
           </TabPanel>
         )}

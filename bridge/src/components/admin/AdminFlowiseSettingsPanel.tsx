@@ -75,7 +75,18 @@ const AdminFlowiseSettingsPanel: React.FC = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
+        alignItems: 'stretch',
+        gap: 2,
+        flex: 1,
+        minHeight: 0,
+        overflow: 'auto',
+      }}
+    >
       <Typography level="h3">Flowise API Key</Typography>
       <Typography level="body-sm">
         Update the proxy key at runtime. This does not require restarting Docker services.
@@ -108,7 +119,7 @@ const AdminFlowiseSettingsPanel: React.FC = () => {
         type="password"
       />
 
-      <Box sx={{ display: 'flex', gap: 1 }}>
+      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
         <Button onClick={handleSave} loading={isSaving} disabled={isSaving || isTesting}>
           Save Key
         </Button>

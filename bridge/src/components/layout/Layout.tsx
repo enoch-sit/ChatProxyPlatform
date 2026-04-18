@@ -32,7 +32,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         sx={{
           flexGrow: 1,
           minWidth: 0,
-          overflow: 'auto',
+          overflow: location.pathname.startsWith('/admin') ? 'hidden' : 'auto',
           bgcolor: 'background.body',
           p: 3,
           display: 'flex',
@@ -40,7 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }}
       >
         <Header />
-        <Box sx={{ flexGrow: 1, minHeight: 0, overflow: location.pathname.startsWith('/admin') ? 'auto' : 'hidden' }}>
+        <Box sx={{ flexGrow: 1, minHeight: 0, overflow: location.pathname.startsWith('/admin') ? 'hidden' : 'hidden' }}>
           {children}
         </Box>
       </Box>
