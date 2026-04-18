@@ -14,7 +14,7 @@ import datetime
 
 # Configuration
 API_BASE_URL = "http://localhost:3000"
-MONGODB_CONTAINER = "auth-mongodb"
+MONGODB_CONTAINER = "mongodb-auth"
 ADMIN_USER = {
     "username": "admin",
     "email": "admin@example.com",

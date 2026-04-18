@@ -1,0 +1,59 @@
+# Terraform Variables — Dev Environment (EXAMPLE / TEMPLATE)
+# Copy this file to terraform.tfvars and fill in your own values.
+# terraform.tfvars is gitignored — NEVER commit real values.
+
+# ─── AWS ──────────────────────────────────────────────────────────────────────
+aws_region     = "us-east-1"
+aws_account_id = "YOUR_12_DIGIT_ACCOUNT_ID"
+environment    = "dev"
+
+# ─── Domain & Certificate ─────────────────────────────────────────────────────
+domain_name     = "yourdomain.com"
+hosted_zone_id  = "YOUR_ROUTE53_HOSTED_ZONE_ID"
+certificate_arn = "arn:aws:acm:us-east-1:YOUR_ACCOUNT_ID:certificate/YOUR_CERT_ID"
+
+# ─── Networking ───────────────────────────────────────────────────────────────
+vpc_cidr             = "10.0.0.0/16"
+availability_zones   = ["us-east-1a", "us-east-1b"]
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24"]
+
+# ─── ECS ──────────────────────────────────────────────────────────────────────
+auth_service_cpu          = 256
+auth_service_memory       = 512
+accounting_service_cpu    = 256
+accounting_service_memory = 512
+flowise_proxy_cpu         = 512
+flowise_proxy_memory      = 1024
+bridge_cpu                = 256
+bridge_memory             = 512
+
+# ─── RDS (PostgreSQL via Aurora Serverless v2) ────────────────────────────────
+db_name            = "accounting"
+db_master_username = "chatproxy_admin"
+# db_master_password — stored in Secrets Manager, not here
+
+# ─── Amazon SES ───────────────────────────────────────────────────────────────
+ses_from_email = "noreply@yourdomain.com"
+# SES SMTP credentials — stored in Secrets Manager, not here
+
+# ─── Service Discovery ────────────────────────────────────────────────────────
+service_discovery_namespace = "chatproxy.dev.local"
+
+# ─── Platform VPC (separate CIDR from flowise VPC 10.0.x.x) ─────────────────
+platform_public_subnet_cidrs  = ["10.1.1.0/24", "10.1.2.0/24"]
+platform_private_subnet_cidrs = ["10.1.11.0/24", "10.1.12.0/24"]
+
+# ─── Container Images ─────────────────────────────────────────────────────────
+# Use versioned tags (e.g. v1.2.3) — NOT :latest.
+# The deploy-service.ps1 script updates these automatically on each release.
+# To roll back: change the tag here and run terraform apply -target=<module>.
+auth_service_image          = "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/chatproxy/auth-service:v1.0.0"
+accounting_service_image    = "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/chatproxy/accounting-service:v1.0.0"
+flowise_proxy_service_image = "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/chatproxy/flowise-proxy:v1.0.0"
+bridge_image                = "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/chatproxy/bridge:v1.0.0"
+
+# ─── Flowise ──────────────────────────────────────────────────────────────────
+flowise_subdomain   = "flowise"
+flowise_image       = "flowiseai/flowise:3.0.0"   # pin third-party images too
+flowise_desired_count = 1

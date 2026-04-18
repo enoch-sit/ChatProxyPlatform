@@ -806,27 +806,27 @@ describe('Role-Based Access Control Tests', () => {
   test('should allow all users access to enduser routes', async () => {
     // Test regular user access
     const regularResponse = await request(API_URL)
-      .get('/admin/dashboard')
+      .get('/dashboard')
       .set('Authorization', `Bearer ${accessToken}`);
     
     expect(regularResponse.status).toBe(200);
-    expect(regularResponse.body).toHaveProperty('message', 'User dashboard accessed successfully');
+    expect(regularResponse.body).toHaveProperty('message', 'This is protected content for your dashboard');
     
     // Test supervisor access
     const supervisorResponse = await request(API_URL)
-      .get('/admin/dashboard')
+      .get('/dashboard')
       .set('Authorization', `Bearer ${supervisorAccessToken}`);
     
     expect(supervisorResponse.status).toBe(200);
-    expect(supervisorResponse.body).toHaveProperty('message', 'User dashboard accessed successfully');
+    expect(supervisorResponse.body).toHaveProperty('message', 'This is protected content for your dashboard');
     
     // Test admin access
     const adminResponse = await request(API_URL)
-      .get('/admin/dashboard')
+      .get('/dashboard')
       .set('Authorization', `Bearer ${adminAccessToken}`);
     
     expect(adminResponse.status).toBe(200);
-    expect(adminResponse.body).toHaveProperty('message', 'User dashboard accessed successfully');
+    expect(adminResponse.body).toHaveProperty('message', 'This is protected content for your dashboard');
     
     console.log('✅ All user types successfully accessed enduser route');
   });

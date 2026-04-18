@@ -30,7 +30,7 @@ services:
     ports:
     - "27017:27017"
     volumes:
-    - D:/DockerVolumes/mongodb-auth:/data/db
+    - mongodb_auth_data:/data/db
     environment:
     - MONGO_INITDB_DATABASE=auth_db
     networks:
@@ -92,3 +92,4 @@ networks:
 
 volumes:
   mongodb-data:
+  mongodb_auth_data:

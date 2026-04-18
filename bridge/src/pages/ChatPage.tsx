@@ -125,7 +125,7 @@ const ChatPage: React.FC = () => {
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'row' }}>
       {/* Main Content - Left Side */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: '800px' }}>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Header Section: Contains controls for selecting chatflows and sessions */}
         <Sheet variant="outlined" sx={{ p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Stack direction="row" spacing={2} alignItems="center">
@@ -199,7 +199,6 @@ const ChatPage: React.FC = () => {
                   justifyContent: 'center', 
                   textAlign: 'center',
                   px: 4,
-                  minWidth: '800px',
                 }}>
                   <Stack spacing={3} alignItems="center">
                     <Typography level="h3" color="primary">

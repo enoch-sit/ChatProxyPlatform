@@ -1,11 +1,30 @@
 // src/api/config.ts
 
+const resolveApiBaseUrl = (): string => {
+	const configuredUrl = import.meta.env.VITE_FLOWISE_PROXY_API_URL;
+	if (configuredUrl) {
+		return configuredUrl;
+	}
+
+	const host = window.location.hostname;
+	const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+
+	// In AWS/remote deployments, use same-origin so ALB path-based routing handles API traffic.
+	if (!isLocalhost) {
+		return '';
+	}
+
+	return 'http://localhost:8000';
+};
+
 /**
- * The base URL for all API requests.
- * It's configured to use the REACT_APP_FLOWISE_PROXY_API_URL environment variable,
- * with a fallback to a local development server.
+ * Base URL for all API requests.
+ * Priority:
+ * 1) Explicit VITE_FLOWISE_PROXY_API_URL
+ * 2) Same-origin for remote/browser deployments (e.g. AWS ALB path routing)
+ * 3) localhost:8000 for local-only development
  */
-export const API_BASE_URL = import.meta.env.VITE_FLOWISE_PROXY_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = resolveApiBaseUrl();
 
 /**
  * The default timeout for standard API requests, in milliseconds.

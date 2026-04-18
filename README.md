@@ -10,44 +10,53 @@
 
 ## 🚀 Quick Start
 
-**For complete beginners (no technical knowledge):**
-```bash
-# 1. After git clone, create environment files from templates
-setup_env_files.bat
+There are **3 scripts** that handle everything on a workstation:
 
-# 2. Generate and populate JWT secrets automatically
-generate_secrets.bat
+| Script | Purpose |
+|--------|---------|
+| `.\setup.ps1` | Fresh machine setup (prereqs, secrets, .env, start services) |
+| `.\patch.ps1` | Pull updates & redeploy changed services |
+| `.\diagnose.ps1` | Health checks, troubleshooting, diagnostics |
 
-# 3. Configure drives automatically (detects RAID, updates paths)
-configure_drives.bat
+**First-time setup:**
+```powershell
+# 1. Clone the repo and run the setup script
+.\setup.ps1
 
-# 4. Check your system
-check_system.bat
-
-# 5. Follow the step-by-step guide
-# Open: DEPLOYMENT_PLAN.md
-```
-
-**For experienced users:**
-```bash
-# 1. Start all services
-cd flowise && start-with-postgres.bat
-cd ..\auth-service && start.bat
-cd ..\accounting-service && start_docker.bat
-cd ..\flowise-proxy-service-py && docker-compose up -d
-cd ..\bridge && start.bat
-
-# 2. Configure Flowise API key (see SETUP_GUIDE.md)
-
-# 3. Create users
-cd auth-service\quickCreateAdminPy
-setup_and_run.bat
-notepad users.csv
-sync_all_users.bat
-
-# 4. Access the platform
+# 2. Access the platform
 # http://localhost:3082 (Bridge UI)
 # http://localhost:3002 (Flowise Admin)
+```
+
+**Pull latest changes:**
+```powershell
+.\patch.ps1                          # Auto-detect what changed, rebuild as needed
+.\patch.ps1 -Mode full              # Force full rebuild of changed services
+.\patch.ps1 -Service auth-service   # Patch a single service
+.\patch.ps1 -Mode status            # Check version & what's pending
+```
+
+**Troubleshooting:**
+```powershell
+.\diagnose.ps1                      # Full diagnostic report
+.\diagnose.ps1 -Quick               # Quick health check
+.\diagnose.ps1 -Login               # Login problem diagnostics
+```
+
+### AWS Deployment (infra/scripts/)
+
+```powershell
+# Bump service version
+.\infra\scripts\bump-version.ps1 -Service auth-service -Type patch
+
+# Deploy to AWS ECS (auto-tags from version.json)
+.\infra\scripts\deploy-service.ps1 -Service auth-service
+
+# Deploy with auto-rollback
+.\infra\scripts\deploy-service.ps1 -Service auth-service -AutoRollback
+
+# Dry run
+.\infra\scripts\deploy-service.ps1 -Service bridge -DryRun
 ```
 
 ---
@@ -56,23 +65,61 @@ sync_all_users.bat
 
 ### Getting Started
 - **[DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md)** - Complete installation guide for beginners (START HERE)
-- **[DEPLOYMENT_PROGRESS.md](DEPLOYMENT_PROGRESS.md)** - Track your installation progress
+- **[DEPLOYMENT_AND_PATCHING_PLAN.md](DEPLOYMENT_AND_PATCHING_PLAN.md)** - Versioning, CI/CD, and fleet management plan
 - **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Service-specific setup instructions
-- **[README_FRESH_INSTALL.md](README_FRESH_INSTALL.md)** - Fresh Windows installation package overview
+- **[docs/AWS_PATCH_PIPELINE_RUNBOOK.md](docs/AWS_PATCH_PIPELINE_RUNBOOK.md)** - Safe AWS dev patch procedure for ECS services
 
-### System Tools
-- **[generate_secrets.py](generate_secrets.py)** / **[.bat](generate_secrets.bat)** - Automated JWT secret generation and .env population
-- **[setup_env_files.bat](setup_env_files.bat)** - Automated .env file creation from templates
-- **[configure_drives.py](configure_drives.py)** / **[.bat](configure_drives.bat)** - Automated drive detection, RAID check, and path configuration
-- **[check_drives_and_setup.bat](check_drives_and_setup.bat)** - Interactive drive configuration assistant (manual)
-- **[check_system.bat](check_system.bat)** - Automated system health checker
+### Operations Scripts
+| Script | Description |
+|--------|-------------|
+| `setup.ps1` | One-command workstation setup |
+| `patch.ps1` | Pull & deploy updates with change detection |
+| `diagnose.ps1` | Full diagnostic suite |
+| `infra/scripts/bump-version.ps1` | Semver bumping + git tags |
+| `infra/scripts/deploy-service.ps1` | AWS ECR → Terraform → ECS deploy pipeline |
+
+### Configuration
+| File | Purpose |
+|------|---------|
+| `version.json` | Service versions — single source of truth |
+| `workstation-manifest.json` | Fleet metadata: deploy order, ports, tools |
+| `.local-version` | Tracks what's deployed on this machine |
 
 ### Technical Documentation
 - **[docs/SERVICE_ARCHITECTURE.md](docs/SERVICE_ARCHITECTURE.md)** - System architecture overview
 - **[docs/JWT_AUTHENTICATION_FIXES.md](docs/JWT_AUTHENTICATION_FIXES.md)** - Authentication implementation details
-- **[docs/JWT_TESTING_PLAN.md](docs/JWT_TESTING_PLAN.md)** - Authentication testing procedures
-- **[docs/DEPLOYMENT_COMPLETE.md](docs/DEPLOYMENT_COMPLETE.md)** - Deployment completion summary
-- **[docs/WINDOWS_DOCKER_DEPLOYMENT_PLAN.md](docs/WINDOWS_DOCKER_DEPLOYMENT_PLAN.md)** - Original deployment plan
+
+### CI/CD (GitHub Actions)
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Pull request / push | Lint, test, typecheck, Docker build per changed service |
+| `deploy-dev.yml` | Push to main | Build → ECR push → Terraform apply → ECS wait stable |
+| `rollback.yml` | Manual dispatch | Revert a service to a previous ECS task definition |
+
+### Fleet Management (WireGuard VPN)
+
+Centrally manage multiple Windows workstations over a WireGuard VPN tunnel.
+
+| File | Purpose |
+|------|---------|
+| `fleet.ps1` | Central management: status, patch, health, setup, deploy-key, run-command |
+| `wg-workstation-setup.ps1` | Configure WireGuard + OpenSSH on a new workstation |
+| `fleet-inventory.json` | Registry of hub + workstation IPs, SSH users, roles |
+| `infra/modules/wireguard/` | Terraform module for the AWS VPN hub (~$5/mo) |
+
+**Quick start:**
+```powershell
+# 1. Deploy the hub
+terraform -chdir=infra/environments/dev apply -var-file=terraform.tfvars
+
+# 2. On each workstation, run:
+.\wg-workstation-setup.ps1 -HubEndpoint "<EIP>:51820" -HubPublicKey "<key>" -MyIP "10.10.0.X/24"
+
+# 3. From your management machine:
+.\fleet.ps1 -Action status          # Check all workstations
+.\fleet.ps1 -Action patch           # Patch all workstations
+.\fleet.ps1 -Action health          # Run diagnostics everywhere
+```
 
 ---
 
@@ -212,26 +259,26 @@ delete,olduser,old@school.com,,,0
 ## 🛠️ Common Tasks
 
 ### Start All Services
-```bash
-# Option 1: Manual start (recommended for first time)
-cd flowise && start-with-postgres.bat
-cd ..\auth-service && start.bat
-cd ..\accounting-service && start_docker.bat
-cd ..\flowise-proxy-service-py && docker-compose up -d
-cd ..\bridge && start.bat
-
-# Option 2: Automated (if script exists)
-start_all_services.bat
+```powershell
+.\setup.ps1 -SkipPrereqs     # Start everything (skip install checks)
 ```
 
 ### Stop All Services
-```bash
-stop_all_services.bat
+```powershell
+.\infra\scripts\dev-stop.ps1  # Stop all Docker Compose services
 ```
 
 ### Check System Health
-```bash
-check_system.bat
+```powershell
+.\diagnose.ps1 -Quick         # Quick container + endpoint check
+.\diagnose.ps1                 # Full diagnostic
+```
+
+### Pull Updates & Rebuild
+```powershell
+.\patch.ps1                    # Auto-detect changes and deploy
+.\patch.ps1 -Mode full        # Force full rebuild
+.\patch.ps1 -Mode status      # See what's pending
 ```
 
 ### Add/Update Users
@@ -265,17 +312,21 @@ backup_databases.bat
 
 ## 🐛 Troubleshooting
 
+### Quick Diagnostics
+```powershell
+.\diagnose.ps1 -Quick          # Container + endpoint health
+.\diagnose.ps1 -Login          # Login-specific diagnostics
+.\diagnose.ps1 -Users          # List users from MongoDB
+```
+
 ### Services Won't Start
-```bash
+```powershell
 # Check Docker is running
 docker --version
 docker ps
 
-# Check ports
-netstat -ano | findstr "3000 3001 3002 3082 8000"
-
-# Run system check
-check_system.bat
+# Full diagnostic
+.\diagnose.ps1
 ```
 
 ### Common Issues
@@ -290,9 +341,9 @@ check_system.bat
 | Out of disk space | Run `docker system prune -a` |
 
 ### Get Detailed Diagnostics
-```bash
-check_system.bat
-# Creates detailed report: system_check_report_[date].txt
+```powershell
+.\diagnose.ps1 -SaveLog
+# Creates detailed report in logs/diagnose_[date].log
 ```
 
 ---
@@ -324,47 +375,39 @@ See [docs/JWT_TESTING_PLAN.md](docs/JWT_TESTING_PLAN.md) for comprehensive JWT t
 
 ```
 ChatProxy Platform/
-├── README.md                        ← You are here
-├── LICENSE                          ← MIT License
-├── DEPLOYMENT_PLAN.md              ← Installation guide
-├── DEPLOYMENT_PROGRESS.md          ← Progress tracker
-├── SETUP_GUIDE.md                  ← Setup reference
-├── README_FRESH_INSTALL.md         ← Package overview
-├── check_system.bat                ← System checker
+├── setup.ps1                       ← One-command workstation setup
+├── patch.ps1                       ← Pull updates & redeploy
+├── diagnose.ps1                    ← Diagnostics & health checks
+├── fleet.ps1                       ← Fleet management (status, patch, health)
+├── wg-workstation-setup.ps1        ← WireGuard + OpenSSH onboarding
+├── generate_secrets.py             ← Secret generation (used by setup.ps1)
+├── version.json                    ← Service version registry
+├── workstation-manifest.json       ← Fleet metadata & deploy order
+├── fleet-inventory.json            ← WireGuard fleet inventory
+├── .local-version                  ← This machine's deployed version
 │
-├── docs/                           ← Technical documentation
-│   ├── SERVICE_ARCHITECTURE.md
-│   ├── JWT_AUTHENTICATION_FIXES.md
-│   ├── JWT_TESTING_PLAN.md
-│   ├── DEPLOYMENT_COMPLETE.md
-│   └── WINDOWS_DOCKER_DEPLOYMENT_PLAN.md
+├── .github/workflows/              ← CI/CD pipelines
+│   ├── ci.yml                      ← PR checks (lint, test, build)
+│   ├── deploy-dev.yml              ← Auto-deploy on push to main
+│   └── rollback.yml                ← Manual rollback trigger
+│
+├── infra/                          ← Terraform + deploy scripts
+│   ├── scripts/                    ← Deploy & version scripts
+│   ├── environments/dev/           ← Dev environment config
+│   ├── modules/                    ← Terraform modules (incl. wireguard)
+│   └── task-definitions/           ← ECS task definition JSONs
 │
 ├── bridge/                         ← Frontend (React + TypeScript)
-│   ├── src/
-│   ├── docker-compose.yml
-│   └── start.bat
-│
 ├── flowise/                        ← AI Flow Builder
-│   ├── docker-compose.yml
-│   └── start-with-postgres.bat
-│
-├── flowise-proxy-service-py/      ← Integration Layer (Python)
-│   ├── app/
-│   ├── docker-compose.yml
-│   └── .env
-│
+├── flowise-proxy-service-py/       ← Integration Layer (Python)
 ├── auth-service/                   ← Authentication (Node.js)
-│   ├── src/
-│   ├── docker-compose.dev.yml
-│   ├── start.bat
-│   └── quickCreateAdminPy/
-│       ├── users.csv              ← Edit users here!
-│       └── sync_all_users.bat     ← Apply changes
+├── accounting-service/             ← Credit Management (Node.js)
 │
-└── accounting-service/             ← Credit Management (Node.js)
-    ├── src/
-    ├── docker-compose.yml
-    └── start_docker.bat
+├── scripts/                        ← Utility scripts (Python, BAT, JS)
+│   └── archive/                    ← Legacy scripts (kept for reference)
+├── docs/                           ← Technical documentation
+│   └── images/                     ← Screenshots & diagrams
+└── logs/                           ← Diagnostic & patch logs (gitignored)
 ```
 
 ---

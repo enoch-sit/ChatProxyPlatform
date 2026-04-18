@@ -1,6 +1,6 @@
 // src/routes/index.ts
-import { Router, Request, Response } from 'express';
-import { authenticate, isAdmin, requireAdmin, requireSupervisor, optionalAuth } from '../auth/auth.middleware'; // Added isAdmin
+import { Router, Request, Response, NextFunction } from 'express';
+import { authenticate, isAdmin, requireAdmin, requireAdminOrTeacher, requireSupervisor, optionalAuth } from '../auth/auth.middleware';
 import { User, UserRole } from '../models/user.model';
 import { authService } from '../auth/auth.service';
 import { passwordService } from '../services/password.service';
@@ -436,7 +436,7 @@ protectedRouter.get('/dashboard', authenticate, (req: Request, res: Response) =>
 // =============================================================================
 
 // Get all users (admin only)
-adminRouter.get('/users', authenticate, requireAdmin, async (req: Request, res: Response) => {
+adminRouter.get('/users', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const users = await User.find().select('-password');
     res.status(200).json({ users });
@@ -446,8 +446,8 @@ adminRouter.get('/users', authenticate, requireAdmin, async (req: Request, res: 
   }
 });
 
-// Get user by ID (Admin only)
-adminRouter.get('/users/:userId', authenticate, isAdmin, async (req: Request, res: Response) => {
+// Get user by ID (Admin or teacher)
+adminRouter.get('/users/:userId', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
@@ -480,8 +480,8 @@ adminRouter.get('/users/:userId', authenticate, isAdmin, async (req: Request, re
   }
 });
 
-// Get user by email (admin only)
-adminRouter.get('/users/by-email/:email', authenticate, requireAdmin, async (req: Request, res: Response) => {
+// Get user by email (admin or teacher)
+adminRouter.get('/users/by-email/:email', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   // GET /api/admin/users/by-email/:email
   try {
     const { email } = req.params;
@@ -504,10 +504,10 @@ adminRouter.get('/users/by-email/:email', authenticate, requireAdmin, async (req
 });
 
 
-// Create a new user (admin only)
-adminRouter.post('/users', authenticate, requireAdmin, async (req: Request, res: Response) => {
+// Create a new user (admin or teacher)
+adminRouter.post('/users', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
-    const { username, email, password, role, skipVerification } = req.body;
+    const { username, email, password, role, skipVerification = true } = req.body;
     
     // Validate required fields
     if (!username || !email || !password) {
@@ -531,7 +531,7 @@ adminRouter.post('/users', authenticate, requireAdmin, async (req: Request, res:
       email,
       password,
       role || UserRole.ENDUSER,
-      skipVerification === true
+      skipVerification !== false
     );
     
     if (!result.success) {
@@ -549,11 +549,11 @@ adminRouter.post('/users', authenticate, requireAdmin, async (req: Request, res:
   }
 });
 
-// Create multiple users at once (admin only)
-adminRouter.post('/users/batch', authenticate, requireAdmin, async (req: Request, res: Response) => {
+// Create multiple users at once (admin or teacher)
+adminRouter.post('/users/batch', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const { users, skipVerification = true } = req.body;
-    
+
     // Validate input
     if (!users || !Array.isArray(users) || users.length === 0) {
       return res.status(400).json({ error: 'A non-empty array of users is required' });
@@ -564,6 +564,13 @@ adminRouter.post('/users/batch', authenticate, requireAdmin, async (req: Request
       if (!user.username || !user.email) {
         return res.status(400).json({ 
           error: 'Each user must have a username and email',
+          invalidUser: user
+        });
+      }
+
+      if (user.password && typeof user.password === 'string' && user.password.length < 8) {
+        return res.status(400).json({
+          error: 'Provided batch password must be at least 8 characters',
           invalidUser: user
         });
       }
@@ -589,7 +596,7 @@ adminRouter.post('/users/batch', authenticate, requireAdmin, async (req: Request
     // Create the users in batch
     const result = await authService.adminCreateBatchUsers(
       users,
-      skipVerification === true
+      skipVerification !== false
     );
     
     logger.info(`Batch user creation by admin ${req.user?.username}. Created: ${result.summary.successful}, Failed: ${result.summary.failed}, Total: ${result.summary.total}`);
@@ -634,8 +641,74 @@ adminRouter.put('/users/:userId/role', authenticate, requireAdmin, async (req: R
   }
 });
 
-// Delete a specific user (admin only)
-adminRouter.delete('/users/:userId', authenticate, requireAdmin, async (req: Request, res: Response) => {
+// Update user roles in batch (admin only)
+adminRouter.put('/users/roles/batch', authenticate, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { updates } = req.body;
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: 'A non-empty updates array is required' });
+    }
+
+    const results: Array<{ userId: string; success: boolean; message: string; role?: string }> = [];
+    let successful = 0;
+    let failed = 0;
+
+    for (const update of updates) {
+      const { userId, role } = update || {};
+
+      if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        failed++;
+        results.push({ userId: userId || 'unknown', success: false, message: 'Invalid user ID' });
+        continue;
+      }
+
+      if (!Object.values(UserRole).includes(role)) {
+        failed++;
+        results.push({ userId, success: false, message: 'Invalid role' });
+        continue;
+      }
+
+      try {
+        const updatedUser = await User.findByIdAndUpdate(
+          userId,
+          { role },
+          { new: true }
+        ).select('-password');
+
+        if (!updatedUser) {
+          failed++;
+          results.push({ userId, success: false, message: 'User not found' });
+          continue;
+        }
+
+        successful++;
+        results.push({ userId, success: true, message: 'Role updated', role: updatedUser.role });
+      } catch (error) {
+        failed++;
+        logger.error(`Error updating role for user ${userId}:`, error);
+        results.push({ userId, success: false, message: 'Failed to update role' });
+      }
+    }
+
+    logger.info(`Batch role update by ${req.user?.username}. Successful: ${successful}, Failed: ${failed}, Total: ${updates.length}`);
+    res.status(200).json({
+      message: `${successful} of ${updates.length} user roles updated successfully`,
+      results,
+      summary: {
+        total: updates.length,
+        successful,
+        failed,
+      },
+    });
+  } catch (error) {
+    logger.error('Batch role update error:', error);
+    res.status(500).json({ error: 'Batch role update failed' });
+  }
+});
+
+// Delete a specific user (admin or teacher)
+adminRouter.delete('/users/:userId', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     
@@ -731,9 +804,100 @@ adminRouter.get('/reports', authenticate, requireSupervisor, (req: Request, res:
   });
 });
 
+// Admin/teacher password reset - set a user's password directly
+adminRouter.put('/users/:userId/password', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { newPassword } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Prevent teachers from resetting admin or other teacher accounts
+    if (req.user?.role === UserRole.TEACHER && (user.role === UserRole.ADMIN || user.role === UserRole.TEACHER || user.role === UserRole.SUPERVISOR)) {
+      return res.status(403).json({ error: 'Teachers can only reset passwords for student accounts' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    logger.info(`Password reset for user ${user.username} by ${req.user?.username}`);
+    res.status(200).json({ message: 'Password reset successfully' });
+  } catch (error: any) {
+    logger.error(`Admin password reset error: ${error.message}`);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// Directly verify a user's email (admin or teacher)
+adminRouter.post('/users/:userId/verify', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { isVerified: true },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Delete any pending verification tokens for this user
+    await Verification.deleteMany({
+      userId: new mongoose.Types.ObjectId(userId),
+      type: VerificationType.EMAIL
+    });
+
+    res.status(200).json({
+      message: 'User verified successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        isVerified: user.isVerified
+      }
+    });
+  } catch (error: any) {
+    logger.error(`Admin verify user error: ${error.message}`);
+    res.status(500).json({ error: 'Failed to verify user' });
+  }
+});
+
 // =============================================================================
 // Testing Routes (previously in testing.routes.ts)
 // =============================================================================
+
+// Security guard: all testing endpoints are blocked in production unless
+// TESTING_SECRET_TOKEN env var is set AND the caller supplies a matching
+// x-testing-token header.  Without the env var the routes are fully disabled.
+testingRouter.use((req: Request, res: Response, next: NextFunction) => {
+  if (process.env.NODE_ENV === 'production') {
+    const testingToken = process.env.TESTING_SECRET_TOKEN;
+    if (!testingToken) {
+      return res.status(403).json({ error: 'Testing endpoints are disabled in production' });
+    }
+    const providedToken = req.headers['x-testing-token'];
+    if (!providedToken || providedToken !== testingToken) {
+      return res.status(403).json({ error: 'Forbidden: invalid or missing testing token' });
+    }
+  }
+  return next();
+});
 
 // Get verification token for a user (development/testing only)
 testingRouter.get('/verification-token/:userId/:type?', async (req: Request, res: Response) => {
@@ -814,6 +978,45 @@ testingRouter.post('/verify-user/:userId', async (req: Request, res: Response) =
   } catch (error: any) {
     logger.error(`Testing route error: ${error.message}`);
     res.status(500).json({ error: 'Failed to verify user' });
+  }
+});
+
+// Promote a user to admin without auth (development/testing bootstrap only)
+testingRouter.post('/promote-admin/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { role: UserRole.ADMIN, isVerified: true },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({
+      message: 'User promoted to admin successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isVerified,
+      },
+    });
+  } catch (error: any) {
+    logger.error(`Testing route error: ${error.message}`);
+    res.status(500).json({ error: 'Failed to promote user to admin' });
   }
 });
 

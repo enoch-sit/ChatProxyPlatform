@@ -6,6 +6,7 @@ import {
   refreshToken as apiRefreshToken,
   logout as apiLogout,
 } from '../api/auth';
+import { navigateTo } from '../api/navigationService';
 import type { AuthState, LoginCredentials, User, AuthTokens, LoginResponse } from '../types/auth';
 import { jwtDecode } from 'jwt-decode';
 
@@ -20,7 +21,7 @@ interface DecodedToken {
 interface AuthActions {
   setUser: (user: User) => void;
   login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshToken: (isBackground?: boolean) => Promise<void>;
   checkAuthStatus: (isBackground?: boolean) => void;
   clearError: () => void;
@@ -49,6 +50,14 @@ const ROLE_PERMISSIONS: Record<User['role'], string[]> = {
     'view_all_sessions',
     'view_all_messages',
   ],
+  teacher: [
+    'manage_users',
+    'manage_chatflows',
+    'view_analytics',
+    'access_admin_panel',
+    'view_all_sessions',
+    'view_all_messages',
+  ],
   enduser: [
     'create_sessions',
     'send_messages',
@@ -65,6 +74,7 @@ const initialState: AuthState = {
   user: null,
   tokens: null,
   isAuthenticated: false,
+  hasHydrated: false,
   isLoading: false,
   error: null,
 };
@@ -123,18 +133,21 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
       logout: async () => {
         const { tokens } = get();
-        // Call server to invalidate refresh token
+
+        // Clear local auth state first so UI/route transition is immediate
+        set(initialState);
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        navigateTo('/login');
+
+        // Best-effort server token invalidation runs after local logout.
         if (tokens?.refreshToken && tokens?.accessToken) {
           try {
             await apiLogout(tokens.refreshToken, tokens.accessToken);
           } catch (error) {
             console.error('Logout API call failed:', error);
-            // Continue with local cleanup even if server call fails
           }
         }
-        set(initialState);
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
       },
       refreshToken: async (isBackground = false) => {
         // Don't show loading for background refreshes
@@ -222,6 +235,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
               get().logout();
             }
           }
+        } else {
+          const { isAuthenticated, user } = get();
+          if (isAuthenticated || user) {
+            set(initialState);
+          }
         }
       },
       clearError: () => set({ error: null }),
@@ -251,6 +269,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ tokens: state.tokens, user: state.user, isAuthenticated: state.isAuthenticated }),
+      onRehydrateStorage: () => (state) => {
+        state?.checkAuthStatus(true);
+        state?.clearError();
+        useAuthStore.setState({ hasHydrated: true });
+      },
     }
   )
 );

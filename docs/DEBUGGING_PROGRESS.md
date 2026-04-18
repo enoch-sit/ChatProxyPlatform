@@ -67,7 +67,7 @@ Authentication failed: SCRAM-SERVER-FIRST-MESSAGE: wrong password
 **Solution**:
 - Updated `flowise-proxy-service-py/.env`:
 ```env
-MONGODB_URL=mongodb://admin:65424b6a739b4198ae2a3e08b35deeda@mongodb-proxy:27017/flowise_proxy?authSource=admin
+MONGODB_URL=mongodb://admin:<REDACTED_PASSWORD>@mongodb-proxy:27017/flowise_proxy?authSource=admin
 ```
 
 **Result**: ✅ Flowise-proxy MongoDB connection successful
@@ -92,8 +92,8 @@ MONGODB_URL=mongodb://admin:65424b6a739b4198ae2a3e08b35deeda@mongodb-proxy:27017
 - Generated new secrets using `generate_secrets.bat`
 - Synchronized across all three services:
 ```env
-JWT_ACCESS_SECRET=II-OYp-J9ydG8K5k1tufUf3CrCu74v6RBoEwwlU5-o.jko-7U.4rei9cJcxSaeh0
-JWT_REFRESH_SECRET=K4.xbCPVjEvJQfvrTOZsG17l_YOmmN8xwQg3hBUKIs3nFZ3K06vjThJ9mqxpl1I_
+JWT_ACCESS_SECRET=<redacted — rotated 2026-03-26, stored in AWS Secrets Manager /chatproxy/dev/jwt>
+JWT_REFRESH_SECRET=<redacted — rotated 2026-03-26, stored in AWS Secrets Manager /chatproxy/dev/jwt>
 ```
 
 **Result**: ✅ All services now share same JWT secrets, authentication works
@@ -250,7 +250,7 @@ GET http://localhost:8000/api/v1/chat/credits
 ### 1. Authentication Test
 ```powershell
 POST http://localhost:8000/api/v1/chat/authenticate
-Body: {"username":"admin","password":"admin@admin"}
+Body: {"username":"admin","password":"<redacted>"}
 Result: ✅ Access token received
 ```
 

@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "18"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ─── Detect which services changed ──────────────────────────────────────────
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      auth: ${{ steps.filter.outputs.auth }}
+      accounting: ${{ steps.filter.outputs.accounting }}
+      proxy: ${{ steps.filter.outputs.proxy }}
+      bridge: ${{ steps.filter.outputs.bridge }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            auth:
+              - 'auth-service/**'
+            accounting:
+              - 'accounting-service/**'
+            proxy:
+              - 'flowise-proxy-service-py/**'
+            bridge:
+              - 'bridge/**'
+            infra:
+              - 'infra/**'
+
+  # ─── Auth Service ───────────────────────────────────────────────────────────
+  auth-service:
+    needs: changes
+    if: needs.changes.outputs.auth == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: auth-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: auth-service/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - name: Docker build check
+        run: docker build -t auth-service:ci .
+
+  # ─── Accounting Service ─────────────────────────────────────────────────────
+  accounting-service:
+    needs: changes
+    if: needs.changes.outputs.accounting == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: accounting-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: accounting-service/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - name: Docker build check
+        run: docker build -t accounting-service:ci .
+
+  # ─── Flowise Proxy (Python) ────────────────────────────────────────────────
+  flowise-proxy:
+    needs: changes
+    if: needs.changes.outputs.proxy == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flowise-proxy-service-py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: pip install pytest
+      - run: python -m pytest tests/ -v
+      - name: Docker build check
+        run: docker build -t flowise-proxy:ci .
+
+  # ─── Bridge (React/Vite) ───────────────────────────────────────────────────
+  bridge:
+    needs: changes
+    if: needs.changes.outputs.bridge == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bridge
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: bridge/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - run: npm run audit:admin-ui
+      - name: Docker build check
+        run: docker build -t bridge:ci .
+
+  # ─── Terraform validate ────────────────────────────────────────────────────
+  terraform:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/environments/dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7"
+      - run: terraform init -backend=false
+      - run: terraform validate
+      - run: terraform fmt -check -recursive ../../

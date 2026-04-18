@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "services": {
+    "auth-service": "1.0.0",
+    "accounting-service": "1.0.0",
+    "flowise-proxy": "1.0.0",
+    "bridge": "1.0.0"
+  },
+  "imageTagFormat": "v{version}-{gitsha7}",
+  "lastUpdated": "2026-04-17"
+}

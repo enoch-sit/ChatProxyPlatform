@@ -5,6 +5,8 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn src/app.ts",
+    "seed:admin": "ts-node src/scripts/seed-admin.ts",
+    "seed:admin:prod": "node dist/src/scripts/seed-admin.js",
     "test": "jest --runInBand --detectOpenHandles",
     "test:mailhog": "jest --runInBand --detectOpenHandles --testMatch=\"**/email.test.ts\"",
     "mailhog:test": "powershell -File ./tests/mailhog-email-tests.ps1"

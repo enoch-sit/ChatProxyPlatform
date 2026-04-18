@@ -1,6 +1,49 @@
 # ChatProxy Platform - Git Ignore Rules
 
 # ============================================
+# Personal Deployment Records (never commit)
+# ============================================
+web-record.md
+docs/web-record.md
+
+# ============================================
+# Terraform (CRITICAL — state files contain secrets in plaintext)
+# ============================================
+# Provider binaries & cache (large, auto-downloaded)
+**/.terraform/
+.terraform/
+
+# State files — NEVER commit, stored in S3 instead
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Plan output files (can expose secret values)
+*.tfplan
+*.tfplan.json
+
+# Variable files with real values (use *.tfvars.example for templates)
+infra/environments/**/*.tfvars
+infra/environments/**/*.hcl
+
+# Terraform crash logs
+crash.log
+crash.*.log
+
+# ============================================
+# Diagnostic & Report Files (may contain system/IP info)
+# ============================================
+login_diagnostic_report_*.txt
+logs/login_diagnostic_report_*.txt
+post-diagnosis.txt
+logs/post-diagnosis.txt
+target_machine_0001.text
+logs/target_machine_0001.text
+
+# Config backups (may contain old secrets)
+config_backup_*/
+
+# ============================================
 # Environment & Secrets
 # ============================================
 .env
@@ -16,6 +59,14 @@ secrets/
 *.pem
 *.pfx
 *.p12
+
+# Temporary credential output files
+new_ses_credentials.json
+new_*_credentials.json
+*_credentials.json
+
+# One-time secret population scripts (contain real values)
+create_secrets.ps1
 
 # ============================================
 # Dependencies
@@ -235,3 +286,6 @@ typedoc/
 !LICENSE
 !README.md
 !CONTRIBUTING.md
+
+# WireGuard config (contains private key)
+wg-fleet.conf

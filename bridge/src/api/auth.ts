@@ -1,5 +1,6 @@
 // src/api/auth.ts
 import type { LoginCredentials, LoginResponse } from '../types/auth';
+import { API_BASE_URL } from './config';
 
 /**
  * Authenticates a user against the backend.
@@ -15,7 +16,7 @@ import type { LoginCredentials, LoginResponse } from '../types/auth';
  */
 export const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {
   // Note: We use fetch here instead of apiClient to avoid auth interceptors during login
-  const response = await fetch(`${import.meta.env.VITE_FLOWISE_PROXY_API_URL || 'http://localhost:8000'}/api/v1/chat/authenticate`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/chat/authenticate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -25,7 +26,8 @@ export const login = async (credentials: LoginCredentials): Promise<LoginRespons
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Authentication failed: ${response.status}`);
+    // FastAPI returns errors in "detail" field, but also check "message" for compatibility
+    throw new Error(errorData.detail || errorData.message || `Authentication failed: ${response.status}`);
   }
 
   return response.json();
@@ -44,7 +46,7 @@ export const login = async (credentials: LoginCredentials): Promise<LoginRespons
  */
 export const refreshToken = async (token: string): Promise<LoginResponse> => {
   // Note: We use fetch here instead of apiClient to avoid auth interceptors during token refresh
-  const response = await fetch(`${import.meta.env.VITE_FLOWISE_PROXY_API_URL || 'http://localhost:8000'}/api/v1/chat/refresh`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/chat/refresh`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -54,7 +56,7 @@ export const refreshToken = async (token: string): Promise<LoginResponse> => {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Token refresh failed: ${response.status}`);
+    throw new Error(errorData.detail || errorData.message || `Token refresh failed: ${response.status}`);
   }
 
   return response.json();
@@ -70,7 +72,7 @@ export const refreshToken = async (token: string): Promise<LoginResponse> => {
 export const logout = async (refreshToken: string, accessToken: string): Promise<void> => {
   try {
     // Call the server to invalidate the refresh token
-    const response = await fetch(`${import.meta.env.VITE_FLOWISE_PROXY_API_URL || 'http://localhost:8000'}/api/v1/chat/revoke`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/chat/revoke`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

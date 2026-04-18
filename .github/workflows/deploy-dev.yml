@@ -1,0 +1,219 @@
+name: Deploy Dev
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'auth-service/**'
+      - 'accounting-service/**'
+      - 'flowise-proxy-service-py/**'
+      - 'bridge/**'
+      - 'version.json'
+
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to deploy (leave empty for all changed)"
+        required: false
+        type: choice
+        options:
+          - ""
+          - auth-service
+          - accounting-service
+          - flowise-proxy
+          - bridge
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: "168437900315"
+  ECR_REGISTRY: 168437900315.dkr.ecr.us-east-1.amazonaws.com
+  ENVIRONMENT: dev
+
+jobs:
+  # ─── Detect changes ────────────────────────────────────────────────────────
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.detect.outputs.services }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: detect
+        run: |
+          if [ -n "${{ inputs.service }}" ]; then
+            echo 'services=["${{ inputs.service }}"]' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          SERVICES='[]'
+          
+          echo "$CHANGED" | grep -q '^auth-service/' && SERVICES=$(echo "$SERVICES" | jq '. + ["auth-service"]')
+          echo "$CHANGED" | grep -q '^accounting-service/' && SERVICES=$(echo "$SERVICES" | jq '. + ["accounting-service"]')
+          echo "$CHANGED" | grep -q '^flowise-proxy-service-py/' && SERVICES=$(echo "$SERVICES" | jq '. + ["flowise-proxy"]')
+          echo "$CHANGED" | grep -q '^bridge/' && SERVICES=$(echo "$SERVICES" | jq '. + ["bridge"]')
+          
+          echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
+          echo "Deploying: $SERVICES"
+
+  # ─── Preflight secret validation ───────────────────────────────────────────
+  validate-secrets:
+    needs: changes
+    if: needs.changes.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate Flowise API key secret for flowise-proxy deploys
+        env:
+          SERVICES_JSON: ${{ needs.changes.outputs.services }}
+        run: |
+          echo "Services selected: $SERVICES_JSON"
+
+          if ! echo "$SERVICES_JSON" | jq -e 'index("flowise-proxy")' >/dev/null; then
+            echo "flowise-proxy not in deployment set; skipping Flowise secret validation"
+            exit 0
+          fi
+
+          SECRET_ID="/chatproxy/${{ env.ENVIRONMENT }}/flowise/api-key"
+          echo "Validating required secret: $SECRET_ID"
+
+          aws secretsmanager describe-secret \
+            --secret-id "$SECRET_ID" \
+            --region "${{ env.AWS_REGION }}" >/dev/null
+
+          SECRET_STRING=$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRET_ID" \
+            --region "${{ env.AWS_REGION }}" \
+            --query 'SecretString' \
+            --output text)
+
+          FLOWISE_API_KEY=$(echo "$SECRET_STRING" | jq -r '.FLOWISE_API_KEY // empty')
+
+          if [ -z "$FLOWISE_API_KEY" ]; then
+            echo "::error::Secrets Manager value /chatproxy/${{ env.ENVIRONMENT }}/flowise/api-key is missing FLOWISE_API_KEY or it is empty"
+            exit 1
+          fi
+
+          echo "Flowise API key secret validation passed"
+
+  # ─── Build & Push to ECR ───────────────────────────────────────────────────
+  build-push:
+    needs: [changes, validate-secrets]
+    if: needs.changes.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.changes.outputs.services) }}
+    outputs:
+      image-tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          VERSION=$(jq -r ".services[\"${{ matrix.service }}\"]" version.json)
+          SHA=$(git rev-parse --short=7 HEAD)
+          TAG="v${VERSION}-${SHA}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Image tag: $TAG"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set source directory
+        id: srcdir
+        run: |
+          case "${{ matrix.service }}" in
+            flowise-proxy) echo "dir=flowise-proxy-service-py" >> "$GITHUB_OUTPUT" ;;
+            *) echo "dir=${{ matrix.service }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Build and push
+        run: |
+          TAG=${{ steps.tag.outputs.tag }}
+          REPO="${{ env.ECR_REGISTRY }}/chatproxy-${{ env.ENVIRONMENT }}-${{ matrix.service }}"
+          DIR="${{ steps.srcdir.outputs.dir }}"
+          
+          docker build -t "$REPO:$TAG" -t "$REPO:latest" "$DIR"
+          docker push "$REPO:$TAG"
+          docker push "$REPO:latest"
+
+  # ─── Terraform Deploy ─────────────────────────────────────────────────────
+  deploy:
+    needs: [changes, validate-secrets, build-push]
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        service: ${{ fromJson(needs.changes.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7"
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          VERSION=$(jq -r ".services[\"${{ matrix.service }}\"]" version.json)
+          SHA=$(git rev-parse --short=7 HEAD)
+          echo "tag=v${VERSION}-${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Map service to terraform
+        id: tf
+        run: |
+          case "${{ matrix.service }}" in
+            auth-service)       echo "module=auth_ecs"         ; echo "var=auth_service_image" ;;
+            accounting-service) echo "module=accounting_ecs"   ; echo "var=accounting_service_image" ;;
+            flowise-proxy)      echo "module=flowise_proxy_ecs" ; echo "var=flowise_proxy_service_image" ;;
+            bridge)             echo "module=bridge_ecs"       ; echo "var=bridge_image" ;;
+          esac >> "$GITHUB_OUTPUT"
+
+      - name: Terraform init
+        working-directory: infra/environments/${{ env.ENVIRONMENT }}
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Terraform apply
+        working-directory: infra/environments/${{ env.ENVIRONMENT }}
+        run: |
+          terraform apply -auto-approve \
+            -var "${{ steps.tf.outputs.var }}=${{ steps.tag.outputs.tag }}" \
+            -target="module.${{ steps.tf.outputs.module }}"
+
+      - name: Wait for ECS stability
+        run: |
+          CLUSTER="chatproxy-${{ env.ENVIRONMENT }}-cluster"
+          case "${{ matrix.service }}" in
+            flowise-proxy) SVC="chatproxy-${{ env.ENVIRONMENT }}-flowise-proxy-service" ;;
+            *)             SVC="chatproxy-${{ env.ENVIRONMENT }}-${{ matrix.service }}" ;;
+          esac
+          aws ecs wait services-stable \
+            --cluster "$CLUSTER" \
+            --services "$SVC" \
+            --region ${{ env.AWS_REGION }}
+          echo "${{ matrix.service }} is stable"

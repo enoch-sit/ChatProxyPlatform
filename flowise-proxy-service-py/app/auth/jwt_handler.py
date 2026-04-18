@@ -1,10 +1,13 @@
 import jwt
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Tuple
 from app.config import settings
 import secrets
 import hashlib
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 class TokenType(Enum):
     ACCESS = "access"
@@ -127,6 +130,9 @@ class JWTHandler:
                 secret_key = settings.JWT_SECRET_KEY  # Fallback for legacy tokens
             
             # Explicitly specify HS256 algorithm and validate claims
+            # NOTE: require_nbf and verify_nbf are disabled because the auth-service
+            # (Node.js jsonwebtoken) does NOT set the `nbf` claim by default.
+            # Requiring it causes ALL tokens from auth-service to fail validation.
             payload = jwt.decode(
                 token, 
                 secret_key, 
@@ -134,15 +140,12 @@ class JWTHandler:
                 options={
                     "verify_signature": True,
                     "verify_exp": True,
-                    "verify_nbf": True,
+                    "verify_nbf": False,
                     "verify_iat": True,
                     "require_exp": True,
                     "require_iat": True,
-                    "require_nbf": True
+                    "require_nbf": False
                 },
-                # Validate issuer and audience
-                # issuer="this is from external service",
-                # audience="flowise-api"
             )
             
             # Additional validation - ensure subject (user ID) exists
@@ -155,16 +158,22 @@ class JWTHandler:
                 
             return payload
         except jwt.ExpiredSignatureError:
-            return None
-        except jwt.InvalidTokenError:
+            logger.warning("Token verification failed: token expired")
             return None
         except jwt.InvalidSignatureError:
+            logger.warning("Token verification failed: invalid signature (secret mismatch?)")
+            return None
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"Token verification failed: {type(e).__name__}: {e}")
             return None
         except jwt.InvalidIssuerError:
+            logger.warning("Token verification failed: invalid issuer")
             return None
         except jwt.InvalidAudienceError:
+            logger.warning("Token verification failed: invalid audience")
             return None
-        except Exception:
+        except Exception as e:
+            logger.error(f"Token verification unexpected error: {type(e).__name__}: {e}")
             return None
 
     @staticmethod

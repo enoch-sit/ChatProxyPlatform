@@ -1,0 +1,22 @@
+{
+  "currentVersion": "1.0.0",
+  "minimumVersion": "1.0.0",
+  "releaseDate": "2026-04-17",
+  "services": {
+    "auth-service":       { "version": "1.0.0", "composeFile": "docker-compose.dev.yml", "port": 3000, "healthPath": "/health" },
+    "accounting-service": { "version": "1.0.0", "composeFile": "docker-compose.yml",     "port": 3001, "healthPath": "/health" },
+    "flowise-proxy":      { "version": "1.0.0", "composeFile": "docker-compose.yml",     "port": 8000, "healthPath": "/health" },
+    "bridge":             { "version": "1.0.0", "composeFile": "docker-compose.yml",     "port": 3082, "healthPath": "/" },
+    "flowise":            { "version": "1.0.0", "composeFile": "docker-compose.yml",     "port": 3002, "healthPath": "/" }
+  },
+  "deployOrder": ["auth-service", "accounting-service", "flowise", "flowise-proxy", "bridge"],
+  "requiredTools": {
+    "docker": ">=24.0.0",
+    "node": ">=18.0.0",
+    "python": ">=3.11.0",
+    "git": ">=2.40.0"
+  },
+  "changelog": [
+    { "version": "1.0.0", "date": "2026-04-17", "changes": ["Initial versioned release", "Consolidated scripts into setup/patch/diagnose"] }
+  ]
+}

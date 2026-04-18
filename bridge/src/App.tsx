@@ -1,9 +1,13 @@
 // src/App.tsx
 import { useEffect } from 'react';
 import { CssVarsProvider } from '@mui/joy/styles';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import CssBaseline from '@mui/joy/CssBaseline';
+import Box from '@mui/joy/Box';
+import CircularProgress from '@mui/joy/CircularProgress';
 import { useAuth } from './hooks/useAuth';
+import { useAuthStore } from './store/authStore';
+import { setNavigate } from './api/navigationService';
 import LoginPage from './pages/LoginPage';
 import ChatPage from './pages/ChatPage';
 import AdminPage from './pages/AdminPage';
@@ -12,10 +16,21 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import Layout from './components/layout/Layout';
 import './i18n';
 
+/** Wires the imperative navigation singleton so the Zustand store can redirect. */
+function NavigateSetter() {
+  const navigate = useNavigate();
+  useEffect(() => { setNavigate(navigate); }, [navigate]);
+  return null;
+}
+
 function App() {
-  const { checkAuthStatus, user } = useAuth();
+  const { checkAuthStatus, isAuthenticated, tokens, hasHydrated } = useAuth();
 
   useEffect(() => {
+    // On mount, immediately mark as hydrated to unblock UI
+    // Zustand's persist middleware handles storage rehydration
+    useAuthStore.setState({ hasHydrated: true });
+    
     // Check authentication status on app start (foreground check)
     checkAuthStatus();
     
@@ -44,19 +59,40 @@ function App() {
     };
   }, [checkAuthStatus]);
 
+  const hasAccessToken = !!tokens?.accessToken;
+
+  if (!hasHydrated) {
+    return (
+      <CssVarsProvider defaultMode="system">
+        <CssBaseline />
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </CssVarsProvider>
+    );
+  }
+
   return (
     <Router>
+      <NavigateSetter />
       <CssVarsProvider defaultMode="system">
         <CssBaseline />
         <Routes>
           <Route 
             path="/login" 
             element={
-              user ? <Navigate to="/chat" replace /> : <LoginPage />
+              isAuthenticated && hasAccessToken ? <Navigate to="/chat" replace /> : <LoginPage />
             } 
           />
           
-          <Route path="/" element={<Navigate to="/chat" replace />} />
+          <Route path="/" element={<Navigate to={isAuthenticated && hasAccessToken ? '/chat' : '/login'} replace />} />
           
           <Route
             path="/dashboard"
@@ -83,7 +119,7 @@ function App() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute requiredRole={['admin', 'supervisor']}>
+              <ProtectedRoute requiredRole={['admin', 'supervisor', 'teacher']}>
                 <Layout>
                   <AdminPage />
                 </Layout>

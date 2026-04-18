@@ -51,7 +51,7 @@ async def chat_predict(
         chatflow_id = chat_request.chatflow_id
 
         # 1. Validate user has access to chatflow
-        if not await auth_service.validate_user_permissions(user_id, chatflow_id):
+        if not await auth_service.validate_user_permissions(user_id, chatflow_id, current_user.get("role")):
             raise HTTPException(
                 status_code=403, detail="Access denied to this chatflow"
             )
@@ -155,7 +155,7 @@ async def chat_predict_stream(
         chatflow_id = chat_request.chatflow_id
 
         # 1. Validate user has access to chatflow
-        if not await auth_service.validate_user_permissions(user_id, chatflow_id):
+        if not await auth_service.validate_user_permissions(user_id, chatflow_id, current_user.get("role")):
             raise HTTPException(
                 status_code=403, detail="Access denied to this chatflow"
             )
@@ -285,7 +285,7 @@ async def chat_predict_stream_store(
         chatflow_id = chat_request.chatflow_id
 
         # 1. Validate user has access to chatflow
-        if not await auth_service.validate_user_permissions(user_id, chatflow_id):
+        if not await auth_service.validate_user_permissions(user_id, chatflow_id, current_user.get("role")):
             raise HTTPException(
                 status_code=403, detail="Access denied to this chatflow"
             )

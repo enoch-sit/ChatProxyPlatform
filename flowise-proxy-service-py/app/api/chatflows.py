@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Optional
-from app.auth.middleware import authenticate_user
+from app.auth.middleware import authenticate_user, ELEVATED_ROLES
 from app.services.flowise_service import FlowiseService
 from app.services.auth_service import AuthService
 from app.models.chatflow import UserChatflow, Chatflow
@@ -39,7 +39,7 @@ async def validate_user_chatflow_access(local_user_id: str, chatflow_id: str) ->
         logger.error(f"Error validating user chatflow access: {e}")
         return False
 
-@router.get("/", response_model=List[Dict])
+@router.get("", response_model=List[Dict])
 async def list_chatflows(
     current_user: Dict = Depends(authenticate_user)
 ):
@@ -48,7 +48,25 @@ async def list_chatflows(
     This endpoint filters chatflows based on user permissions.
     """
     try:
-        # Get the local user from the JWT token data
+        user_role = current_user.get('role', '')
+
+        # Elevated roles (admin/supervisor/teacher) see ALL active chatflows
+        if user_role in ELEVATED_ROLES:
+            chatflows = await Chatflow.find(
+                Chatflow.sync_status != "deleted",
+            ).to_list()
+            logger.info(f"🔑 Elevated user {current_user.get('email')} ({user_role}): returning all {len(chatflows)} chatflows")
+            return [
+                {
+                    "id": chatflow.flowise_id,
+                    "name": chatflow.name,
+                    "description": chatflow.description,
+                    "is_public": chatflow.is_public
+                }
+                for chatflow in chatflows
+            ]
+
+        # Regular users: filter by their UserChatflow assignments
         local_user = await get_local_user_from_jwt(current_user)
         if not local_user:
             logger.warning(f"Could not find local user for JWT: {current_user.get('email')}")
@@ -104,7 +122,28 @@ async def get_my_chatflows(
     This endpoint returns chatflows from the local database that the user has access to.
     """
     try:
-        # FIXED: Get the actual local user ID from the database (same logic as main endpoint)
+        user_role = current_user.get('role', '')
+
+        # Elevated roles (admin/supervisor/teacher) see ALL active chatflows
+        if user_role in ELEVATED_ROLES:
+            chatflows = await Chatflow.find(
+                Chatflow.sync_status != "deleted",
+            ).to_list()
+            logger.info(f"🔑 Elevated user {current_user.get('email')} ({user_role}): returning all {len(chatflows)} chatflows")
+            return [
+                {
+                    "id": chatflow.flowise_id,
+                    "name": chatflow.name,
+                    "description": chatflow.description,
+                    "category": chatflow.category,
+                    "type": chatflow.type,
+                    "deployed": chatflow.deployed,
+                    "assigned_at": None
+                }
+                for chatflow in chatflows
+            ]
+
+        # Regular users: filter by their UserChatflow assignments
         local_user = await get_local_user_from_jwt(current_user)
         
         if not local_user:
@@ -187,21 +226,16 @@ async def get_chatflow(
 ):
     """Get specific chatflow details if user has access"""
     try:
-        # FIXED: Use proper user ID resolution
-        local_user = await get_local_user_from_jwt(current_user)
-        if not local_user:
-            raise HTTPException(
-                status_code=404,
-                detail="User not found"
-            )
-        
-        # Check user permissions using local user ID
-        if not await validate_user_chatflow_access(str(local_user.id), chatflow_id):
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied to this chatflow"
-            )
-        
+        user_role = current_user.get('role', '')
+
+        # Elevated roles bypass per-chatflow access checks
+        if user_role not in ELEVATED_ROLES:
+            local_user = await get_local_user_from_jwt(current_user)
+            if not local_user:
+                raise HTTPException(status_code=404, detail="User not found")
+            if not await validate_user_chatflow_access(str(local_user.id), chatflow_id):
+                raise HTTPException(status_code=403, detail="Access denied to this chatflow")
+
         # Get chatflow details from local database first
         chatflow = await Chatflow.find_one(Chatflow.flowise_id == chatflow_id)
         
@@ -239,21 +273,16 @@ async def get_chatflow_config(
 ):
     """Get chatflow configuration if user has access"""
     try:
-        # FIXED: Use proper user ID resolution
-        local_user = await get_local_user_from_jwt(current_user)
-        if not local_user:
-            raise HTTPException(
-                status_code=404,
-                detail="User not found"
-            )
-        
-        # Check user permissions using local user ID
-        if not await validate_user_chatflow_access(str(local_user.id), chatflow_id):
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied to this chatflow"
-            )
-        
+        user_role = current_user.get('role', '')
+
+        # Elevated roles bypass per-chatflow access checks
+        if user_role not in ELEVATED_ROLES:
+            local_user = await get_local_user_from_jwt(current_user)
+            if not local_user:
+                raise HTTPException(status_code=404, detail="User not found")
+            if not await validate_user_chatflow_access(str(local_user.id), chatflow_id):
+                raise HTTPException(status_code=403, detail="Access denied to this chatflow")
+
         # Get chatflow config from Flowise service
         flowise_service = FlowiseService()
         config = await flowise_service.get_chatflow_config(chatflow_id)

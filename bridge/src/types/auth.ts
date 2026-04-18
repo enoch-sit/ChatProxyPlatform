@@ -1,5 +1,5 @@
 // src/types/auth.ts
-export type UserRole = 'admin' | 'supervisor' | 'enduser' | 'user';
+export type UserRole = 'admin' | 'supervisor' | 'teacher' | 'enduser' | 'user';
 
 export interface User {
   id: string;
@@ -30,6 +30,7 @@ export interface AuthState {
   user: User | null;
   tokens: AuthTokens | null;
   isAuthenticated: boolean;
+  hasHydrated: boolean;
   isLoading: boolean;
   error: string | null;
 }

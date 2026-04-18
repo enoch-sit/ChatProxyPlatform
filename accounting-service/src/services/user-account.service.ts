@@ -52,27 +52,20 @@ export class UserAccountService {
       
       if (existingUser) {
         logger.info(`UserAccountService.findOrCreateUser - User found by PK: ${userId}. Existing sub: ${existingUser.sub}`);
-        
-        // Optional: Logic to update the existing user if details (email, username, role, or even sub if it was missing/different) have changed.
-        // For example, if the 'sub' field was null and is now provided, or if email/username/role needs updating.
-        // This depends on your application's requirements for data synchronization.
-        // For now, we simply return the existing user.
-        // Example update logic (use with caution, ensure idempotency and correctness):
-        // let needsUpdate = false;
-        // if (email && existingUser.email !== email) { existingUser.email = email; needsUpdate = true; }
-        // if (username && existingUser.username !== username) { existingUser.username = username; needsUpdate = true; }
-        // if (role && existingUser.role !== role) { existingUser.role = role; needsUpdate = true; }
-        // if (sub && existingUser.sub !== sub) { // If sub was null or different
-        //   logger.info(`UserAccountService.findOrCreateUser - Updating sub for user ${userId} from '${existingUser.sub}' to '${sub}'`);
-        //   existingUser.sub = sub;
-        //   needsUpdate = true;
-        // }
-        // if (needsUpdate) {
-        //   await existingUser.save();
-        //   logger.info(`UserAccountService.findOrCreateUser - Updated details for existing user: ${userId}`);
-        // }
-        
         return existingUser;
+      }
+
+      // PK lookup missed — also search by email to handle cases where the JWT sub
+      // changed (e.g. admin user was re-created in the auth DB with a new ObjectId).
+      // Returning the existing row avoids a SequelizeUniqueConstraintError and lets
+      // the request succeed. The DB fix (updating user_id to the new sub) should be
+      // applied separately so that per-user credit lookups remain consistent.
+      if (email && email !== 'unknown@example.com') {
+        const existingByEmail = await UserAccount.findOne({ where: { email } });
+        if (existingByEmail) {
+          logger.info(`UserAccountService.findOrCreateUser - User found by email fallback: ${email}. Existing userId: ${existingByEmail.userId}. Requested userId: ${userId}`);
+          return existingByEmail;
+        }
       }
       
       logger.info(`UserAccountService.findOrCreateUser - Creating new user account for userId (sub): ${userId}, email: ${email}, role: ${role}, explicit sub provided: ${params.sub !== undefined}`);

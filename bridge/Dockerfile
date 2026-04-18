@@ -4,11 +4,15 @@ FROM node:18-alpine AS builder
 # Set working directory
 WORKDIR /app
 
+# Accept build-time env vars for Vite (baked into the static bundle)
+ARG VITE_FLOWISE_PROXY_API_URL=https://aidcec-ai-agent.com
+ENV VITE_FLOWISE_PROXY_API_URL=$VITE_FLOWISE_PROXY_API_URL
+
 # Copy package files
 COPY package*.json ./
 
 # Install all dependencies (including dev dependencies needed for build)
-RUN npm ci
+RUN npm ci || npm install
 
 # Copy source code
 COPY . .

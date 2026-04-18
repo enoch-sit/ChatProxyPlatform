@@ -19,12 +19,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredPermission,
   fallbackPath = '/login',
 }) => {
-  const { isAuthenticated, isLoading, user, hasRole, hasPermission } = useAuth();
+  const { isAuthenticated, isLoading, hasHydrated, user, tokens, hasRole, hasPermission } = useAuth();
   const location = useLocation();
   const { t } = useTranslation();
 
   // Show loading while checking authentication
-  if (isLoading) {
+  if (!hasHydrated || isLoading) {
     return (
       <Box
         sx={{
@@ -43,7 +43,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Redirect to login if not authenticated
-  if (!isAuthenticated || !user) {
+  if (!isAuthenticated || !user || !tokens?.accessToken) {
     return <Navigate to={fallbackPath} state={{ from: location }} replace />;
   }
 
