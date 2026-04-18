@@ -6,9 +6,11 @@ from app.services.chatflow_service import ChatflowService
 from app.services.flowise_service import FlowiseService
 from app.core.logging import logger
 from app.config import settings
+from app.database import get_database
 from pydantic import BaseModel
 import httpx
 import traceback
+from datetime import datetime
 
 # Import all request/response schemas from the new central location
 from app.schemas import (
@@ -19,6 +21,46 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+
+
+class UpdateFlowiseApiKeyRequest(BaseModel):
+    api_key: str
+
+
+class TestFlowiseApiKeyRequest(BaseModel):
+    api_key: Optional[str] = None
+
+
+class FlowiseApiKeyStatusResponse(BaseModel):
+    configured: bool
+    source: str
+    masked_key: Optional[str] = None
+
+
+class FlowiseApiKeyTestResponse(BaseModel):
+    valid: bool
+    status_code: Optional[int] = None
+    message: str
+
+
+def _mask_secret(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    if len(value) <= 8:
+        return "*" * len(value)
+    return f"{value[:4]}{'*' * (len(value) - 8)}{value[-4:]}"
+
+
+async def _get_effective_flowise_api_key() -> tuple[Optional[str], str]:
+    db = await get_database()
+    if db is not None:
+        doc = await db["runtime_settings"].find_one({"_id": "flowise_proxy"})
+        runtime_key = (doc or {}).get("flowise_api_key")
+        if runtime_key:
+            return runtime_key, "runtime"
+    if settings.FLOWISE_API_KEY:
+        return settings.FLOWISE_API_KEY, "env"
+    return None, "unset"
 
 # This dependency injection function remains unchanged as it's a solid pattern.
 async def get_chatflow_service() -> ChatflowService:
@@ -40,6 +82,81 @@ async def get_chatflow_service() -> ChatflowService:
     external_auth_service = ExternalAuthService()
     # Pass all required services to the ChatflowService constructor
     return ChatflowService(db=database.database, flowise_service=flowise_service, external_auth_service=external_auth_service)
+
+
+@router.get("/settings/flowise-api-key", response_model=FlowiseApiKeyStatusResponse)
+async def get_flowise_api_key_status(current_user: Dict = Depends(require_admin_role)):
+    """Return Flowise API key status and source without exposing the raw secret."""
+    api_key, source = await _get_effective_flowise_api_key()
+    return FlowiseApiKeyStatusResponse(
+        configured=bool(api_key),
+        source=source,
+        masked_key=_mask_secret(api_key),
+    )
+
+
+@router.post("/settings/flowise-api-key")
+async def update_flowise_api_key(
+    request: UpdateFlowiseApiKeyRequest,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Update Flowise API key at runtime (persisted in Mongo runtime settings)."""
+    new_key = request.api_key.strip()
+    if not new_key:
+        raise HTTPException(status_code=400, detail="api_key must not be empty")
+
+    db = await get_database()
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not connected")
+
+    await db["runtime_settings"].update_one(
+        {"_id": "flowise_proxy"},
+        {
+            "$set": {
+                "flowise_api_key": new_key,
+                "updated_by": current_user.get("email", "unknown"),
+                "updated_at": datetime.utcnow(),
+            }
+        },
+        upsert=True,
+    )
+
+    logger.info(f"Flowise API key updated by admin {current_user.get('email', 'unknown')}")
+    return {"message": "Flowise API key updated successfully", "source": "runtime"}
+
+
+@router.post("/settings/flowise-api-key/test", response_model=FlowiseApiKeyTestResponse)
+async def test_flowise_api_key(
+    request: TestFlowiseApiKeyRequest,
+    current_user: Dict = Depends(require_admin_role)
+):
+    """Validate provided (or effective) Flowise API key against Flowise chatflows endpoint."""
+    key_to_test = request.api_key.strip() if request.api_key else None
+    if not key_to_test:
+        key_to_test, _ = await _get_effective_flowise_api_key()
+    if not key_to_test:
+        raise HTTPException(status_code=400, detail="No Flowise API key configured")
+
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key_to_test}"}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{settings.FLOWISE_API_URL}/api/v1/chatflows",
+                headers=headers,
+                timeout=10,
+            )
+
+        if response.status_code == 200:
+            return FlowiseApiKeyTestResponse(valid=True, status_code=200, message="Flowise API key is valid")
+
+        return FlowiseApiKeyTestResponse(
+            valid=False,
+            status_code=response.status_code,
+            message=f"Flowise returned status {response.status_code}",
+        )
+    except Exception as e:
+        logger.warning(f"Flowise API key test failed for admin {current_user.get('email', 'unknown')}: {e}")
+        return FlowiseApiKeyTestResponse(valid=False, status_code=None, message=f"Flowise connectivity error: {e}")
 
 # =================================================================================
 # Endpoints Restored and Refactored

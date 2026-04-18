@@ -13,6 +13,7 @@ import AdminUsersPanel from '../components/admin/AdminUsersPanel';
 import AdminCreditsPanel from '../components/admin/AdminCreditsPanel';
 import AdminUsagePanel from '../components/admin/AdminUsagePanel';
 import AdminChatHistoryPanel from '../components/admin/AdminChatHistoryPanel';
+import AdminFlowiseSettingsPanel from '../components/admin/AdminFlowiseSettingsPanel';
 
 const AdminPage: React.FC = () => {
   const { t } = useTranslation();
@@ -247,6 +248,7 @@ const AdminPage: React.FC = () => {
           {canManageUsers && <Tab value="credits">Credits</Tab>}
           {canViewAnalytics && <Tab value="usage">Token Usage</Tab>}
           {canManageUsers && <Tab value="student-chats">Student Chats</Tab>}
+          {canManageChatflows && <Tab value="settings">Settings</Tab>}
           </TabList>
 
         {/* ---- Chatflows Tab (existing functionality) ---- */}
@@ -376,6 +378,13 @@ const AdminPage: React.FC = () => {
         {canManageUsers && (
           <TabPanel value="student-chats" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <AdminChatHistoryPanel />
+          </TabPanel>
+        )}
+
+        {/* ---- Runtime Settings Tab ---- */}
+        {canManageChatflows && (
+          <TabPanel value="settings" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+            <AdminFlowiseSettingsPanel />
           </TabPanel>
         )}
         </Tabs>

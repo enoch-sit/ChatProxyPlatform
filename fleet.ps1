@@ -90,6 +90,28 @@ function Get-TargetWorkstations {
     return $matched
 }
 
+function Invoke-Preflight {
+    $targets = @(Get-TargetWorkstations)
+    if ($targets.Count -eq 0) {
+        Write-Fail "No valid targets selected. Check -Target and fleet-inventory.json."
+        exit 1
+    }
+
+    foreach ($ws in $targets) {
+        if (-not $ws.name -or -not $ws.wireguardIp -or -not $ws.sshUser) {
+            Write-Fail "Invalid workstation entry in inventory (missing name/wireguardIp/sshUser)."
+            exit 1
+        }
+    }
+
+    $requiresSSHKey = @('status', 'patch', 'health', 'setup', 'run-command') -contains $Action
+    if ($requiresSSHKey -and -not (Test-Path $sshKey)) {
+        Write-Fail "SSH key required for '$Action' but not found at $sshKey"
+        Write-Host "  Run: .\fleet.ps1 -Action deploy-key" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
 # ── SSH Helper ───────────────────────────────────────────────────────
 
 function Invoke-FleetSSH {
@@ -338,6 +360,8 @@ function Invoke-RunCommand {
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host " Fleet Manager -- ChatProxy Platform" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
+
+Invoke-Preflight
 
 switch ($Action) {
     'status'      { Invoke-Status }

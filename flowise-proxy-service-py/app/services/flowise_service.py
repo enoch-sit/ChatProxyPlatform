@@ -1,6 +1,7 @@
 import httpx
 from typing import Dict, List, Optional, Any
 from app.config import settings
+from app.database import get_database
 
 class FlowiseService:
     def __init__(self):
@@ -8,11 +9,25 @@ class FlowiseService:
         self.api_key = settings.FLOWISE_API_KEY
         self.timeout = 10000  # Increased from 3000ms to 10000ms (10 seconds)
 
-    def _get_headers(self) -> Dict[str, str]:
+    async def _get_runtime_api_key(self) -> Optional[str]:
+        """Resolve API key from runtime settings with .env fallback."""
+        try:
+            db = await get_database()
+            if db is not None:
+                doc = await db["runtime_settings"].find_one({"_id": "flowise_proxy"})
+                if doc and doc.get("flowise_api_key"):
+                    return doc.get("flowise_api_key")
+        except Exception:
+            # Fall back to startup value when runtime settings are unavailable.
+            pass
+        return self.api_key
+
+    async def _get_headers(self) -> Dict[str, str]:
         """Get headers for Flowise API requests"""
         headers = {"Content-Type": "application/json"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+        api_key = await self._get_runtime_api_key()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         return headers
 
     async def list_chatflows(self) -> Optional[List[Dict]]:
@@ -21,7 +36,7 @@ class FlowiseService:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{self.flowise_url}/api/v1/chatflows",
-                    headers=self._get_headers(),
+                    headers=await self._get_headers(),
                     timeout=self.timeout
                 )
                 
@@ -44,7 +59,7 @@ class FlowiseService:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{self.flowise_url}/api/v1/chatflows/{chatflow_id}",
-                    headers=self._get_headers(),
+                    headers=await self._get_headers(),
                     timeout=self.timeout
                 )
                 
@@ -70,7 +85,7 @@ class FlowiseService:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{self.flowise_url}/api/v1/prediction/{chatflow_id}",
-                    headers=self._get_headers(),
+                    headers=await self._get_headers(),
                     json=payload,
                     timeout=self.timeout  # Longer timeout for AI responses
                 )
@@ -102,7 +117,7 @@ class FlowiseService:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{self.flowise_url}/api/v1/chatflows/{chatflow_id}/config",
-                    headers=self._get_headers(),
+                    headers=await self._get_headers(),
                     timeout=self.timeout
                 )
                 

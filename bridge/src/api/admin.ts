@@ -258,3 +258,34 @@ export const adminGetUserSessions = async (userId: string): Promise<AdminChatSes
   const response = await apiClient.get(`/api/v1/admin/chat/users/${userId}/sessions`);
   return response.data;
 };
+
+// =============================================================================
+// Flowise API Key Settings
+// =============================================================================
+
+export interface FlowiseApiKeyStatus {
+  configured: boolean;
+  source: 'runtime' | 'env' | 'unset' | string;
+  masked_key?: string | null;
+}
+
+export interface FlowiseApiKeyTestResult {
+  valid: boolean;
+  status_code?: number | null;
+  message: string;
+}
+
+export const getFlowiseApiKeyStatus = async (): Promise<FlowiseApiKeyStatus> => {
+  const response = await apiClient.get('/api/v1/admin/settings/flowise-api-key');
+  return response.data;
+};
+
+export const updateFlowiseApiKey = async (apiKey: string): Promise<{ message: string; source: string }> => {
+  const response = await apiClient.post('/api/v1/admin/settings/flowise-api-key', { api_key: apiKey });
+  return response.data;
+};
+
+export const testFlowiseApiKey = async (apiKey?: string): Promise<FlowiseApiKeyTestResult> => {
+  const response = await apiClient.post('/api/v1/admin/settings/flowise-api-key/test', { api_key: apiKey });
+  return response.data;
+};
