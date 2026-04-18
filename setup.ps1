@@ -247,8 +247,11 @@ foreach ($svc in $deployOrder) {
 
     Write-Host "  Starting $svc..." -ForegroundColor Yellow
     Push-Location (Join-Path $scriptRoot $dir)
+    $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
     docker compose -f $composeFile up -d 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
+    $dockerExit = $LASTEXITCODE
+    $ErrorActionPreference = $savedEAP
+    if ($dockerExit -ne 0) {
         Write-Fail "$svc failed to start"
         $errors += $svc
     } else {
