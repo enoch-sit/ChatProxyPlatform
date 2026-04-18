@@ -167,8 +167,12 @@ if ($SkipDriveConfig) {
     if (Test-Path $configureDrivesScript) {
         # Check if D: drive exists (common for multi-disk setups)
         if (Test-Path "D:\") {
-            Write-Host "  D: drive detected. Running drive configuration..." -ForegroundColor Yellow
-            python $configureDrivesScript 2>&1 | ForEach-Object { Write-Host "  $_" }
+            if (Test-Command "python") {
+                Write-Host "  D: drive detected. Running drive configuration..." -ForegroundColor Yellow
+                python $configureDrivesScript 2>&1 | ForEach-Object { Write-Host "  $_" }
+            } else {
+                Write-OK "D: drive detected but Python not available -- skipping drive config (using defaults)"
+            }
         } else {
             Write-OK "Single drive setup -- using defaults"
         }
