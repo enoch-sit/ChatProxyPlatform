@@ -15,13 +15,20 @@ if (Test-Path $configPath) {
     try { $existing = Get-Content $configPath -Raw | ConvertFrom-Json } catch {}
 }
 
-# Build config: completely omit credsStore so Docker uses auths{} only
-# An empty-string value still triggers the helper; the key must not exist.
+# Build config: explicitly set empty auths for docker.io so Docker skips
+# the credential helper for public registries (Docker Desktop v4+ calls
+# docker-credential-desktop even when credsStore is absent; an explicit
+# empty auth entry prevents that lookup for the registry).
+$auths = [ordered]@{}
 if ($existing -and $existing.auths) {
-    $json = [ordered]@{ auths = $existing.auths } | ConvertTo-Json -Depth 5
-} else {
-    $json = '{}'
+    # Preserve any existing auth entries
+    $existing.auths.PSObject.Properties | ForEach-Object { $auths[$_.Name] = $_.Value }
 }
+# Ensure docker.io has an empty entry so no credential helper is called
+if (-not $auths.Contains('https://index.docker.io/v1/')) {
+    $auths['https://index.docker.io/v1/'] = [ordered]@{}
+}
+$json = [ordered]@{ auths = $auths } | ConvertTo-Json -Depth 5
 [System.IO.File]::WriteAllText($configPath, $json, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host "[OK] Docker credential store disabled for user $env:USERNAME"
