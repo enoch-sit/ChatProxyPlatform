@@ -23,7 +23,9 @@ if ($existing -and $existing.auths) {
 # Empty string disables the credential store
 $config['credsStore'] = ''
 
-$config | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
+$config | ConvertTo-Json -Depth 5 | ForEach-Object {
+    [System.IO.File]::WriteAllText($configPath, $_, [System.Text.UTF8Encoding]::new($false))
+}
 
 Write-Host "[OK] Docker credential store disabled for user $env:USERNAME"
 Write-Host "     Config written to: $configPath"
