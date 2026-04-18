@@ -286,7 +286,7 @@ const AdminPage: React.FC = () => {
 
         {/* ---- Chatflows Tab (existing functionality) ---- */}
         {canManageChatflows && (
-          <TabPanel value="chatflows" sx={{ p: 0, flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <TabPanel value="chatflows" sx={{ p: 0, minHeight: 0, overflow: 'auto' }}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
               {canSyncChatflows && (
                 <Button onClick={handleSync} disabled={isLoading}>
@@ -388,35 +388,35 @@ const AdminPage: React.FC = () => {
 
         {/* ---- Users Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="users" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <TabPanel value="users" sx={{ p: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <AdminUsersPanel />
           </TabPanel>
         )}
 
         {/* ---- Credits Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="credits" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <TabPanel value="credits" sx={{ p: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <AdminCreditsPanel />
           </TabPanel>
         )}
 
         {/* ---- Usage / Token Stats Tab ---- */}
         {canViewAnalytics && (
-          <TabPanel value="usage" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <TabPanel value="usage" sx={{ p: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <AdminUsagePanel />
           </TabPanel>
         )}
 
         {/* ---- Student Chat History Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="student-chats" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <TabPanel value="student-chats" sx={{ p: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <AdminChatHistoryPanel />
           </TabPanel>
         )}
 
         {/* ---- Runtime Settings Tab ---- */}
         {canManageChatflows && (
-          <TabPanel value="settings" sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <TabPanel value="settings" sx={{ p: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <AdminFlowiseSettingsPanel />
           </TabPanel>
         )}
