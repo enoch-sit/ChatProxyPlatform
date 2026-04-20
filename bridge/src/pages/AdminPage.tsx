@@ -46,6 +46,7 @@ const AdminPage: React.FC = () => {
     removeUserFromChatflow,
     setSelectedChatflow,
     clearError,
+    syncChatflows,
   } = useAdminStore();
 
   // Local UI state
@@ -116,9 +117,12 @@ const AdminPage: React.FC = () => {
   // Handle sync (placeholder - you might want to add this to the store)
   const handleSync = async () => {
     try {
-      // Import syncChatflows if you have this API function
-      // await syncChatflows();
-      setSuccessMessage('Chatflows synced successfully!');
+      const result = await syncChatflows();
+      setSuccessMessage(
+        `Sync complete: ${result.total_fetched} fetched, ${result.created} created, ` +
+        `${result.updated} updated, ${result.deleted} deleted` +
+        (result.errors > 0 ? `, ${result.errors} errors` : '')
+      );
       await loadAdminData();
     } catch (err) {
       console.error('Sync failed:', err);
@@ -275,7 +279,7 @@ const AdminPage: React.FC = () => {
           onChange={(_, v) => setActiveTab(v as string)}
           sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
         >
-          <TabList sx={{ mb: 2, flexShrink: 0 }}>
+          <TabList sx={{ mb: 0.5, flexShrink: 0 }}>
           {canManageChatflows && <Tab value="chatflows">Chatflows</Tab>}
           {canManageUsers && <Tab value="users">Users</Tab>}
           {canManageUsers && <Tab value="credits">Credits</Tab>}

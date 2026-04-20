@@ -2,6 +2,9 @@ import httpx
 from typing import Dict, List, Optional, Any
 from app.config import settings
 from app.database import get_database
+from app.core.logging import logger
+from app.exceptions import FlowiseAPIError
+
 
 class FlowiseService:
     def __init__(self):
@@ -30,8 +33,13 @@ class FlowiseService:
             headers["Authorization"] = f"Bearer {api_key}"
         return headers
 
-    async def list_chatflows(self) -> Optional[List[Dict]]:
-        """Get list of all available chatflows from Flowise"""
+    async def list_chatflows(self) -> List[Dict]:
+        """Get list of all available chatflows from Flowise.
+
+        Returns a list on success.  Raises :class:`FlowiseAPIError` on any
+        failure so that callers can distinguish "Flowise returned 0 chatflows"
+        from "we could not reach Flowise at all".
+        """
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
@@ -43,15 +51,20 @@ class FlowiseService:
                 if response.status_code == 200:
                     return response.json()
                 else:
-                    print(f"Flowise API error: {response.status_code}")
-                    return None
+                    msg = f"Flowise API returned HTTP {response.status_code}: {response.text[:200]}"
+                    logger.error(msg)
+                    raise FlowiseAPIError(msg, status_code=response.status_code)
                     
+        except FlowiseAPIError:
+            raise
         except httpx.RequestError as e:
-            print(f"Flowise connection error: {e}")
-            return None
+            msg = f"Flowise connection error: {e}"
+            logger.error(msg)
+            raise FlowiseAPIError(msg) from e
         except Exception as e:
-            print(f"Unexpected Flowise error: {e}")
-            return None
+            msg = f"Unexpected Flowise error: {e}"
+            logger.error(msg)
+            raise FlowiseAPIError(msg) from e
 
     async def get_chatflow(self, chatflow_id: str) -> Optional[Dict]:
         """Get specific chatflow details"""

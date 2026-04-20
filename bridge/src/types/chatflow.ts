@@ -64,3 +64,12 @@ export interface ChatflowStats {
   error: number;
   last_sync?: string;
 }
+
+export interface ChatflowSyncResult {
+  total_fetched: number;
+  created: number;
+  updated: number;
+  deleted: number;
+  errors: number;
+  error_details?: Array<Record<string, string>>;
+}

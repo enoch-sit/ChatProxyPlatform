@@ -21,8 +21,9 @@ import {
   removeCredits,
   adjustCredits,
   getSystemStats,
+  syncChatflows as syncChatflowsApi,
 } from '../api/admin';
-import type { Chatflow, ChatflowUser, ChatflowStats } from '../types/chatflow';
+import type { Chatflow, ChatflowUser, ChatflowStats, ChatflowSyncResult } from '../types/chatflow';
 import type {
   AdminUser,
   CreditAllocation,
@@ -62,7 +63,7 @@ interface AdminActions {
   addUserToChatflow: (flowiseId: string, userEmail: string) => Promise<void>;
   removeUserFromChatflow: (flowiseId: string, userEmail: string) => Promise<void>;
   bulkAddUsersToChatflow: (flowiseId: string, userEmails: string[]) => Promise<{ successful: number; failed: string[] }>;
-  syncChatflows: () => Promise<void>;
+  syncChatflows: () => Promise<ChatflowSyncResult>;
   setSelectedChatflow: (chatflow: Chatflow | null) => void;
   clearChatflowUsers: () => void;
   // Users
@@ -198,16 +199,16 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
   syncChatflows: async () => {
     set({ isLoading: true, error: null });
     try {
-      // 假設您有 syncChatflows API 函數
-      // await syncChatflows();
+      const syncResult = await syncChatflowsApi();
       
-      // 同步後重新獲取 chatflows 和 stats
+      // Refresh chatflows and stats after sync
       const [chatflows, stats] = await Promise.all([
         getAllChatflows(),
         getChatflowStats(),
       ]);
       
       set({ chatflows, stats, isLoading: false });
+      return syncResult;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sync chatflows';
       set({ isLoading: false, error: errorMessage });

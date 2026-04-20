@@ -23,13 +23,13 @@ import type {
   BatchRoleUpdateItem,
   BatchRoleUpdateResponse,
 } from '../types/admin';
-import type { Chatflow, ChatflowStats, ChatflowUser} from '../types/chatflow';
+import type { Chatflow, ChatflowStats, ChatflowUser, ChatflowSyncResult } from '../types/chatflow';
 
 /**
  * Triggers a synchronization of chatflows from the Flowise instance.
  * Evidence: `quickTestChatflowsSync_01.py` shows a POST request to this endpoint.
  */
-export const syncChatflows = async (): Promise<{ message: string }> => {
+export const syncChatflows = async (): Promise<ChatflowSyncResult> => {
   const response = await apiClient.post('/api/v1/admin/chatflows/sync', {});
   return response.data;
 };

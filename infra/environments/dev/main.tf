@@ -86,6 +86,8 @@ module "flowise_aws" {
   flowise_memory      = var.flowise_memory
   flowise_image       = var.flowise_image
   desired_count       = var.flowise_desired_count
+
+  secret_flowise_config_arn = module.secrets.secret_flowise_config_arn
 }
 
 output "flowise_url" {

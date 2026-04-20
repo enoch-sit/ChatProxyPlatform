@@ -5,6 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from fastapi import HTTPException
 from app.models.chatflow import Chatflow, UserChatflow
 from app.services.flowise_service import FlowiseService
+from app.exceptions import FlowiseAPIError
 from app.core.logging import logger
 from app.models.user import User
 from app.services.external_auth_service import ExternalAuthService
@@ -41,13 +42,35 @@ class ChatflowService:
         
         try:
             # Fetch chatflows from Flowise
-            flowise_chatflows = await self.flowise_service.list_chatflows()
+            try:
+                flowise_chatflows = await self.flowise_service.list_chatflows()
+            except FlowiseAPIError as e:
+                result.errors += 1
+                error_msg = f"Failed to fetch chatflows from Flowise API: {str(e)}"
+                result.error_details.append({"error": error_msg, "type": "flowise_api_error"})
+                logger.error(error_msg)
+                return result
+
             result.total_fetched = len(flowise_chatflows)
             
             # Get existing chatflows from database using Beanie
             existing_chatflows = await Chatflow.find_all().to_list()
             existing_ids_map = {cf.flowise_id: cf for cf in existing_chatflows}
             
+            # Guard: if Flowise returned 0 chatflows but we have local data,
+            # skip the deletion step to prevent accidental mass-deletion
+            # (e.g. during a Flowise restart or API key mismatch).
+            skip_deletion = (
+                len(flowise_chatflows) == 0 and len(existing_chatflows) > 0
+            )
+            if skip_deletion:
+                warning_msg = (
+                    f"Flowise returned 0 chatflows but {len(existing_chatflows)} exist locally "
+                    f"— skipping deletion to prevent data loss"
+                )
+                result.error_details.append({"warning": warning_msg, "type": "empty_response_guard"})
+                logger.warning(warning_msg)
+
             # Track current Flowise IDs
             current_flowise_ids = set()
             
@@ -81,13 +104,14 @@ class ChatflowService:
                     logger.error(error_msg)
             
             # Mark deleted chatflows using Beanie
-            deleted_ids = set(existing_ids_map.keys()) - current_flowise_ids
-            if deleted_ids:
-                await Chatflow.find({"flowise_id": {"$in": list(deleted_ids)}}).update(
-                    {"$set": {"sync_status": "deleted", "synced_at": datetime.utcnow()}}
-                )
-                result.deleted = len(deleted_ids)
-                logger.info(f"Marked {len(deleted_ids)} chatflows as deleted")
+            if not skip_deletion:
+                deleted_ids = set(existing_ids_map.keys()) - current_flowise_ids
+                if deleted_ids:
+                    await Chatflow.find({"flowise_id": {"$in": list(deleted_ids)}}).update(
+                        {"$set": {"sync_status": "deleted", "synced_at": datetime.utcnow()}}
+                    )
+                    result.deleted = len(deleted_ids)
+                    logger.info(f"Marked {len(deleted_ids)} chatflows as deleted")
             
         except Exception as e:
             result.errors += 1

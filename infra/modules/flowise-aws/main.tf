@@ -101,6 +101,76 @@ resource "aws_security_group" "ecs" {
   }
 }
 
+resource "aws_security_group" "efs" {
+  name        = "${local.name_prefix}-efs-sg"
+  description = "Allow NFS from Flowise ECS tasks"
+  vpc_id      = aws_vpc.this.id
+
+  ingress {
+    from_port       = 2049
+    to_port         = 2049
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${local.name_prefix}-efs-sg"
+  }
+}
+
+# ── EFS: persistent storage for /root/.flowise ────────────────
+resource "aws_efs_file_system" "flowise_data" {
+  creation_token   = "${local.name_prefix}-data"
+  encrypted        = true
+  performance_mode = "generalPurpose"
+  throughput_mode  = "bursting"
+
+  lifecycle_policy {
+    transition_to_ia = "AFTER_30_DAYS"
+  }
+
+  tags = {
+    Name = "${local.name_prefix}-data"
+  }
+}
+
+resource "aws_efs_access_point" "flowise_data" {
+  file_system_id = aws_efs_file_system.flowise_data.id
+
+  posix_user {
+    uid = 0
+    gid = 0
+  }
+
+  root_directory {
+    path = "/flowise"
+    creation_info {
+      owner_uid   = 0
+      owner_gid   = 0
+      permissions = "755"
+    }
+  }
+
+  tags = {
+    Name = "${local.name_prefix}-ap"
+  }
+}
+
+resource "aws_efs_mount_target" "flowise_data" {
+  count = length(aws_subnet.public)
+
+  file_system_id  = aws_efs_file_system.flowise_data.id
+  subnet_id       = aws_subnet.public[count.index].id
+  security_groups = [aws_security_group.efs.id]
+}
+
 resource "aws_lb" "this" {
   name               = substr(replace(local.name_prefix, "_", "-"), 0, 32)
   load_balancer_type = "application"
@@ -189,6 +259,60 @@ resource "aws_iam_role_policy_attachment" "task_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy" "task_execution_secrets" {
+  name = "secrets-access"
+  role = aws_iam_role.task_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = [var.secret_flowise_config_arn]
+      }
+    ]
+  })
+}
+
+# Task role — grants the running container permission to access EFS
+resource "aws_iam_role" "task" {
+  name = "${local.name_prefix}-task"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "task_efs" {
+  name = "efs-access"
+  role = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess"
+        ]
+        Resource = aws_efs_file_system.flowise_data.arn
+      }
+    ]
+  })
+}
+
 resource "aws_ecs_task_definition" "flowise" {
   family                   = "${local.name_prefix}-task"
   requires_compatibilities = ["FARGATE"]
@@ -196,6 +320,22 @@ resource "aws_ecs_task_definition" "flowise" {
   cpu                      = tostring(var.flowise_cpu)
   memory                   = tostring(var.flowise_memory)
   execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+
+  volume {
+    name = "flowise-data"
+
+    efs_volume_configuration {
+      file_system_id          = aws_efs_file_system.flowise_data.id
+      root_directory          = "/"
+      transit_encryption      = "ENABLED"
+
+      authorization_config {
+        access_point_id = aws_efs_access_point.flowise_data.id
+        iam             = "ENABLED"
+      }
+    }
+  }
 
   container_definitions = jsonencode([
     {
@@ -213,6 +353,31 @@ resource "aws_ecs_task_definition" "flowise" {
         {
           name  = "PORT"
           value = "3000"
+        },
+        {
+          name  = "DISABLE_FLOWISE_TELEMETRY"
+          value = "true"
+        }
+      ]
+      secrets = [
+        {
+          name      = "FLOWISE_SECRETKEY_OVERWRITE"
+          valueFrom = "${var.secret_flowise_config_arn}:FLOWISE_SECRETKEY_OVERWRITE::"
+        },
+        {
+          name      = "FLOWISE_USERNAME"
+          valueFrom = "${var.secret_flowise_config_arn}:FLOWISE_USERNAME::"
+        },
+        {
+          name      = "FLOWISE_PASSWORD"
+          valueFrom = "${var.secret_flowise_config_arn}:FLOWISE_PASSWORD::"
+        }
+      ]
+      mountPoints = [
+        {
+          sourceVolume  = "flowise-data"
+          containerPath = "/root/.flowise"
+          readOnly      = false
         }
       ]
       logConfiguration = {
@@ -248,8 +413,13 @@ resource "aws_ecs_service" "flowise" {
 
   depends_on = [
     aws_lb_listener.https,
-    aws_iam_role_policy_attachment.task_execution
+    aws_iam_role_policy_attachment.task_execution,
+    aws_efs_mount_target.flowise_data
   ]
+
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
 }
 
 resource "aws_route53_record" "flowise" {

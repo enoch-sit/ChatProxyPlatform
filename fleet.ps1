@@ -12,7 +12,7 @@
     - OpenSSH client installed (Windows 10+ built-in)
 
 .PARAMETER Action
-    What to do: status, patch, health, setup, deploy-key, run-command
+    What to do: status, patch, health, setup, deploy-key, run-command, test-flowise-key
 
 .PARAMETER Target
     Which workstation(s): 'all' (default) or a comma-separated list of names from fleet-inventory.json
@@ -31,11 +31,12 @@
     .\fleet.ps1 -Action patch -Target aidcec-demo-windows-workstation -PatchMode quick
     .\fleet.ps1 -Action health -Target all
     .\fleet.ps1 -Action run-command -Command "Get-Service docker"
+    .\fleet.ps1 -Action test-flowise-key
 #>
 
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('status', 'patch', 'health', 'setup', 'deploy-key', 'run-command')]
+    [ValidateSet('status', 'patch', 'health', 'setup', 'deploy-key', 'run-command', 'test-flowise-key')]
     [string]$Action,
 
     [string]$Target = 'all',
@@ -104,7 +105,7 @@ function Invoke-Preflight {
         }
     }
 
-    $requiresSSHKey = @('status', 'patch', 'health', 'setup', 'run-command') -contains $Action
+    $requiresSSHKey = @('status', 'patch', 'health', 'setup', 'run-command', 'test-flowise-key') -contains $Action
     if ($requiresSSHKey -and -not (Test-Path $sshKey)) {
         Write-Fail "SSH key required for '$Action' but not found at $sshKey"
         Write-Host "  Run: .\fleet.ps1 -Action deploy-key" -ForegroundColor Yellow
@@ -355,6 +356,47 @@ function Invoke-RunCommand {
     }
 }
 
+# ── Action: test-flowise-key ────────────────────────────────────────
+
+function Invoke-TestFlowiseKey {
+    Write-Step "Test Flowise API Key"
+
+    $workstations = Get-TargetWorkstations
+
+    foreach ($ws in $workstations) {
+        Write-Host "`n  ─ $($ws.name) ─"
+
+        $r = Invoke-FleetSSH -Workstation $ws -RemoteCommand @'
+$proxyEnv = 'C:\Users\aidcec\Documents\ChatProxyPlatform\flowise-proxy-service-py\.env'
+if (-not (Test-Path $proxyEnv)) { Write-Output 'NO_ENV_FILE'; exit 1 }
+$line = Get-Content $proxyEnv | Where-Object { $_ -match '^FLOWISE_API_KEY=' } | Select-Object -First 1
+if (-not $line) { Write-Output 'NO_API_KEY'; exit 1 }
+$key = ($line -split '=', 2)[1].Trim()
+if (-not $key) { Write-Output 'EMPTY_API_KEY'; exit 1 }
+try {
+    $h = @{ "Authorization" = "Bearer $key" }
+    $resp = Invoke-WebRequest -Uri "http://localhost:3000/api/v1/chatflows" -Headers $h -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+    Write-Output "OK|$($resp.StatusCode)"
+} catch {
+    $s = $null; if ($_.Exception.Response) { $s = [int]$_.Exception.Response.StatusCode }
+    Write-Output "FAIL|$s"
+}
+'@
+
+        if ($r.Success -and $r.Output -match '^OK\|') {
+            Write-OK "API key valid"
+        } elseif ($r.Output -match 'NO_ENV_FILE') {
+            Write-Warn "No .env file found"
+        } elseif ($r.Output -match 'NO_API_KEY|EMPTY_API_KEY') {
+            Write-Warn "API key not configured"
+        } elseif ($r.Output -match 'FAIL\|401') {
+            Write-Fail "API key is INVALID (401) -- recreate in Flowise UI"
+        } else {
+            Write-Warn "Could not test: $($r.Output)"
+        }
+    }
+}
+
 # ── Dispatch ─────────────────────────────────────────────────────────
 
 Write-Host "======================================" -ForegroundColor Cyan
@@ -364,12 +406,13 @@ Write-Host "======================================" -ForegroundColor Cyan
 Invoke-Preflight
 
 switch ($Action) {
-    'status'      { Invoke-Status }
-    'patch'       { Invoke-Patch }
-    'health'      { Invoke-Health }
-    'setup'       { Invoke-Setup }
-    'deploy-key'  { Invoke-DeployKey }
-    'run-command' { Invoke-RunCommand }
+    'status'           { Invoke-Status }
+    'patch'            { Invoke-Patch }
+    'health'           { Invoke-Health }
+    'setup'            { Invoke-Setup }
+    'deploy-key'       { Invoke-DeployKey }
+    'run-command'      { Invoke-RunCommand }
+    'test-flowise-key' { Invoke-TestFlowiseKey }
 }
 
 Write-Host "`n── Fleet operation complete ──`n" -ForegroundColor Cyan

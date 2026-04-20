@@ -392,6 +392,37 @@ foreach ($svc in $manifest.deployOrder) {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Step 4b: Validate Flowise API key after restart
+# ═══════════════════════════════════════════════════════════════════════════════
+if ($changedServices -contains 'flowise') {
+    Write-Host "  Validating Flowise API key..." -ForegroundColor Yellow
+    $proxyEnv = Join-Path $scriptRoot "flowise-proxy-service-py\.env"
+    if (Test-Path $proxyEnv) {
+        $apiKeyLine = Get-Content $proxyEnv | Where-Object { $_ -match '^FLOWISE_API_KEY=' } | Select-Object -First 1
+        if ($apiKeyLine) {
+            $apiKey = ($apiKeyLine -split '=', 2)[1].Trim()
+            if ($apiKey) {
+                try {
+                    $headers = @{ "Authorization" = "Bearer $apiKey" }
+                    $r = Invoke-WebRequest -Uri "http://localhost:3000/api/v1/chatflows" -Headers $headers -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+                    if ($r.StatusCode -eq 200) {
+                        Write-Log "Flowise API key validated" "OK"
+                    }
+                } catch {
+                    $status = $null
+                    if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
+                    if ($status -eq 401) {
+                        Write-Log "Flowise API key is INVALID (401). Recreate in Flowise UI: http://localhost:3000 > Settings > API Keys" "FAIL"
+                    } else {
+                        Write-Log "Flowise API key validation inconclusive (HTTP $status)" "WARN"
+                    }
+                }
+            }
+        }
+    }
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Step 5: Summary + version update
 # ═══════════════════════════════════════════════════════════════════════════════
 Write-Host ""

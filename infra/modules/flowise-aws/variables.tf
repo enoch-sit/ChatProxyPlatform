@@ -58,3 +58,8 @@ variable "desired_count" {
   type    = number
   default = 1
 }
+
+variable "secret_flowise_config_arn" {
+  description = "ARN of Secrets Manager secret containing FLOWISE_SECRETKEY_OVERWRITE, FLOWISE_USERNAME, FLOWISE_PASSWORD"
+  type        = string
+}

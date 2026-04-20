@@ -209,6 +209,24 @@ if (Test-Path $generateSecretsPs1) {
     }
 }
 
+# Safety net: ensure FLOWISE_SECRETKEY_OVERWRITE is set (prevents API key
+# invalidation on Flowise restart).
+$flowiseEnv = Join-Path $scriptRoot "flowise\.env"
+if (Test-Path $flowiseEnv) {
+    $flowiseEnvContent = Get-Content $flowiseEnv -Raw
+    if ($flowiseEnvContent -notmatch 'FLOWISE_SECRETKEY_OVERWRITE=\S+') {
+        $bytes = [byte[]]::new(24)
+        [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+        $generatedKey = [Convert]::ToBase64String($bytes)
+        Add-Content -Path $flowiseEnv -Value "`nFLOWISE_SECRETKEY_OVERWRITE=$generatedKey"
+        Write-OK "Generated FLOWISE_SECRETKEY_OVERWRITE (prevents API key invalidation on restart)"
+    } else {
+        Write-OK "FLOWISE_SECRETKEY_OVERWRITE is set"
+    }
+} else {
+    Write-Warn "flowise/.env not found -- FLOWISE_SECRETKEY_OVERWRITE cannot be verified"
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 4: Start services in dependency order
 # ═══════════════════════════════════════════════════════════════════════════════
