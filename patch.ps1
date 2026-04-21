@@ -371,8 +371,20 @@ foreach ($svc in $manifest.deployOrder) {
     $dockerArgs = @("compose", "-f", $composeFile, "up", "-d", "--force-recreate")
     if ($Mode -eq "full") { $dockerArgs += "--build" }
 
-    $deployOutput = & docker @dockerArgs 2>&1
-    $deployExitCode = $LASTEXITCODE
+    $stdoutPath = Join-Path $env:TEMP ("patch_docker_{0}_{1}.out.log" -f $svc, $PID)
+    $stderrPath = Join-Path $env:TEMP ("patch_docker_{0}_{1}.err.log" -f $svc, $PID)
+
+    if (Test-Path $stdoutPath) { Remove-Item $stdoutPath -Force -ErrorAction SilentlyContinue }
+    if (Test-Path $stderrPath) { Remove-Item $stderrPath -Force -ErrorAction SilentlyContinue }
+
+    $proc = Start-Process -FilePath "docker" -ArgumentList $dockerArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+    $deployExitCode = $proc.ExitCode
+    $deployOutput = @()
+    if (Test-Path $stdoutPath) { $deployOutput += Get-Content $stdoutPath -ErrorAction SilentlyContinue }
+    if (Test-Path $stderrPath) { $deployOutput += Get-Content $stderrPath -ErrorAction SilentlyContinue }
+
+    if (Test-Path $stdoutPath) { Remove-Item $stdoutPath -Force -ErrorAction SilentlyContinue }
+    if (Test-Path $stderrPath) { Remove-Item $stderrPath -Force -ErrorAction SilentlyContinue }
 
     if ($deployExitCode -ne 0) {
         Write-Log "$svc failed to deploy" "FAIL"
