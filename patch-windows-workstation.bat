@@ -118,7 +118,7 @@ if errorlevel 1 (
 )
 
 call :log INFO "Comparing pre/post state for forbidden drift (passwords/data)"
-powershell -NoProfile -Command "function Parse-State([string]$p){ $m=@{}; if(Test-Path $p){ Get-Content $p | ForEach-Object { if($_ -match '^(?<k>[^=]+)=(?<v>.*)$'){ $m[$matches.k]=$matches.v } } }; return $m }; $pre=Parse-State('%STATE_FILE%'); $post=Parse-State('%POST_STATE_FILE%'); $keys=@('FLOWISE_API_KEY_SHA256','FLOWISE_SECRETKEY_OVERWRITE_SHA256','PROXY_MONGO_PASSWORD_SHA256','PROXY_JWT_ACCESS_SECRET_SHA256','PROXY_JWT_REFRESH_SECRET_SHA256','AUTH_MONGO_INITDB_ROOT_PASSWORD_SHA256','AUTH_JWT_ACCESS_SECRET_SHA256','AUTH_JWT_REFRESH_SECRET_SHA256','ACCOUNTING_DB_PASSWORD_SHA256','ACCOUNTING_POSTGRES_PASSWORD_SHA256','DATA_AUTH_USERS_COUNT','DATA_PROXY_OBJECTS_COUNT','DATA_FLOWISE_PG_EST_ROWS','DATA_ACCOUNTING_PG_EST_ROWS'); $diff=@(); foreach($k in $keys){ $a = if($pre.ContainsKey($k) -and -not [string]::IsNullOrWhiteSpace($pre[$k])) { $pre[$k] } else { '__MISSING__' }; $b = if($post.ContainsKey($k) -and -not [string]::IsNullOrWhiteSpace($post[$k])) { $post[$k] } else { '__MISSING__' }; if($a -ne $b){ $diff += ('{0}: PRE={1} POST={2}' -f $k,$a,$b) } }; if($diff.Count -gt 0){ $diff | ForEach-Object { Write-Host $_ }; exit 1 } else { exit 0 }"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%check-patch-drift.ps1" -PreFile "%STATE_FILE%" -PostFile "%POST_STATE_FILE%"
 if errorlevel 1 (
   call :log ERROR "Forbidden drift detected: password/data state changed"
   echo [FAIL] Password or data drift detected. Patch aborted as requested.
