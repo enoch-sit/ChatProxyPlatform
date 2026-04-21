@@ -149,7 +149,7 @@ jobs:
       - name: Build and push
         run: |
           TAG=${{ steps.tag.outputs.tag }}
-          REPO="${{ env.ECR_REGISTRY }}/chatproxy-${{ env.ENVIRONMENT }}-${{ matrix.service }}"
+          REPO="${{ env.ECR_REGISTRY }}/chatproxy/${{ matrix.service }}"
           DIR="${{ steps.srcdir.outputs.dir }}"
           
           docker build -t "$REPO:$TAG" -t "$REPO:latest" "$DIR"
@@ -201,8 +201,10 @@ jobs:
       - name: Terraform apply
         working-directory: infra/environments/${{ env.ENVIRONMENT }}
         run: |
+          IMAGE="${{ env.ECR_REGISTRY }}/chatproxy/${{ matrix.service }}:${{ steps.tag.outputs.tag }}"
           terraform apply -auto-approve \
-            -var "${{ steps.tf.outputs.var }}=${{ steps.tag.outputs.tag }}" \
+            -var-file=terraform.ci.tfvars \
+            -var "${{ steps.tf.outputs.var }}=${IMAGE}" \
             -target="module.${{ steps.tf.outputs.module }}"
 
       - name: Wait for ECS stability
