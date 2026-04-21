@@ -24,6 +24,8 @@ docs/web-record.md
 
 # Variable files with real values (use *.tfvars.example for templates)
 infra/environments/**/*.tfvars
+# CI tfvars has no secrets — must be tracked
+!infra/environments/**/*.ci.tfvars
 infra/environments/**/*.hcl
 
 # Terraform crash logs
