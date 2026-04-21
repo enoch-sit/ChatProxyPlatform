@@ -371,20 +371,30 @@ foreach ($svc in $manifest.deployOrder) {
     $dockerArgs = @("compose", "-f", $composeFile, "up", "-d", "--force-recreate")
     if ($Mode -eq "full") { $dockerArgs += "--build" }
 
-    $stdoutPath = Join-Path $env:TEMP ("patch_docker_{0}_{1}.out.log" -f $svc, $PID)
-    $stderrPath = Join-Path $env:TEMP ("patch_docker_{0}_{1}.err.log" -f $svc, $PID)
+    $tmpDir = [System.IO.Path]::GetTempPath()
+    $tmpToken = [System.IO.Path]::GetRandomFileName().Replace('.', '')
+    $stdoutPath = Join-Path $tmpDir ("patch_docker_{0}_{1}.out.log" -f $svc, $tmpToken)
+    $stderrPath = Join-Path $tmpDir ("patch_docker_{0}_{1}.err.log" -f $svc, $tmpToken)
 
-    if (Test-Path $stdoutPath) { Remove-Item $stdoutPath -Force -ErrorAction SilentlyContinue }
-    if (Test-Path $stderrPath) { Remove-Item $stderrPath -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $stdoutPath) {
+        try { Remove-Item -LiteralPath $stdoutPath -Force -ErrorAction SilentlyContinue } catch { }
+    }
+    if (Test-Path -LiteralPath $stderrPath) {
+        try { Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue } catch { }
+    }
 
     $proc = Start-Process -FilePath "docker" -ArgumentList $dockerArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
     $deployExitCode = $proc.ExitCode
     $deployOutput = @()
-    if (Test-Path $stdoutPath) { $deployOutput += Get-Content $stdoutPath -ErrorAction SilentlyContinue }
-    if (Test-Path $stderrPath) { $deployOutput += Get-Content $stderrPath -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $stdoutPath) { $deployOutput += Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $stderrPath) { $deployOutput += Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue }
 
-    if (Test-Path $stdoutPath) { Remove-Item $stdoutPath -Force -ErrorAction SilentlyContinue }
-    if (Test-Path $stderrPath) { Remove-Item $stderrPath -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $stdoutPath) {
+        try { Remove-Item -LiteralPath $stdoutPath -Force -ErrorAction SilentlyContinue } catch { }
+    }
+    if (Test-Path -LiteralPath $stderrPath) {
+        try { Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue } catch { }
+    }
 
     if ($deployExitCode -ne 0) {
         Write-Log "$svc failed to deploy" "FAIL"
