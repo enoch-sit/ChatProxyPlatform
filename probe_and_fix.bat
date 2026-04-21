@@ -65,7 +65,7 @@ for /f %%N in ('git -C "%ROOT%" rev-list --count HEAD..origin/main 2^>nul') do s
 if "%PENDING_COUNT%"=="0" (
   echo [OK] No pending commits on origin/main.
 ) else (
-  echo [INFO] %PENDING_COUNT% commit(s) available on origin/main:
+  echo [INFO] %PENDING_COUNT% commits available on origin/main:
   git -C "%ROOT%" log --oneline HEAD..origin/main
 )
 echo.
