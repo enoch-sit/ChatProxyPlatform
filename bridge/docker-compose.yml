@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_FLOWISE_PROXY_API_URL: ${FLOWISE_PROXY_URL:-http://host.docker.internal:8000}
+        VITE_FLOWISE_PROXY_API_URL: ${FLOWISE_PROXY_URL:-}
     container_name: bridge-ui
     ports:
       - "3082:3082"
@@ -12,9 +12,9 @@ services:
     environment:
       - NODE_ENV=development
       # Change this to your Flowise Proxy API URL
-      # Default: http://host.docker.internal:8000 (for local development)
+      # Default: empty (bridge app falls back to same-origin on remote, localhost:8000 on localhost)
       # Production: Change to your actual API URL
-      - VITE_FLOWISE_PROXY_API_URL=${FLOWISE_PROXY_URL:-http://host.docker.internal:8000}
+      - VITE_FLOWISE_PROXY_API_URL=${FLOWISE_PROXY_URL:-}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3082"]
       interval: 30s

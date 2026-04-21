@@ -14,6 +14,16 @@ set "MODE=%~2"
 if "%SERVICE%"=="" set "SERVICE=all"
 if "%MODE%"=="" set "MODE=auto"
 
+REM Bridge UI builds bake API URL at build time; force explicit target to avoid wrong domain bake-in.
+if /I "%SERVICE%"=="bridge" (
+  if "%FLOWISE_PROXY_URL%"=="" (
+    echo [FAIL] FLOWISE_PROXY_URL is required when patching bridge.
+    echo        Example for BHSS: set FLOWISE_PROXY_URL=https://ai01.bhss.edu.hk
+    exit /b 1
+  )
+  echo [INFO] Bridge build target FLOWISE_PROXY_URL=%FLOWISE_PROXY_URL%
+)
+
 for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "TS=%%I"
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 set "LOG_FILE=%LOG_DIR%\patch-workstation-%TS%.log"
