@@ -29,6 +29,8 @@ infra/environments/**/*.tfvars
 infra/environments/**/*.hcl
 # backend.hcl has no secrets (bucket/key/region only) — must be tracked for CI
 !infra/environments/**/backend.hcl
+# Provider lock file must be tracked for reproducible terraform runs
+!infra/environments/**/.terraform.lock.hcl
 
 # Terraform crash logs
 crash.log
