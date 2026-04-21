@@ -99,7 +99,7 @@ for /f "usebackq delims=" %%A in (`docker ps --filter "name=^flowise-postgres$" 
 for /f "usebackq delims=" %%A in (`docker ps --filter "name=^flowise-proxy$" --format "{{.Names}}"`) do set "C_FLOWISE_PROXY_RUNNING=1"
 for /f "usebackq delims=" %%A in (`docker ps --filter "name=^auth-service$" --format "{{.Names}}"`) do set "C_AUTH_SERVICE_RUNNING=1"
 for /f "usebackq delims=" %%A in (`docker ps --filter "name=^accounting-service$" --format "{{.Names}}"`) do set "C_ACCOUNTING_SERVICE_RUNNING=1"
-for /f "usebackq delims=" %%A in (`docker ps --filter "name=^bridge$" --format "{{.Names}}"`) do set "C_BRIDGE_RUNNING=1"
+for /f "usebackq delims=" %%A in (`docker ps --filter "name=^bridge-ui$" --format "{{.Names}}"`) do set "C_BRIDGE_RUNNING=1"
 
 if "%C_FLOWISE_RUNNING%"=="0" (
   call :log ERROR "Flowise container is not running"
