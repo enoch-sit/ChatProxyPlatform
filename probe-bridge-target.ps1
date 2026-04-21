@@ -145,7 +145,7 @@ if (-not $recommended) {
     $recommended = $good | Select-Object -First 1
 }
 
-$flowiseProxyUrl = $recommended.Url -replace '/health$',''
+$flowiseProxyUrl = $recommended.Url -replace "/health`$", ""
 
 Write-Ok "Use this for bridge build target:"
 Write-Host ""
