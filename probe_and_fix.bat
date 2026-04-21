@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM Fix broken git branch state then run the comprehensive workstation probe.
+REM Fix broken git branch state, collect machine state, then run comprehensive workstation probe.
 REM Exit code: 0 = probe passed, 1 = abort.
 REM Usage: probe_and_fix.bat
 
@@ -12,11 +12,37 @@ set "LOG_DIR=%ROOT%\logs"
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 
 echo ============================================================
-echo  ChatProxy Workstation Git Fix + Probe
+echo  ChatProxy Workstation -- Git Fix + Machine State + Probe
 echo ============================================================
 echo.
 
-REM ── Step 1: Verify git is available ─────────────────────────
+REM ── [MACHINE IDENTITY] ───────────────────────────────────────
+echo [MACHINE IDENTITY]
+echo   Computer : %COMPUTERNAME%
+echo   User     : %USERNAME%
+for /f "tokens=* delims=" %%V in ('ver') do echo   OS       : %%V
+echo.
+
+REM ── [DISK SPACE] ─────────────────────────────────────────────
+echo [DISK SPACE  C:\]
+powershell -NoProfile -Command "Get-PSDrive C | ForEach-Object { $free=[math]::Round($_.Free/1GB,1); $used=[math]::Round($_.Used/1GB,1); $total=$free+$used; Write-Host ('  Used: {0} GB    Free: {1} GB    Total: {2} GB' -f $used, $free, $total) }"
+echo.
+
+REM ── [NETWORK] ────────────────────────────────────────────────
+echo [NETWORK]
+powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^127\.' -and $_.IPAddress -notmatch '^169\.254\.' } | ForEach-Object { Write-Host ('  {0,-35} {1}' -f $_.InterfaceAlias, $_.IPAddress) }"
+echo.
+echo   WireGuard hub (10.10.0.1):
+ping -n 1 -w 1000 10.10.0.1 >nul 2>&1
+if errorlevel 1 (
+  echo   [WARN] WireGuard hub 10.10.0.1 unreachable -- VPN may be down
+) else (
+  echo   [OK]   WireGuard hub 10.10.0.1 reachable
+)
+echo.
+
+REM ── [GIT] Step 1: Verify git is available ───────────────────
+echo [GIT]
 echo [INFO] Checking git...
 git --version >nul 2>&1
 if errorlevel 1 (
@@ -32,6 +58,17 @@ if errorlevel 1 (
   exit /b 1
 )
 echo [OK] Fetch complete.
+
+REM ── Step 2b: Show pending remote commits ─────────────────────
+set "PENDING_COUNT=0"
+for /f %%N in ('git -C "%ROOT%" rev-list --count HEAD..origin/main 2^>nul') do set "PENDING_COUNT=%%N"
+if "%PENDING_COUNT%"=="0" (
+  echo [OK] No pending commits on origin/main.
+) else (
+  echo [INFO] %PENDING_COUNT% commit(s) available on origin/main:
+  git -C "%ROOT%" log --oneline HEAD..origin/main
+)
+echo.
 
 REM ── Step 3: Switch to main ───────────────────────────────────
 echo [INFO] Switching to main branch...
@@ -69,14 +106,40 @@ if errorlevel 1 (
 )
 echo [OK] Pull complete.
 
-REM ── Step 6: Show current state ───────────────────────────────
+REM ── Step 6: Show current git state ───────────────────────────
 for /f "usebackq delims=" %%C in (`git -C "%ROOT%" rev-parse --short HEAD 2^>nul`) do set "HEAD_SHORT=%%C"
 for /f "usebackq delims=" %%B in (`git -C "%ROOT%" rev-parse --abbrev-ref HEAD 2^>nul`) do set "FINAL_BRANCH=%%B"
 echo [INFO] Branch: %FINAL_BRANCH%  Commit: %HEAD_SHORT%
 echo.
 
-REM ── Step 7: Run the comprehensive probe ──────────────────────
-echo [INFO] Running workstation probe...
+REM ── [DOCKER DISK USAGE] ──────────────────────────────────────
+echo [DOCKER DISK USAGE]
+docker system df 2>nul
+echo.
+
+REM ── [RUNNING CONTAINERS] ─────────────────────────────────────
+echo [RUNNING CONTAINERS]
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" 2>nul
+echo.
+
+REM ── [CONTAINER DETAILS] restart counts + uptime ──────────────
+echo [CONTAINER DETAILS  name / state / restarts / started]
+powershell -NoProfile -Command "$names='flowise','flowise-postgres','flowise-proxy','auth-service','accounting-service','bridge'; foreach ($n in $names) { $raw = docker inspect $n 2>$null; if ($LASTEXITCODE -eq 0 -and $raw) { try { $d = ($raw | ConvertFrom-Json)[0]; $st = $d.State.Status; $rc = $d.RestartCount; $sa = $d.State.StartedAt.Substring(0,19); Write-Host ('  {0,-25} {1,-12} restarts={2,-5} since={3}' -f $n, $st, $rc, $sa) } catch { Write-Host ('  {0,-25} inspect-parse-error' -f $n) } } else { Write-Host ('  {0,-25} not found' -f $n) } }"
+echo.
+
+REM ── [ENV FILES] presence check ───────────────────────────────
+echo [ENV FILES]
+for %%S in (auth-service accounting-service flowise flowise-proxy-service-py) do (
+  if exist "%ROOT%\%%S\.env" (
+    echo   [OK]   %%S\.env
+  ) else (
+    echo   [MISS] %%S\.env  *** MISSING ***
+  )
+)
+echo.
+
+REM ── Run the comprehensive probe ───────────────────────────────
+echo [INFO] Running comprehensive workstation probe...
 echo ============================================================
 call "%ROOT%\probe-machine-state.bat"
 set "PROBE_EXIT=%ERRORLEVEL%"
@@ -87,4 +150,5 @@ if "%PROBE_EXIT%"=="0" (
 ) else (
   echo [FAIL] Probe reported errors. Patch must be aborted.
 )
+exit /b %PROBE_EXIT%
 exit /b %PROBE_EXIT%
