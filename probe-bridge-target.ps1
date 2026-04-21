@@ -70,10 +70,10 @@ try {
 } catch { }
 
 # Add host from existing bundle scan when possible (if bridge-ui is running).
-$bundleLines = docker exec bridge-ui sh -c "grep -R -n -E 'https?://[^\"\x27 ]+' /usr/share/nginx/html/assets 2>/dev/null | head -n 80" 2>$null
+$bundleLines = docker exec bridge-ui sh -c "grep -R -n -E 'https?://[^\"\047 ]+' /usr/share/nginx/html/assets 2>/dev/null | head -n 80" 2>$null
 if ($bundleLines) {
     foreach ($line in $bundleLines) {
-        if ($line -match 'https?://([^/\"\x27 :]+)') {
+        if ($line -match 'https?://([^/\s:"'']+)') {
             $h = $matches[1]
             if ($h) { [void]$hosts.Add($h) }
         }
@@ -99,8 +99,8 @@ $probeUrls = New-Object System.Collections.Generic.List[string]
 [void]$probeUrls.Add("https://localhost:$ProxyPort/health")
 
 foreach ($h in $hostSet) {
-    [void]$probeUrls.Add("http://$h:$ProxyPort/health")
-    [void]$probeUrls.Add("https://$h:$ProxyPort/health")
+    [void]$probeUrls.Add("http://${h}:$ProxyPort/health")
+    [void]$probeUrls.Add("https://${h}:$ProxyPort/health")
 }
 
 $probeUrls = $probeUrls | Select-Object -Unique
@@ -131,7 +131,8 @@ if (-not $good -or $good.Count -eq 0) {
 # Prefer PreferredHost if provided and reachable; else choose first non-localhost reachable HTTP/HTTPS.
 $recommended = $null
 if ($PreferredHost) {
-    $recommended = $good | Where-Object { $_.Url -match "//${PreferredHost}:$ProxyPort/health$" } | Select-Object -First 1
+    $preferredLiteral = "//${PreferredHost}:$ProxyPort/health"
+    $recommended = $good | Where-Object { $_.Url -like "*$preferredLiteral" } | Select-Object -First 1
 }
 if (-not $recommended) {
     $recommended = $good | Where-Object { $_.Url -notmatch '//localhost:' } | Select-Object -First 1
