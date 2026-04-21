@@ -368,11 +368,22 @@ foreach ($svc in $manifest.deployOrder) {
     Write-Host "  Deploying $svc ($Mode)..." -ForegroundColor Yellow
     Push-Location (Join-Path $scriptRoot $dir)
 
-    $cmd = "docker compose -f $composeFile up -d --force-recreate $buildFlag"
-    Invoke-Expression "$cmd 2>&1" | Out-Null
+    $dockerArgs = @("compose", "-f", $composeFile, "up", "-d", "--force-recreate")
+    if ($Mode -eq "full") { $dockerArgs += "--build" }
 
-    if ($LASTEXITCODE -ne 0) {
+    $deployOutput = & docker @dockerArgs 2>&1
+    $deployExitCode = $LASTEXITCODE
+
+    if ($deployExitCode -ne 0) {
         Write-Log "$svc failed to deploy" "FAIL"
+        if ($deployOutput) {
+            Write-Host "    Last docker output lines:" -ForegroundColor DarkGray
+            $deployOutput | Select-Object -Last 60 | ForEach-Object {
+                $line = $_.ToString()
+                Write-Host "    $line" -ForegroundColor DarkGray
+                Add-Content -Path $logFile -Value "[DOCKER] $line"
+            }
+        }
         $errors += $svc
         Pop-Location
         continue
