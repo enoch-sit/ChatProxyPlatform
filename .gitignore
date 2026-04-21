@@ -27,6 +27,8 @@ infra/environments/**/*.tfvars
 # CI tfvars has no secrets — must be tracked
 !infra/environments/**/*.ci.tfvars
 infra/environments/**/*.hcl
+# backend.hcl has no secrets (bucket/key/region only) — must be tracked for CI
+!infra/environments/**/backend.hcl
 
 # Terraform crash logs
 crash.log
