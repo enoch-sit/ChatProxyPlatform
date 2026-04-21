@@ -57,6 +57,8 @@ config_backup_*/
 
 # Secrets
 secrets/
+# Terraform secrets module (contains no actual secrets, just tf code)
+!infra/modules/secrets/
 *.key
 *.pem
 *.pfx
