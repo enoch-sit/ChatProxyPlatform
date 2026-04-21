@@ -167,11 +167,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         });
         
         if (!tokens?.refreshToken) {
-          console.error('❌ No refresh token available - this is why the app is "refreshing"');
+          console.error('❌ No refresh token available');
           if (!isBackground) {
             set({ isLoading: false, error: 'No refresh token available.' });
-            get().logout();
           }
+          await get().logout();
           throw new Error('No refresh token available.');
         }
         
@@ -193,15 +193,13 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             status: error.response?.status,
             isBackground
           });
-          
+
           if (!isBackground) {
             set({ error: error.message || 'Token refresh failed', isLoading: false });
-            get().logout();
-          } else {
-            // For background refreshes, don't logout immediately
-            // Let the user continue and handle it gracefully on next API call
-            set({ isLoading: false });
           }
+
+          // Always force a full logout on refresh failure to avoid stale admin UI state.
+          await get().logout();
           throw error;
         }
       },
@@ -231,9 +229,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
               }
             }
           } catch {
-            if (!isBackground) {
-              get().logout();
-            }
+            void get().logout();
           }
         } else {
           const { isAuthenticated, user } = get();

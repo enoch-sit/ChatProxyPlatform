@@ -16,6 +16,51 @@ const protectedRouter = Router();
 const adminRouter = Router();
 const testingRouter = Router();
 
+const durationToMs = (value: string | undefined, fallbackMs: number): number => {
+  const input = (value || '').trim();
+  const match = input.match(/^(\d+)(ms|s|m|h|d)$/i);
+
+  if (!match) {
+    return fallbackMs;
+  }
+
+  const amount = parseInt(match[1], 10);
+  const unit = match[2].toLowerCase();
+
+  switch (unit) {
+    case 'ms':
+      return amount;
+    case 's':
+      return amount * 1000;
+    case 'm':
+      return amount * 60 * 1000;
+    case 'h':
+      return amount * 60 * 60 * 1000;
+    case 'd':
+      return amount * 24 * 60 * 60 * 1000;
+    default:
+      return fallbackMs;
+  }
+};
+
+const accessTokenCookieMaxAgeMs = durationToMs(process.env.JWT_ACCESS_EXPIRES_IN, 15 * 60 * 1000);
+const refreshTokenCookieMaxAgeMs = durationToMs(process.env.JWT_REFRESH_EXPIRES_IN, 7 * 24 * 60 * 60 * 1000);
+
+const clearAuthCookies = (res: Response): void => {
+  const secure = process.env.NODE_ENV === 'production';
+  res.clearCookie('accessToken', {
+    httpOnly: true,
+    secure,
+    sameSite: 'strict',
+  });
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure,
+    sameSite: 'strict',
+    path: '/api/auth/refresh',
+  });
+};
+
 // =============================================================================
 // Auth Routes (previously in auth.routes.ts)
 // =============================================================================
@@ -110,7 +155,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 15 * 60 * 1000 // 15 minutes
+        maxAge: accessTokenCookieMaxAgeMs,
       });
     }
     
@@ -121,7 +166,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         path: '/api/auth/refresh',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        maxAge: refreshTokenCookieMaxAgeMs,
       });
     }
     
@@ -159,7 +204,7 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 15 * 60 * 1000 // 15 minutes
+        maxAge: accessTokenCookieMaxAgeMs,
       });
     }
     
@@ -170,7 +215,7 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         path: '/api/auth/refresh',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        maxAge: refreshTokenCookieMaxAgeMs,
       });
     }
     
@@ -195,9 +240,7 @@ authRouter.post('/logout', async (req: Request, res: Response) => {
       await authService.logout(refreshToken);
     }
     
-    // Clear cookies
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
+    clearAuthCookies(res);
     
     res.status(200).json({ message: 'Logout successful' });
   } catch (error: any) {
@@ -217,9 +260,7 @@ authRouter.post('/logout-all', authenticate, async (req: Request, res: Response)
     
     await authService.logoutAll(userId);
     
-    // Clear cookies
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
+    clearAuthCookies(res);
     
     res.status(200).json({ message: 'Logged out from all devices' });
   } catch (error: any) {

@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
@@ -8,7 +9,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'html',
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:42073',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -21,8 +22,8 @@ export default defineConfig({
   webServer: process.env.CI
     ? undefined
     : {
-        command: 'npm run dev',
-        url: 'http://localhost:5173',
-        reuseExistingServer: true,
+        command: 'npm run dev -- --port 42073 --strictPort',
+        url: 'http://localhost:42073',
+        reuseExistingServer: false,
       },
 });

@@ -14,6 +14,10 @@ const Header: React.FC = () => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
 
+  const handleLogout = async () => {
+    await logout();
+  };
+
   return (
     <Box
       component="header"
@@ -53,7 +57,7 @@ const Header: React.FC = () => {
         {user && <Typography>{t('common.welcomeUser', { username: user.username })}</Typography>}
         <LanguageSelector />
         <ThemeToggleButton />
-        {user && <Button onClick={logout}>{t('auth.logout')}</Button>}
+        {user && <Button onClick={() => { void handleLogout(); }}>{t('auth.logout')}</Button>}
       </Box>
     </Box>
   );

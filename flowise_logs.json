@@ -1,0 +1,10 @@
+{
+    "events": [
+        {
+            "timestamp": 1776673676398,
+            "message": "2026-04-20 08:27:56 [INFO]: Starting Flowise...",
+            "ingestionTime": 1776673676587
+        },
+        {
+            "timestamp": 1776673676744,
+            "message": 

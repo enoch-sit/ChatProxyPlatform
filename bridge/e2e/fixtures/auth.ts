@@ -47,8 +47,24 @@ const MOCK_ADMIN_USER: AuthUser = {
   isActive: true,
 };
 
+const createMockJwt = () => {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const payload = {
+    username: 'e2e-admin',
+    role: 'admin',
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  const encode = (value: object) => btoa(JSON.stringify(value))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+  return `${encode(header)}.${encode(payload)}.e2e-signature`;
+};
+
 const MOCK_TOKENS: AuthTokens = {
-  accessToken: 'e2e-mock-access-token',
+  accessToken: createMockJwt(),
   refreshToken: 'e2e-mock-refresh-token',
   expiresIn: 3600,
   tokenType: 'Bearer',

@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures/auth';
+import { test, expect } from './fixtures/auth';
 
 /**
  * E2E tests for the chatflow sync feature.
