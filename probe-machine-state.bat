@@ -212,21 +212,19 @@ set "DATA_PROXY_OBJECTS_COUNT="
 set "DATA_FLOWISE_PG_EST_ROWS="
 set "DATA_ACCOUNTING_PG_EST_ROWS="
 
-if "%C_AUTH_SERVICE_RUNNING%"=="1" (
-  for /f %%A in ('powershell -NoProfile -Command "try { $v = docker exec mongodb-auth mongosh --quiet --eval \"db.getSiblingDB('auth_db').users.countDocuments({})\" 2^> $null; if($LASTEXITCODE -eq 0 -and $v){ ($v ^| Select-Object -Last 1).ToString().Trim() } else { '' } } catch { '' }"') do set "DATA_AUTH_USERS_COUNT=%%A"
-)
+REM Use a single top-level PowerShell call writing to a temp file.
+REM This avoids cmd's ( ) block-matching bug with ) inside for/f inside if blocks.
+set "DF_TMP=%TEMP%\probe_df_%RANDOM%.txt"
+del "%DF_TMP%" 2>nul
 
-if "%C_FLOWISE_PROXY_RUNNING%"=="1" (
-  for /f %%A in ('powershell -NoProfile -Command "try { $v = docker exec mongodb-proxy mongosh --quiet --eval \"db.getSiblingDB('flowise_proxy').stats().objects\" 2^> $null; if($LASTEXITCODE -eq 0 -and $v){ ($v ^| Select-Object -Last 1).ToString().Trim() } else { '' } } catch { '' }"') do set "DATA_PROXY_OBJECTS_COUNT=%%A"
-)
+powershell -NoProfile -Command "$f='%DF_TMP%'; $r=@('','','',''); if ('%C_AUTH_SERVICE_RUNNING%' -eq '1') { try { $v=docker exec mongodb-auth mongosh --quiet --eval 'db.getSiblingDB(''auth_db'').users.estimatedDocumentCount()' 2>$null; if ($LASTEXITCODE -eq 0 -and $v) { $r[0]=($v|Select-Object -Last 1).ToString().Trim() } } catch {} }; if ('%C_FLOWISE_PROXY_RUNNING%' -eq '1') { try { $v=docker exec mongodb-proxy mongosh --quiet --eval 'db.getSiblingDB(''flowise_proxy'').stats().objects' 2>$null; if ($LASTEXITCODE -eq 0 -and $v) { $r[1]=($v|Select-Object -Last 1).ToString().Trim() } } catch {} }; if ('%C_FLOWISE_POSTGRES_RUNNING%' -eq '1') { try { $v=docker exec flowise-postgres psql -U flowiseuser -d flowise -t -A -c 'SELECT COALESCE(SUM(n_live_tup)::bigint,0) FROM pg_stat_user_tables;' 2>$null; if ($LASTEXITCODE -eq 0 -and $v) { $r[2]=($v|Select-Object -Last 1).ToString().Trim() } } catch {} }; if ('%C_ACCOUNTING_SERVICE_RUNNING%' -eq '1') { try { $v=docker exec postgres-accounting psql -U postgres -d accounting_db -t -A -c 'SELECT COALESCE(SUM(n_live_tup)::bigint,0) FROM pg_stat_user_tables;' 2>$null; if ($LASTEXITCODE -eq 0 -and $v) { $r[3]=($v|Select-Object -Last 1).ToString().Trim() } } catch {} }; @(\"DATA_AUTH_USERS_COUNT=$($r[0])\",\"DATA_PROXY_OBJECTS_COUNT=$($r[1])\",\"DATA_FLOWISE_PG_EST_ROWS=$($r[2])\",\"DATA_ACCOUNTING_PG_EST_ROWS=$($r[3])\") | Set-Content $f"
 
-if "%C_FLOWISE_POSTGRES_RUNNING%"=="1" (
-  for /f %%A in ('powershell -NoProfile -Command "try { $v = docker exec flowise-postgres psql -U flowiseuser -d flowise -t -A -c \"SELECT COALESCE(SUM(n_live_tup)::bigint,0) FROM pg_stat_user_tables;\" 2^> $null; if($LASTEXITCODE -eq 0 -and $v){ ($v ^| Select-Object -Last 1).ToString().Trim() } else { '' } } catch { '' }"') do set "DATA_FLOWISE_PG_EST_ROWS=%%A"
+if not exist "%DF_TMP%" (
+  call :log ERROR "Data fingerprint collection failed - temp file not written"
+  exit /b 1
 )
-
-if "%C_ACCOUNTING_SERVICE_RUNNING%"=="1" (
-  for /f %%A in ('powershell -NoProfile -Command "try { $v = docker exec postgres-accounting psql -U postgres -d accounting_db -t -A -c \"SELECT COALESCE(SUM(n_live_tup)::bigint,0) FROM pg_stat_user_tables;\" 2^> $null; if($LASTEXITCODE -eq 0 -and $v){ ($v ^| Select-Object -Last 1).ToString().Trim() } else { '' } } catch { '' }"') do set "DATA_ACCOUNTING_PG_EST_ROWS=%%A"
-)
+for /f "usebackq tokens=1,* delims==" %%K in ("%DF_TMP%") do set "%%K=%%L"
+del "%DF_TMP%" 2>nul
 
 if "%C_FLOWISE_POSTGRES_RUNNING%"=="1" if not defined DATA_FLOWISE_PG_EST_ROWS (
   call :log ERROR "Failed to capture Flowise postgres data fingerprint"
