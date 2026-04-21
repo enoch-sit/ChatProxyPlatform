@@ -73,9 +73,12 @@ try {
 $bundleLines = docker exec bridge-ui sh -c "grep -R -n -E 'https?://[^\"\047 ]+' /usr/share/nginx/html/assets 2>/dev/null | head -n 80" 2>$null
 if ($bundleLines) {
     foreach ($line in $bundleLines) {
-        if ($line -match "https?://([^/\s:`"']+)") {
-            $h = $matches[1]
-            if ($h) { [void]$hosts.Add($h) }
+        if ($line -match 'https?://\S+') {
+            $url = $matches[0].TrimEnd("'", '"', ',', ';', ')', ']')
+            try {
+                $u = [uri]$url
+                if ($u.Host) { [void]$hosts.Add($u.Host) }
+            } catch { }
         }
     }
 }
