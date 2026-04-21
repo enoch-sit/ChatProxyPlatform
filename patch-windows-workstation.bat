@@ -14,6 +14,46 @@ set "MODE=%~2"
 if "%SERVICE%"=="" set "SERVICE=all"
 if "%MODE%"=="" set "MODE=auto"
 
+REM HARD SAFETY: require explicit patch target to avoid cross-environment mistakes.
+if "%PATCH_TARGET%"=="" (
+  echo [FAIL] PATCH_TARGET is required. Set PATCH_TARGET=BHSS or PATCH_TARGET=AWS before patching.
+  echo        Example (BHSS): set PATCH_TARGET=BHSS
+  echo        Example (AWS) : set PATCH_TARGET=AWS
+  exit /b 1
+)
+
+if /I not "%PATCH_TARGET%"=="BHSS" if /I not "%PATCH_TARGET%"=="AWS" (
+  echo [FAIL] PATCH_TARGET must be BHSS or AWS. Current: %PATCH_TARGET%
+  exit /b 1
+)
+
+if /I "%PATCH_TARGET%"=="BHSS" (
+  echo %COMPUTERNAME% | find /I "BHSS" >nul
+  if errorlevel 1 (
+    echo [FAIL] PATCH_TARGET=BHSS but machine name does not look like BHSS: %COMPUTERNAME%
+    exit /b 1
+  )
+)
+
+if /I "%PATCH_TARGET%"=="AWS" (
+  echo %COMPUTERNAME% | find /I "BHSS" >nul
+  if not errorlevel 1 (
+    echo [FAIL] PATCH_TARGET=AWS but this appears to be a BHSS machine: %COMPUTERNAME%
+    exit /b 1
+  )
+)
+
+REM HARD SAFETY: prevent broad all-service patch unless explicitly confirmed.
+if /I "%SERVICE%"=="all" (
+  if /I not "%PATCH_ALLOW_ALL%"=="1" (
+    echo [FAIL] SERVICE=all requires PATCH_ALLOW_ALL=1 confirmation.
+    echo        Example: set PATCH_ALLOW_ALL=1
+    exit /b 1
+  )
+)
+
+echo [INFO] Patch guard: PATCH_TARGET=%PATCH_TARGET%  SERVICE=%SERVICE%  MODE=%MODE%
+
 REM Bridge UI builds bake API URL at build time; force explicit target to avoid wrong domain bake-in.
 if /I "%SERVICE%"=="bridge" (
   if "%FLOWISE_PROXY_URL%"=="" (
