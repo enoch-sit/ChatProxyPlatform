@@ -88,7 +88,7 @@ if ($bundleLines) {
 $hostSet = $hosts |
     Where-Object { $_ -and $_.Trim() -ne "" } |
     ForEach-Object { $_.Trim() } |
-    Where-Object { $_ -notmatch '^localhost$' -or $true } |
+    Where-Object { $_ -notmatch "^localhost`$" -or $true } |
     Select-Object -Unique
 
 Write-Section "Candidate Hosts"
