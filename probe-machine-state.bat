@@ -155,7 +155,7 @@ set "E_ACCOUNTING_HTTP=0"
 REM Single PowerShell spawn checks all 4 endpoints in parallel (saves ~1.5s vs 4 serial spawns)
 set "EP_TMP=%TEMP%\probe_ep_%RANDOM%.txt"
 del "%EP_TMP%" 2>nul
-powershell -NoProfile -Command "$t=%EP_TMP%; $eps=@( @{k='E_FLOWISE_HTTP';u='http://localhost:3002/api/v1/ping'}, @{k='E_PROXY_HTTP';u='http://localhost:8000/health'}, @{k='E_AUTH_HTTP';u='http://localhost:3000/health'}, @{k='E_ACCOUNTING_HTTP';u='http://localhost:3001/health'} ); $jobs=$eps | ForEach-Object { $ep=$_; Start-Job -ScriptBlock { param($u) try{(Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 5).StatusCode}catch{0} } -ArgumentList $ep.u | Add-Member -NotePropertyName key -NotePropertyValue $ep.k -PassThru }; $results=$jobs | ForEach-Object { $r=Receive-Job $_ -Wait; Remove-Job $_; '{0}={1}' -f $_.key,$r }; $results | Set-Content $t"
+powershell -NoProfile -Command "$t='%EP_TMP%'; $eps=@( @{k='E_FLOWISE_HTTP';u='http://localhost:3002/api/v1/ping'}, @{k='E_PROXY_HTTP';u='http://localhost:8000/health'}, @{k='E_AUTH_HTTP';u='http://localhost:3000/health'}, @{k='E_ACCOUNTING_HTTP';u='http://localhost:3001/health'} ); $jobs=$eps | ForEach-Object { $ep=$_; Start-Job -ScriptBlock { param($u) try{(Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 5).StatusCode}catch{0} } -ArgumentList $ep.u | Add-Member -NotePropertyName key -NotePropertyValue $ep.k -PassThru }; $results=$jobs | ForEach-Object { $r=Receive-Job $_ -Wait; Remove-Job $_; '{0}={1}' -f $_.key,$r }; $results | Set-Content $t"
 if exist "%EP_TMP%" (
   for /f "usebackq tokens=1,* delims==" %%K in ("%EP_TMP%") do set "%%K=%%L"
   del "%EP_TMP%" 2>nul

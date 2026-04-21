@@ -144,7 +144,7 @@ echo.
 
 REM ── [CONTAINER DETAILS] restart counts + uptime ──────────────
 echo [CONTAINER DETAILS  name / state / restarts / started]
-powershell -NoProfile -Command "$names='flowise','flowise-postgres','flowise-proxy','auth-service','accounting-service','bridge'; foreach ($n in $names) { $raw = docker inspect $n 2>$null; if ($LASTEXITCODE -eq 0 -and $raw) { try { $d = ($raw | ConvertFrom-Json)[0]; $st = $d.State.Status; $rc = $d.RestartCount; $sa = $d.State.StartedAt.Substring(0,19); Write-Host ('  {0,-25} {1,-12} restarts={2,-5} since={3}' -f $n, $st, $rc, $sa) } catch { Write-Host ('  {0,-25} inspect-parse-error' -f $n) } } else { Write-Host ('  {0,-25} not found' -f $n) } }"
+powershell -NoProfile -Command "$names='flowise','flowise-postgres','flowise-proxy','auth-service','accounting-service','bridge-ui'; foreach ($n in $names) { $raw = docker inspect $n 2>$null; if ($LASTEXITCODE -eq 0 -and $raw) { try { $d = ($raw | ConvertFrom-Json)[0]; $st = $d.State.Status; $rc = $d.RestartCount; $sa = $d.State.StartedAt.Substring(0,19); Write-Host ('  {0,-25} {1,-12} restarts={2,-5} since={3}' -f $n, $st, $rc, $sa) } catch { Write-Host ('  {0,-25} inspect-parse-error' -f $n) } } else { Write-Host ('  {0,-25} not found' -f $n) } }"
 echo.
 
 REM ── [ENV FILES] presence check ───────────────────────────────
