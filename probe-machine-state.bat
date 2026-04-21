@@ -8,7 +8,8 @@ REM   probe-machine-state.bat
 REM   probe-machine-state.bat "C:\path\custom-state.env"
 
 set "ROOT=%~dp0"
-set "LOG_DIR=%ROOT%logs"
+if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
+set "LOG_DIR=%ROOT%\logs"
 
 for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "TS=%%I"
 set "LOG_FILE=%LOG_DIR%\probe-state-%TS%.log"
@@ -183,18 +184,18 @@ set "FP_AUTH_JWT_REFRESH_SECRET_SHA256="
 set "FP_ACCOUNTING_DB_PASSWORD_SHA256="
 set "FP_ACCOUNTING_POSTGRES_PASSWORD_SHA256="
 
-call :hash_env_value "%ROOT%flowise-proxy-service-py\.env" "FLOWISE_API_KEY" FP_FLOWISE_API_KEY_SHA256
-call :hash_env_value "%ROOT%flowise-proxy-service-py\.env" "MONGO_PASSWORD" FP_PROXY_MONGO_PASSWORD_SHA256
-call :hash_env_value "%ROOT%flowise-proxy-service-py\.env" "JWT_ACCESS_SECRET" FP_PROXY_JWT_ACCESS_SECRET_SHA256
-call :hash_env_value "%ROOT%flowise-proxy-service-py\.env" "JWT_REFRESH_SECRET" FP_PROXY_JWT_REFRESH_SECRET_SHA256
-call :hash_env_value "%ROOT%flowise\.env" "FLOWISE_SECRETKEY_OVERWRITE" FP_FLOWISE_SECRETKEY_OVERWRITE_SHA256
+call :hash_env_value "%ROOT%\flowise-proxy-service-py\.env" "FLOWISE_API_KEY" FP_FLOWISE_API_KEY_SHA256
+call :hash_env_value "%ROOT%\flowise-proxy-service-py\.env" "MONGO_PASSWORD" FP_PROXY_MONGO_PASSWORD_SHA256
+call :hash_env_value "%ROOT%\flowise-proxy-service-py\.env" "JWT_ACCESS_SECRET" FP_PROXY_JWT_ACCESS_SECRET_SHA256
+call :hash_env_value "%ROOT%\flowise-proxy-service-py\.env" "JWT_REFRESH_SECRET" FP_PROXY_JWT_REFRESH_SECRET_SHA256
+call :hash_env_value "%ROOT%\flowise\.env" "FLOWISE_SECRETKEY_OVERWRITE" FP_FLOWISE_SECRETKEY_OVERWRITE_SHA256
 
-call :hash_env_value "%ROOT%auth-service\.env" "MONGO_INITDB_ROOT_PASSWORD" FP_AUTH_MONGO_INITDB_ROOT_PASSWORD_SHA256
-call :hash_env_value "%ROOT%auth-service\.env" "JWT_ACCESS_SECRET" FP_AUTH_JWT_ACCESS_SECRET_SHA256
-call :hash_env_value "%ROOT%auth-service\.env" "JWT_REFRESH_SECRET" FP_AUTH_JWT_REFRESH_SECRET_SHA256
+call :hash_env_value "%ROOT%\auth-service\.env" "MONGO_INITDB_ROOT_PASSWORD" FP_AUTH_MONGO_INITDB_ROOT_PASSWORD_SHA256
+call :hash_env_value "%ROOT%\auth-service\.env" "JWT_ACCESS_SECRET" FP_AUTH_JWT_ACCESS_SECRET_SHA256
+call :hash_env_value "%ROOT%\auth-service\.env" "JWT_REFRESH_SECRET" FP_AUTH_JWT_REFRESH_SECRET_SHA256
 
-call :hash_env_value "%ROOT%accounting-service\.env" "DB_PASSWORD" FP_ACCOUNTING_DB_PASSWORD_SHA256
-call :hash_env_value "%ROOT%accounting-service\.env" "POSTGRES_PASSWORD" FP_ACCOUNTING_POSTGRES_PASSWORD_SHA256
+call :hash_env_value "%ROOT%\accounting-service\.env" "DB_PASSWORD" FP_ACCOUNTING_DB_PASSWORD_SHA256
+call :hash_env_value "%ROOT%\accounting-service\.env" "POSTGRES_PASSWORD" FP_ACCOUNTING_POSTGRES_PASSWORD_SHA256
 
 if not defined FP_FLOWISE_API_KEY_SHA256 (
   call :log ERROR "FLOWISE_API_KEY fingerprint missing"
