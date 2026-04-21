@@ -1,159 +1,172 @@
+#!/usr/bin/env pwsh
+<#
+.SYNOPSIS
+    Discover the working flowise-proxy endpoint on this machine.
+
+.DESCRIPTION
+    Probes localhost and candidate hosts to find which protocol/port/host 
+    combination works for the flowise-proxy health endpoint.
+    
+    Helps identify the correct FLOWISE_PROXY_URL for bridge builds.
+
+.PARAMETER PreferredHost
+    Preferred hostname/IP to test (e.g., "ai01.bhss.edu.hk").
+    If provided and reachable, will be recommended.
+
+.PARAMETER ProxyPort
+    Port to test (default 8000). Probes both HTTP and HTTPS on this port.
+
+.EXAMPLE
+    .\probe-bridge-target.ps1 -PreferredHost "ai01.bhss.edu.hk"
+    .\probe-bridge-target.ps1 -PreferredHost "ai01.bhss.edu.hk" -ProxyPort 8000
+#>
+[CmdletBinding()]
 param(
     [string]$PreferredHost = "",
-    [int]$ProxyPort = 8000,
-    [int]$BridgePort = 3082
+    [int]$ProxyPort = 8000
 )
 
 $ErrorActionPreference = "Continue"
 
-function Write-Section {
-    param([string]$Title)
-    Write-Host ""
-    Write-Host "============================================================" -ForegroundColor Cyan
-    Write-Host " $Title" -ForegroundColor Cyan
-    Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host " Flowise Proxy Endpoint Discovery" -ForegroundColor Cyan
+Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host "Time       : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+Write-Host "Machine    : $env:COMPUTERNAME"
+Write-Host "PreferredHost: $PreferredHost"
+Write-Host "ProxyPort  : $ProxyPort"
+Write-Host ""
+
+# Build list of candidates to test
+$candidates = @()
+
+if ($PreferredHost) {
+    $candidates += @($PreferredHost)
 }
 
-function Write-Ok { param([string]$m) Write-Host "[OK] $m" -ForegroundColor Green }
-function Write-Warn { param([string]$m) Write-Host "[WARN] $m" -ForegroundColor Yellow }
-function Write-Fail { param([string]$m) Write-Host "[FAIL] $m" -ForegroundColor Red }
+# Add localhost
+$candidates += @("localhost", "127.0.0.1")
 
-function Test-Url {
-    param([string]$Url)
+# Add machine name
+$candidates += @($env:COMPUTERNAME)
 
-    $result = [ordered]@{
-        Url = $Url
-        Reachable = $false
-        Status = 0
-        Error = ""
-    }
-
-    try {
-        $r = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 6 -ErrorAction Stop
-        $result.Reachable = $true
-        $result.Status = [int]$r.StatusCode
-    }
-    catch {
-        $ex = $_.Exception
-        if ($ex.Response -and $ex.Response.StatusCode) {
-            $result.Status = [int]$ex.Response.StatusCode
-        }
-        $result.Error = $ex.Message
-    }
-
-    return [pscustomobject]$result
-}
-
-Write-Section "Bridge Target Probe"
-Write-Host "Time      : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-Write-Host "Machine   : $env:COMPUTERNAME"
-Write-Host "Preferred : $PreferredHost"
-Write-Host "ProxyPort : $ProxyPort"
-Write-Host "BridgePort: $BridgePort"
-
-$hosts = New-Object System.Collections.Generic.List[string]
-if ($PreferredHost) { [void]$hosts.Add($PreferredHost) }
-
-# Add machine name and FQDN candidates.
-[void]$hosts.Add($env:COMPUTERNAME)
+# Try to get FQDN
 try {
     $fqdn = ([System.Net.Dns]::GetHostEntry($env:COMPUTERNAME)).HostName
-    if ($fqdn) { [void]$hosts.Add($fqdn) }
+    if ($fqdn -and $fqdn -ne $env:COMPUTERNAME) {
+        $candidates += @($fqdn)
+    }
 } catch { }
 
-# Add local non-loopback IPv4 addresses.
+# Add local non-loopback IPs
 try {
     $ips = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-        Where-Object { $_.IPAddress -notmatch '^127\.' -and $_.IPAddress -notmatch '^169\.254\.' } |
+        Where-Object { $_.IPAddress -notmatch "^127\." -and $_.IPAddress -notmatch "^169\.254\." } |
         Select-Object -ExpandProperty IPAddress -Unique
-    foreach ($ip in $ips) { [void]$hosts.Add($ip) }
+    $candidates += $ips
 } catch { }
 
-# Add host from existing bundle scan when possible (if bridge-ui is running).
-$bundleLines = docker exec bridge-ui sh -c "grep -R -n -E 'https?://[^\"\047 ]+' /usr/share/nginx/html/assets 2>/dev/null | head -n 80" 2>$null
-if ($bundleLines) {
-    foreach ($line in $bundleLines) {
-        if ($line -match 'https?://\S+') {
-            $trimChars = [char[]](44,59,41,93,34,39)
-            $url = $matches[0].TrimEnd($trimChars)
-            try {
-                $u = [uri]$url
-                if ($u.Host) { [void]$hosts.Add($u.Host) }
-            } catch { }
+# Deduplicate
+$candidates = $candidates | Where-Object { $_ } | Select-Object -Unique
+
+Write-Host "Testing candidates:"
+$candidates | ForEach-Object { Write-Host "  - $_" }
+Write-Host ""
+
+# Test each candidate with both HTTP and HTTPS
+$results = @()
+
+foreach ($host in $candidates) {
+    foreach ($scheme in @("http", "https")) {
+        $url = "${scheme}://${host}:${ProxyPort}/health"
+        
+        try {
+            $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 6 -ErrorAction Stop
+            if ($response.StatusCode -eq 200) {
+                Write-Host "[OK]    $url -> HTTP $($response.StatusCode)" -ForegroundColor Green
+                $results += @{
+                    Url = $url
+                    Scheme = $scheme
+                    Host = $host
+                    Port = $ProxyPort
+                    Status = $response.StatusCode
+                    Working = $true
+                }
+            }
+        } catch {
+            $statusCode = 0
+            if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+                $statusCode = [int]$_.Exception.Response.StatusCode
+            }
+            
+            if ($statusCode -gt 0) {
+                Write-Host "[WARN]  $url -> HTTP $statusCode" -ForegroundColor Yellow
+            } else {
+                Write-Host "[FAIL]  $url -> unreachable" -ForegroundColor Gray
+            }
         }
     }
 }
 
-# Deduplicate and filter junk tokens.
-$hostSet = $hosts |
-    Where-Object { $_ -and $_.Trim() -ne "" } |
-    ForEach-Object { $_.Trim() } |
-    Where-Object { $_ -notmatch "^localhost`$" -or $true } |
-    Select-Object -Unique
+Write-Host ""
+Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host " Results" -ForegroundColor Cyan
+Write-Host "================================================================" -ForegroundColor Cyan
 
-Write-Section "Candidate Hosts"
-$hostSet | ForEach-Object { Write-Host "  $_" }
-
-Write-Section "Proxy Endpoint Tests"
-$tests = New-Object System.Collections.Generic.List[object]
-
-# Always include localhost candidates explicitly.
-$probeUrls = New-Object System.Collections.Generic.List[string]
-[void]$probeUrls.Add("http://localhost:$ProxyPort/health")
-[void]$probeUrls.Add("https://localhost:$ProxyPort/health")
-
-foreach ($h in $hostSet) {
-    [void]$probeUrls.Add("http://${h}:$ProxyPort/health")
-    [void]$probeUrls.Add("https://${h}:$ProxyPort/health")
-}
-
-$probeUrls = $probeUrls | Select-Object -Unique
-
-foreach ($u in $probeUrls) {
-    $r = Test-Url -Url $u
-    [void]$tests.Add($r)
-    if ($r.Reachable -and $r.Status -eq 200) {
-        Write-Ok "$($r.Url) -> HTTP $($r.Status)"
-    } else {
-        if ($r.Status -gt 0) {
-            Write-Warn "$($r.Url) -> HTTP $($r.Status)"
-        } else {
-            Write-Warn "$($r.Url) -> unreachable"
-        }
-    }
-}
-
-Write-Section "Recommendation"
-$good = $tests | Where-Object { $_.Reachable -and $_.Status -eq 200 }
-
-if (-not $good -or $good.Count -eq 0) {
-    Write-Fail "No reachable proxy /health endpoint found on tested hosts."
-    Write-Host "Check flowise-proxy publish/port/firewall first."
+if ($results.Count -eq 0) {
+    Write-Host "[FAIL] No working endpoint found!" -ForegroundColor Red
+    Write-Host "Check that flowise-proxy is running and accessible." -ForegroundColor Yellow
     exit 1
 }
 
-# Prefer PreferredHost if provided and reachable; else choose first non-localhost reachable HTTP/HTTPS.
+Write-Host "Found $($results.Count) working endpoint(s):" -ForegroundColor Green
+$results | ForEach-Object {
+    Write-Host "  $($_.Url)" -ForegroundColor Green
+}
+
+Write-Host ""
+Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host " Recommendation" -ForegroundColor Cyan
+Write-Host "================================================================" -ForegroundColor Cyan
+
+# Pick the best result
 $recommended = $null
+
+# Prefer PreferredHost if provided and reachable
 if ($PreferredHost) {
-    $preferredLiteral = "//${PreferredHost}:$ProxyPort/health"
-    $recommended = $good | Where-Object { $_.Url -like "*$preferredLiteral" } | Select-Object -First 1
-}
-if (-not $recommended) {
-    $recommended = $good | Where-Object { $_.Url -notmatch "//localhost:" } | Select-Object -First 1
-}
-if (-not $recommended) {
-    $recommended = $good | Select-Object -First 1
+    $recommended = $results | Where-Object { $_.Host -eq $PreferredHost } | Select-Object -First 1
 }
 
-$flowiseProxyUrl = $recommended.Url -replace "/health`$", ""
+# Otherwise prefer HTTPS if available
+if (-not $recommended) {
+    $recommended = $results | Where-Object { $_.Scheme -eq "https" } | Select-Object -First 1
+}
 
-Write-Ok "Use this for bridge build target:"
+# Otherwise prefer non-localhost
+if (-not $recommended) {
+    $recommended = $results | Where-Object { $_.Host -notmatch "^localhost$" } | Where-Object { $_.Host -notmatch "^127\.0\.0\.1$" } | Select-Object -First 1
+}
+
+# Last resort: just take first working one
+if (-not $recommended) {
+    $recommended = $results[0]
+}
+
+$proxyUrl = $recommended.Url -replace "/health$", ""
+
+Write-Host "Recommended URL:" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  set FLOWISE_PROXY_URL=$flowiseProxyUrl" -ForegroundColor Cyan
+Write-Host "  $proxyUrl" -ForegroundColor Green
+Write-Host ""
+Write-Host "To use this for bridge patching:" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  set FLOWISE_PROXY_URL=$proxyUrl" -ForegroundColor Cyan
 Write-Host "  patch-windows-workstation.bat bridge full" -ForegroundColor Cyan
-Write-Host "  set FLOWISE_PROXY_URL=" -ForegroundColor Cyan
-
 Write-Host ""
-Write-Host "If browser still serves old JS, do Ctrl+F5 and re-test login." 
+Write-Host "  (or for quick patch with no rebuild:)" -ForegroundColor Gray
+Write-Host "  set FLOWISE_PROXY_URL=$proxyUrl" -ForegroundColor Gray
+Write-Host "  patch-windows-workstation.bat bridge quick" -ForegroundColor Gray
+Write-Host ""
 
 exit 0
