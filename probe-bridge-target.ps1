@@ -74,7 +74,8 @@ $bundleLines = docker exec bridge-ui sh -c "grep -R -n -E 'https?://[^\"\047 ]+'
 if ($bundleLines) {
     foreach ($line in $bundleLines) {
         if ($line -match 'https?://\S+') {
-            $url = $matches[0].TrimEnd("'", '"', ',', ';', ')', ']')
+            $trimChars = [char[]](44,59,41,93,34,39)
+            $url = $matches[0].TrimEnd($trimChars)
             try {
                 $u = [uri]$url
                 if ($u.Host) { [void]$hosts.Add($u.Host) }
