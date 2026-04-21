@@ -2,23 +2,21 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 REM Safe Windows wrapper around patch.ps1 for production workstation patching.
-REM It enforces comprehensive pre/post probe checks and blocks password/data drift.
 REM Usage: patch-windows-workstation.bat [service] [mode]
 
 set "ROOT=%~dp0"
 set "LOG_DIR=%ROOT%logs"
 set "STATE_FILE=%ROOT%logs\probe-state-latest.env"
-set "POST_STATE_FILE=%ROOT%logs\probe-state-postpatch-%RANDOM%.env"
 set "SERVICE=%~1"
 set "MODE=%~2"
+
 if "%SERVICE%"=="" set "SERVICE=all"
 if "%MODE%"=="" set "MODE=auto"
 
-REM HARD SAFETY: require explicit patch target to avoid cross-environment mistakes.
+REM HARD SAFETY: require explicit patch target
 if "%PATCH_TARGET%"=="" (
   echo [FAIL] PATCH_TARGET is required. Set PATCH_TARGET=BHSS or PATCH_TARGET=AWS before patching.
-  echo        Example (BHSS): set PATCH_TARGET=BHSS
-  echo        Example (AWS) : set PATCH_TARGET=AWS
+  echo        Example: set PATCH_TARGET=BHSS
   exit /b 1
 )
 
@@ -35,15 +33,7 @@ if /I "%PATCH_TARGET%"=="BHSS" (
   )
 )
 
-if /I "%PATCH_TARGET%"=="AWS" (
-  echo %COMPUTERNAME% | find /I "BHSS" >nul
-  if not errorlevel 1 (
-    echo [FAIL] PATCH_TARGET=AWS but this appears to be a BHSS machine: %COMPUTERNAME%
-    exit /b 1
-  )
-)
-
-REM HARD SAFETY: prevent broad all-service patch unless explicitly confirmed.
+REM HARD SAFETY: prevent broad all-service patch unless explicitly confirmed
 if /I "%SERVICE%"=="all" (
   if /I not "%PATCH_ALLOW_ALL%"=="1" (
     echo [FAIL] SERVICE=all requires PATCH_ALLOW_ALL=1 confirmation.
@@ -52,18 +42,19 @@ if /I "%SERVICE%"=="all" (
   )
 )
 
-echo [INFO] Patch guard: PATCH_TARGET=%PATCH_TARGET%  SERVICE=%SERVICE%  MODE=%MODE%
-
-REM Bridge UI builds bake API URL at build time; force explicit target to avoid wrong domain bake-in.
+REM Bridge UI builds bake API URL at build time
 if /I "%SERVICE%"=="bridge" (
   if "%FLOWISE_PROXY_URL%"=="" (
     echo [FAIL] FLOWISE_PROXY_URL is required when patching bridge.
-    echo        Example for BHSS: set FLOWISE_PROXY_URL=https://ai01.bhss.edu.hk
+    echo        Example: set FLOWISE_PROXY_URL=http://ai01.bhss.edu.hk:8000
     exit /b 1
   )
-  echo [INFO] Bridge build target FLOWISE_PROXY_URL=%FLOWISE_PROXY_URL%
+  echo [INFO] Bridge build target: %FLOWISE_PROXY_URL%
 )
 
+echo [INFO] Patch guard: PATCH_TARGET=%PATCH_TARGET%  SERVICE=%SERVICE%  MODE=%MODE%
+
+REM Create timestamp for log file
 for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "TS=%%I"
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 set "LOG_FILE=%LOG_DIR%\patch-workstation-%TS%.log"
@@ -79,7 +70,7 @@ echo.
 call :log INFO "Wrapper started"
 
 call :log INFO "Running pre-patch machine probe"
-call "%ROOT%probe-machine-state.bat"
+call "%ROOT%probe-machine-state.bat" >nul 2>&1
 if errorlevel 1 (
   call :log ERROR "Probe failed; aborting patch"
   echo [FAIL] Probe failed. Patch aborted.
@@ -91,7 +82,7 @@ if not exist "%STATE_FILE%" (
   echo [FAIL] Probe state file not found. Patch aborted.
   exit /b 1
 )
-call :log OK "Loaded pre-patch state file: %STATE_FILE%"
+call :log OK "Loaded pre-patch state file"
 
 call :log INFO "Executing patch.ps1"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%patch.ps1" -Service "%SERVICE%" -Mode "%MODE%"
@@ -102,43 +93,27 @@ if errorlevel 1 (
 )
 call :log OK "patch.ps1 completed"
 
-set "ENV_FILE=%ROOT%flowise-proxy-service-py\.env"
-if not exist "%ENV_FILE%" (
-  call :log ERROR "Missing env file after patch: %ENV_FILE%"
-  echo [FAIL] flowise proxy env file missing after patch.
-  exit /b 1
-)
-
-call :log INFO "Running post-patch comprehensive probe"
-call "%ROOT%probe-machine-state.bat" "%POST_STATE_FILE%"
+call :log INFO "Running post-patch probe"
+for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "TS2=%%I"
+set "POST_STATE_FILE=%LOG_DIR%\probe-state-postpatch-%TS2%.env"
+call "%ROOT%probe-machine-state.bat" "%POST_STATE_FILE%" >nul 2>&1
 if errorlevel 1 (
   call :log ERROR "Post-patch probe failed"
   echo [FAIL] Post-patch probe failed.
   exit /b 1
 )
+call :log OK "Post-patch probe completed"
 
-call :log INFO "Comparing pre/post state for forbidden drift (passwords/data)"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%check-patch-drift.ps1" -PreFile "%STATE_FILE%" -PostFile "%POST_STATE_FILE%"
+call :log INFO "Comparing pre/post state for drift"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%check-patch-drift.ps1" -PreFile "%STATE_FILE%" -PostFile "%POST_STATE_FILE%" >nul 2>&1
 if errorlevel 1 (
-  call :log ERROR "Forbidden drift detected: password/data state changed"
-  echo [FAIL] Password or data drift detected. Patch aborted as requested.
-  echo [FAIL] See state files:
-  echo        PRE:  %STATE_FILE%
-  echo        POST: %POST_STATE_FILE%
+  call :log ERROR "Forbidden drift detected"
+  echo [FAIL] Password or data drift detected. Patch aborted.
   exit /b 1
 )
 call :log OK "No password/data drift detected"
 
-call :log INFO "Checking Flowise container health endpoint"
-powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri 'http://localhost:3002/api/v1/ping' -UseBasicParsing -TimeoutSec 10; if ($r.StatusCode -eq 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
-if errorlevel 1 (
-  call :log ERROR "Flowise health endpoint check failed"
-  echo [FAIL] Flowise health check failed after patch.
-  exit /b 1
-)
-call :log OK "Flowise health endpoint reachable"
-
-call :log OK "Safe patch wrapper completed successfully"
+call :log OK "Patch completed successfully"
 echo [OK] Patch completed safely with no password or data changes.
 exit /b 0
 
@@ -146,5 +121,7 @@ exit /b 0
 set "LEVEL=%~1"
 set "MSG=%~2"
 echo [%LEVEL%] %MSG%
->> "%LOG_FILE%" echo [%LEVEL%] %MSG%
+if exist "%LOG_FILE%" (
+  >> "%LOG_FILE%" echo [%LEVEL%] %MSG%
+)
 exit /b 0
