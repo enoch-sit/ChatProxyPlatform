@@ -158,8 +158,60 @@ for %%S in (auth-service accounting-service flowise flowise-proxy-service-py) do
 )
 echo.
 
-REM ── Run the comprehensive probe ───────────────────────────────
-echo [INFO] Running comprehensive workstation probe...
+REM ── Run the comprehensive diagnostic (NEW) ──────────────────
+echo [INFO] Running comprehensive BHSS diagnostic...
+echo ============================================================
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\diagnose-bhss-state.ps1"
+set "DIAG_EXIT=%ERRORLEVEL%"
+
+echo ============================================================
+if "%DIAG_EXIT%"=="0" (
+  echo [OK] Diagnostic completed. Review output above.
+) else (
+  echo [WARN] Diagnostic had issues. Review output above.
+)
+echo.
+
+REM ── Offer to auto-start services if needed ──────────────────
+echo [HEALTH CHECK]
+docker ps --format "{{.Names}}" | findstr /i "flowise-proxy" >nul 2>&1
+if errorlevel 1 (
+  echo [WARN] flowise-proxy not running. Starting services...
+  if exist "%ROOT%\flowise-proxy-service-py\docker-compose.yml" (
+    cd /d "%ROOT%\flowise-proxy-service-py"
+    docker-compose up -d
+    if errorlevel 1 (
+      echo [FAIL] Could not start flowise-proxy
+    ) else (
+      echo [OK] flowise-proxy started. Waiting 5 seconds for health check...
+      timeout /t 5 /nobreak
+    )
+  )
+) else (
+  echo [OK] flowise-proxy is running
+)
+
+docker ps --format "{{.Names}}" | findstr /i "auth-service" >nul 2>&1
+if errorlevel 1 (
+  echo [WARN] auth-service not running. Starting...
+  if exist "%ROOT%\auth-service\docker-compose.dev.yml" (
+    cd /d "%ROOT%\auth-service"
+    docker-compose -f docker-compose.dev.yml up -d
+    if errorlevel 1 (
+      echo [FAIL] Could not start auth-service
+    ) else (
+      echo [OK] auth-service started. Waiting 5 seconds for health check...
+      timeout /t 5 /nobreak
+    )
+  )
+) else (
+  echo [OK] auth-service is running
+)
+
+echo.
+
+REM ── Final probe check ───────────────────────────────────────
+echo [INFO] Running final machine state probe...
 echo ============================================================
 call "%ROOT%\probe-machine-state.bat"
 set "PROBE_EXIT=%ERRORLEVEL%"
@@ -167,6 +219,11 @@ set "PROBE_EXIT=%ERRORLEVEL%"
 echo ============================================================
 if "%PROBE_EXIT%"=="0" (
   echo [OK] Git fix + probe completed successfully. Safe to patch.
+  echo.
+  echo [NEXT STEP] Run bridge target probe to find flowise-proxy endpoint:
+  echo.
+  echo   powershell -ExecutionPolicy Bypass -File .\probe-bridge-target.ps1 -PreferredHost "ai01.bhss.edu.hk" -ProxyPort 8000
+  echo.
 ) else (
   echo [FAIL] Probe reported errors. Patch must be aborted.
 )
