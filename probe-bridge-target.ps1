@@ -77,9 +77,9 @@ Write-Host ""
 # Test each candidate with both HTTP and HTTPS
 $results = @()
 
-foreach ($host in $candidates) {
+foreach ($candidate in $candidates) {
     foreach ($scheme in @("http", "https")) {
-        $url = "${scheme}://${host}:${ProxyPort}/health"
+        $url = "${scheme}://${candidate}:${ProxyPort}/health"
         
         try {
             $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 6 -ErrorAction Stop
@@ -88,7 +88,7 @@ foreach ($host in $candidates) {
                 $results += @{
                     Url = $url
                     Scheme = $scheme
-                    Host = $host
+                    Host = $candidate
                     Port = $ProxyPort
                     Status = $response.StatusCode
                     Working = $true
