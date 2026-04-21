@@ -54,10 +54,10 @@ jobs:
           CHANGED=$(git diff --name-only HEAD~1 HEAD)
           SERVICES='[]'
           
-          echo "$CHANGED" | grep -q '^auth-service/' && SERVICES=$(echo "$SERVICES" | jq '. + ["auth-service"]')
-          echo "$CHANGED" | grep -q '^accounting-service/' && SERVICES=$(echo "$SERVICES" | jq '. + ["accounting-service"]')
-          echo "$CHANGED" | grep -q '^flowise-proxy-service-py/' && SERVICES=$(echo "$SERVICES" | jq '. + ["flowise-proxy"]')
-          echo "$CHANGED" | grep -q '^bridge/' && SERVICES=$(echo "$SERVICES" | jq '. + ["bridge"]')
+          echo "$CHANGED" | grep -q '^auth-service/' && SERVICES=$(echo "$SERVICES" | jq -c '. + ["auth-service"]')
+          echo "$CHANGED" | grep -q '^accounting-service/' && SERVICES=$(echo "$SERVICES" | jq -c '. + ["accounting-service"]')
+          echo "$CHANGED" | grep -q '^flowise-proxy-service-py/' && SERVICES=$(echo "$SERVICES" | jq -c '. + ["flowise-proxy"]')
+          echo "$CHANGED" | grep -q '^bridge/' && SERVICES=$(echo "$SERVICES" | jq -c '. + ["bridge"]')
           
           echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
           echo "Deploying: $SERVICES"
