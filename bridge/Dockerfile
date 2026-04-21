@@ -5,7 +5,7 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Accept build-time env vars for Vite (baked into the static bundle)
-ARG VITE_FLOWISE_PROXY_API_URL=https://aidcec-ai-agent.com
+ARG VITE_FLOWISE_PROXY_API_URL=http://host.docker.internal:8000
 ENV VITE_FLOWISE_PROXY_API_URL=$VITE_FLOWISE_PROXY_API_URL
 
 # Copy package files

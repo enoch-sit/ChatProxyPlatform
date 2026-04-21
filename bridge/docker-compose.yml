@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_FLOWISE_PROXY_API_URL: ${FLOWISE_PROXY_URL:-http://host.docker.internal:8000}
     container_name: bridge-ui
     ports:
       - "3082:3082"
