@@ -6,7 +6,8 @@ REM Exit code: 0 = probe passed, 1 = abort.
 REM Usage: probe_and_fix.bat
 
 set "ROOT=%~dp0"
-set "LOG_DIR=%ROOT%logs"
+if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
+set "LOG_DIR=%ROOT%\logs"
 
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 
@@ -77,7 +78,7 @@ echo.
 REM ── Step 7: Run the comprehensive probe ──────────────────────
 echo [INFO] Running workstation probe...
 echo ============================================================
-call "%ROOT%probe-machine-state.bat"
+call "%ROOT%\probe-machine-state.bat"
 set "PROBE_EXIT=%ERRORLEVEL%"
 
 echo ============================================================
