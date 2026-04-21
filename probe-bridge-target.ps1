@@ -139,7 +139,7 @@ if ($PreferredHost) {
     $recommended = $good | Where-Object { $_.Url -like "*$preferredLiteral" } | Select-Object -First 1
 }
 if (-not $recommended) {
-    $recommended = $good | Where-Object { $_.Url -notmatch '//localhost:' } | Select-Object -First 1
+    $recommended = $good | Where-Object { $_.Url -notmatch "//localhost:" } | Select-Object -First 1
 }
 if (-not $recommended) {
     $recommended = $good | Select-Object -First 1
