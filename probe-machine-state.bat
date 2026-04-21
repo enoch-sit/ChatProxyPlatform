@@ -152,10 +152,14 @@ set "E_PROXY_HTTP=0"
 set "E_AUTH_HTTP=0"
 set "E_ACCOUNTING_HTTP=0"
 
-for /f %%A in ('powershell -NoProfile -Command "try { (Invoke-WebRequest -Uri 'http://localhost:3002/api/v1/ping' -UseBasicParsing -TimeoutSec 5).StatusCode } catch { 0 }"') do set "E_FLOWISE_HTTP=%%A"
-for /f %%A in ('powershell -NoProfile -Command "try { (Invoke-WebRequest -Uri 'http://localhost:8000/health' -UseBasicParsing -TimeoutSec 5).StatusCode } catch { 0 }"') do set "E_PROXY_HTTP=%%A"
-for /f %%A in ('powershell -NoProfile -Command "try { (Invoke-WebRequest -Uri 'http://localhost:3000/health' -UseBasicParsing -TimeoutSec 5).StatusCode } catch { 0 }"') do set "E_AUTH_HTTP=%%A"
-for /f %%A in ('powershell -NoProfile -Command "try { (Invoke-WebRequest -Uri 'http://localhost:3001/health' -UseBasicParsing -TimeoutSec 5).StatusCode } catch { 0 }"') do set "E_ACCOUNTING_HTTP=%%A"
+REM Single PowerShell spawn checks all 4 endpoints in parallel (saves ~1.5s vs 4 serial spawns)
+set "EP_TMP=%TEMP%\probe_ep_%RANDOM%.txt"
+del "%EP_TMP%" 2>nul
+powershell -NoProfile -Command "$t=%EP_TMP%; $eps=@( @{k='E_FLOWISE_HTTP';u='http://localhost:3002/api/v1/ping'}, @{k='E_PROXY_HTTP';u='http://localhost:8000/health'}, @{k='E_AUTH_HTTP';u='http://localhost:3000/health'}, @{k='E_ACCOUNTING_HTTP';u='http://localhost:3001/health'} ); $jobs=$eps | ForEach-Object { $ep=$_; Start-Job -ScriptBlock { param($u) try{(Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 5).StatusCode}catch{0} } -ArgumentList $ep.u | Add-Member -NotePropertyName key -NotePropertyValue $ep.k -PassThru }; $results=$jobs | ForEach-Object { $r=Receive-Job $_ -Wait; Remove-Job $_; '{0}={1}' -f $_.key,$r }; $results | Set-Content $t"
+if exist "%EP_TMP%" (
+  for /f "usebackq tokens=1,* delims==" %%K in ("%EP_TMP%") do set "%%K=%%L"
+  del "%EP_TMP%" 2>nul
+)
 
 if not "%E_FLOWISE_HTTP%"=="200" (
   call :log ERROR "Flowise endpoint unhealthy (HTTP %E_FLOWISE_HTTP%)"
@@ -176,26 +180,23 @@ set "FP_PROXY_MONGO_PASSWORD_SHA256="
 set "FP_PROXY_JWT_ACCESS_SECRET_SHA256="
 set "FP_PROXY_JWT_REFRESH_SECRET_SHA256="
 set "FP_FLOWISE_SECRETKEY_OVERWRITE_SHA256="
-
 set "FP_AUTH_MONGO_INITDB_ROOT_PASSWORD_SHA256="
 set "FP_AUTH_JWT_ACCESS_SECRET_SHA256="
 set "FP_AUTH_JWT_REFRESH_SECRET_SHA256="
-
 set "FP_ACCOUNTING_DB_PASSWORD_SHA256="
 set "FP_ACCOUNTING_POSTGRES_PASSWORD_SHA256="
 
-call :hash_env_value "%ROOT%\flowise-proxy-service-py\.env" "FLOWISE_API_KEY" FP_FLOWISE_API_KEY_SHA256
-call :hash_env_value "%ROOT%\flowise-proxy-service-py\.env" "MONGO_PASSWORD" FP_PROXY_MONGO_PASSWORD_SHA256
-call :hash_env_value "%ROOT%\flowise-proxy-service-py\.env" "JWT_ACCESS_SECRET" FP_PROXY_JWT_ACCESS_SECRET_SHA256
-call :hash_env_value "%ROOT%\flowise-proxy-service-py\.env" "JWT_REFRESH_SECRET" FP_PROXY_JWT_REFRESH_SECRET_SHA256
-call :hash_env_value "%ROOT%\flowise\.env" "FLOWISE_SECRETKEY_OVERWRITE" FP_FLOWISE_SECRETKEY_OVERWRITE_SHA256
+REM Single PowerShell spawn reads all 10 secrets at once (saves ~4s vs 10 serial spawns)
+set "FP_TMP=%TEMP%\probe_fp_%RANDOM%.txt"
+del "%FP_TMP%" 2>nul
+powershell -NoProfile -Command "$r='%ROOT%'; $t='%FP_TMP%'; function gh($p,$k){ if(Test-Path $p){ $l=Get-Content $p | Where-Object{$_ -match ('^'+[regex]::Escape($k)+'=')} | Select-Object -First 1; if($l){ $v=$l.Substring($l.IndexOf('=')+1); $s=[System.Security.Cryptography.SHA256]::Create(); $b=[System.Text.Encoding]::UTF8.GetBytes($v); return ($s.ComputeHash($b)|ForEach-Object{$_.ToString('x2')}) -join '' } }; return '' }; @( 'FP_FLOWISE_API_KEY_SHA256='+(gh \"$r\flowise-proxy-service-py\.env\" 'FLOWISE_API_KEY'), 'FP_PROXY_MONGO_PASSWORD_SHA256='+(gh \"$r\flowise-proxy-service-py\.env\" 'MONGO_PASSWORD'), 'FP_PROXY_JWT_ACCESS_SECRET_SHA256='+(gh \"$r\flowise-proxy-service-py\.env\" 'JWT_ACCESS_SECRET'), 'FP_PROXY_JWT_REFRESH_SECRET_SHA256='+(gh \"$r\flowise-proxy-service-py\.env\" 'JWT_REFRESH_SECRET'), 'FP_FLOWISE_SECRETKEY_OVERWRITE_SHA256='+(gh \"$r\flowise\.env\" 'FLOWISE_SECRETKEY_OVERWRITE'), 'FP_AUTH_MONGO_INITDB_ROOT_PASSWORD_SHA256='+(gh \"$r\auth-service\.env\" 'MONGO_INITDB_ROOT_PASSWORD'), 'FP_AUTH_JWT_ACCESS_SECRET_SHA256='+(gh \"$r\auth-service\.env\" 'JWT_ACCESS_SECRET'), 'FP_AUTH_JWT_REFRESH_SECRET_SHA256='+(gh \"$r\auth-service\.env\" 'JWT_REFRESH_SECRET'), 'FP_ACCOUNTING_DB_PASSWORD_SHA256='+(gh \"$r\accounting-service\.env\" 'DB_PASSWORD'), 'FP_ACCOUNTING_POSTGRES_PASSWORD_SHA256='+(gh \"$r\accounting-service\.env\" 'POSTGRES_PASSWORD') ) | Set-Content $t"
 
-call :hash_env_value "%ROOT%\auth-service\.env" "MONGO_INITDB_ROOT_PASSWORD" FP_AUTH_MONGO_INITDB_ROOT_PASSWORD_SHA256
-call :hash_env_value "%ROOT%\auth-service\.env" "JWT_ACCESS_SECRET" FP_AUTH_JWT_ACCESS_SECRET_SHA256
-call :hash_env_value "%ROOT%\auth-service\.env" "JWT_REFRESH_SECRET" FP_AUTH_JWT_REFRESH_SECRET_SHA256
-
-call :hash_env_value "%ROOT%\accounting-service\.env" "DB_PASSWORD" FP_ACCOUNTING_DB_PASSWORD_SHA256
-call :hash_env_value "%ROOT%\accounting-service\.env" "POSTGRES_PASSWORD" FP_ACCOUNTING_POSTGRES_PASSWORD_SHA256
+if not exist "%FP_TMP%" (
+  call :log ERROR "Secret fingerprint collection failed - temp file not written"
+  exit /b 1
+)
+for /f "usebackq tokens=1,* delims==" %%K in ("%FP_TMP%") do set "%%K=%%L"
+del "%FP_TMP%" 2>nul
 
 if not defined FP_FLOWISE_API_KEY_SHA256 (
   call :log ERROR "FLOWISE_API_KEY fingerprint missing"
@@ -289,6 +290,10 @@ call :log INFO "Writing comprehensive state file"
   echo DATA_PROXY_OBJECTS_COUNT=%DATA_PROXY_OBJECTS_COUNT%
   echo DATA_FLOWISE_PG_EST_ROWS=%DATA_FLOWISE_PG_EST_ROWS%
   echo DATA_ACCOUNTING_PG_EST_ROWS=%DATA_ACCOUNTING_PG_EST_ROWS%
+
+  echo IMPACT_ENV_FILES_IN_DIFF=%IMPACT_ENV_FILES_IN_DIFF%
+  echo IMPACT_SERVICES_AFFECTED=%IMPACT_SERVICES_AFFECTED%
+  echo IMPACT_MAX_CHANGE_TYPE=%IMPACT_MAX_CHANGE_TYPE%
 )
 if errorlevel 1 (
   call :log ERROR "Failed to write state file"

@@ -70,6 +70,26 @@ if "%PENDING_COUNT%"=="0" (
 )
 echo.
 
+REM ── [PATCH IMPACT ANALYSIS] ─────────────────────────────────
+set "IMPACT_ENV_FILES_IN_DIFF=N/A"
+set "IMPACT_SERVICES_AFFECTED=N/A"
+set "IMPACT_MAX_CHANGE_TYPE=N/A"
+
+if "%PENDING_COUNT%"=="0" goto :impact_done
+
+echo [PATCH IMPACT ANALYSIS]  %PENDING_COUNT% commits incoming
+set "IA_TMP=%TEMP%\probe_impact_%RANDOM%.txt"
+del "%IA_TMP%" 2>nul
+
+powershell -NoProfile -Command "$root=$env:ROOT; $tmp=$env:IA_TMP; $changed=@(git -C $root diff --name-only HEAD..origin/main 2>$null); $buckets=@{}; foreach ($svc in @('auth-service','accounting-service','flowise-proxy-service-py','flowise','bridge','root')) { $buckets[$svc]=@{f=0;mx=''} }; $ord=@{'IMAGE REBUILD'=3;'SOURCE -- rebuild likely'=2;'CONFIG/SCRIPTS'=1;''=0}; function gimpact { param([string]$x); if ($x -match 'Dockerfile|requirements\.txt|package\.json|package-lock\.json') { return 'IMAGE REBUILD' }; if ($x -match '\.ts$|\.tsx$|\.py$|\.js$') { return 'SOURCE -- rebuild likely' }; 'CONFIG/SCRIPTS' }; $envHit='NONE'; $aff=@(); foreach ($f in $changed) { if ($f -match '\.env') { $envHit=$f }; $bk='root'; foreach ($s in @('auth-service','accounting-service','flowise-proxy-service-py','flowise','bridge')) { if ($f -like ($s+'/*')) { $bk=$s; break } }; $imp=gimpact $f; $buckets[$bk].f++; if ($ord[$imp] -gt $ord[$buckets[$bk].mx]) { $buckets[$bk].mx=$imp } }; Write-Host ('  {0,-30} {1,-5} {2}' -f 'Service','Files','Max Impact'); Write-Host ('  '+('-'*60)); $omx=''; foreach ($s in @('auth-service','accounting-service','flowise-proxy-service-py','flowise','bridge','root')) { $b=$buckets[$s]; if ($b.f -gt 0) { $aff+=$s; Write-Host ('  {0,-30} {1,-5} {2}' -f $s,$b.f,$b.mx); if ($ord[$b.mx] -gt $ord[$omx]) { $omx=$b.mx } } }; if ($envHit -ne 'NONE') { Write-Host ('  [WARN] .env file in diff: '+$envHit+' -- VERIFY intentional!') -ForegroundColor Yellow } else { Write-Host ('  {0,-30} {1}' -f '.env files in diff:','NONE (safe)') }; $affStr=if ($aff.Count -gt 0) { $aff -join ',' } else { 'none' }; @('IMPACT_ENV_FILES_IN_DIFF='+$envHit,'IMPACT_SERVICES_AFFECTED='+$affStr,'IMPACT_MAX_CHANGE_TYPE='+$omx) | Set-Content $tmp"
+
+if not exist "%IA_TMP%" goto :impact_done
+for /f "usebackq tokens=1,* delims==" %%K in ("%IA_TMP%") do set "%%K=%%L"
+del "%IA_TMP%" 2>nul
+
+:impact_done
+echo.
+
 REM ── Step 3: Switch to main ───────────────────────────────────
 echo [INFO] Switching to main branch...
 for /f "usebackq delims=" %%B in (`git -C "%ROOT%" rev-parse --abbrev-ref HEAD 2^>nul`) do set "CURRENT_BRANCH=%%B"
@@ -150,5 +170,4 @@ if "%PROBE_EXIT%"=="0" (
 ) else (
   echo [FAIL] Probe reported errors. Patch must be aborted.
 )
-exit /b %PROBE_EXIT%
 exit /b %PROBE_EXIT%
