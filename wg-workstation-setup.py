@@ -57,8 +57,9 @@ def run(cmd, input_text=None, check=True, capture=True):
         shell=isinstance(cmd, str),
     )
     if check and r.returncode != 0:
-        fail(f"Command failed ({r.returncode}): {' '.join(cmd) if isinstance(cmd, list) else cmd}\n{r.stderr}")
-    return r.stdout.strip(), r.returncode
+        stderr = r.stderr.strip() if r.stderr else ""
+        fail(f"Command failed ({r.returncode}): {' '.join(cmd) if isinstance(cmd, list) else cmd}\n{stderr}")
+    return (r.stdout.strip() if r.stdout is not None else ""), r.returncode
 
 # ── Constants ─────────────────────────────────────────────────────────
 
