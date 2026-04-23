@@ -157,6 +157,72 @@ def generate_keys():
     return priv_key, pub_key
 
 # ═══════════════════════════════════════════════════════════════════
+# STEP 2b: IP conflict check
+# ═══════════════════════════════════════════════════════════════════
+
+def check_ip_conflict(my_ip_cidr: str):
+    """
+    Three-layer conflict check for the VPN IP before writing any config:
+      1. Subnet route conflict — does this machine already route 10.10.0.0/24
+         via a non-WireGuard adapter? (another VPN, corporate network, etc.)
+      2. Local interface collision — does this machine already own the exact
+         IP we're about to assign on any adapter?
+      3. Live host ping — is anything on the network already responding at
+         that IP? (another misconfigured peer, leftover static assignment)
+    Aborts on FAIL; prints a warning and continues on soft conflicts.
+    """
+    step("Step 2b: IP conflict check")
+
+    # Strip CIDR notation to get bare IP
+    bare_ip = my_ip_cidr.split("/")[0].strip()
+    # Derive the /24 subnet prefix for route-print queries (e.g. "10.10.0")
+    octets = bare_ip.rsplit(".", 1)
+    subnet_prefix = octets[0]  # e.g. "10.10.0"
+
+    # ── Check 1: existing routes for the subnet ──────────────────────
+    out, _ = run(["route", "print", f"{subnet_prefix}.*"], check=False)
+    if subnet_prefix in out:
+        conflict_lines = [l.strip() for l in out.splitlines()
+                          if subnet_prefix in l and l.strip()]
+        # Ignore the loopback 127.x lines route print always emits
+        conflict_lines = [l for l in conflict_lines if not l.startswith("127.")]
+        if conflict_lines:
+            warn(f"Existing route(s) for {subnet_prefix}.x found on this machine:")
+            for cl in conflict_lines:
+                print(f"      {YELLOW}{cl}{RESET}")
+            warn("This could mean another VPN or network already uses this subnet.")
+            warn("WireGuard will add its own route — overlapping routes may cause")
+            warn("routing ambiguity. Proceed only if you understand the conflict.")
+            answer = input("  Continue anyway? [y/N] ").strip().lower()
+            if answer != "y":
+                fail("Aborted by user due to subnet route conflict.")
+        else:
+            ok(f"No existing {subnet_prefix}.0/24 routes")
+    else:
+        ok(f"No existing {subnet_prefix}.0/24 routes")
+
+    # ── Check 2: local interface already owns this IP ─────────────────
+    ipconfig_out, _ = run(["ipconfig", "/all"], check=False)
+    if bare_ip in ipconfig_out:
+        fail(
+            f"This machine already has {bare_ip} assigned to a local interface.\n"
+            f"  Cannot assign the same IP to WireGuard — it would be a duplicate."
+        )
+    ok(f"No local interface owns {bare_ip}")
+
+    # ── Check 3: ping the target IP (pre-tunnel) ──────────────────────
+    # -n 2 pings, -w 800ms each — fast enough not to slow the script much
+    _, rc = run(["ping", "-n", "2", "-w", "800", bare_ip], check=False)
+    if rc == 0:
+        fail(
+            f"Something at {bare_ip} is already responding to ping!\n"
+            f"  Another host may already be using this VPN IP.\n"
+            f"  Check fleet-inventory.json and choose a different IP."
+        )
+    ok(f"{bare_ip} is not responding to ping -- IP appears available")
+
+
+# ═══════════════════════════════════════════════════════════════════
 # STEP 3: Write tunnel config
 # ═══════════════════════════════════════════════════════════════════
 
@@ -321,6 +387,7 @@ def main():
 
     check_admin()
     ensure_wireguard()
+    check_ip_conflict(args.my_ip)
     priv_key, pub_key = generate_keys()
     conf_path = write_tunnel_config(
         priv_key, args.hub_public_key, args.hub_endpoint,
