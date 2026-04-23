@@ -1,0 +1,9 @@
+[
+  {
+    "name": "BHSS-AI-SERVER0",
+    "host": "ai01.bhss.edu.hk",
+    "sshUser": "admin",
+    "sshPort": 22,
+    "notes": "BHSS school AI server. VPN IP pre-assigned 10.10.0.3 (see wg-fleet.conf)."
+  }
+]
