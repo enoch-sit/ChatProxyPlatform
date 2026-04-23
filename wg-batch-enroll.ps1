@@ -231,6 +231,56 @@ foreach ($c in $Candidates) {
     }
     Write-OK "SSH reachable"
 
+    # ── Run pre-enrollment probe on remote machine ────────────────
+    Write-Info "Running pre-enrollment probe on $name ..."
+    $probeCmd = @"
+`$probeScript = '$RepoPath\wg-pre-enroll-probe.ps1'
+if (Test-Path `$probeScript) {
+    & `$probeScript -HubEndpoint '$HubEndpoint' -ExpectedVpnIp '$vpnIp' -Json 2>&1
+} else {
+    Write-Output '{"overall":"SKIP","summary":{"fail":0,"warn":0},"message":"probe script not found"}'
+}
+"@
+
+    $probe = Invoke-InitialSSH -Host $host -User $user -Port $port -RemoteCommand $probeCmd
+    $probeJson = $null
+    try {
+        # Extract JSON block from output (may have noise before/after)
+        $jsonLine = $probe.Output -split "`n" | Where-Object { $_ -match '^\s*\{' } | Select-Object -First 1
+        if ($jsonLine) { $probeJson = $jsonLine | ConvertFrom-Json }
+    } catch { }
+
+    if ($probeJson) {
+        $po = $probeJson.overall
+        $pf = $probeJson.summary.fail
+        $pw = $probeJson.summary.warn
+        if ($po -eq 'FAIL') {
+            Write-Fail "Pre-enrollment probe FAILED ($pf blocker(s)) on $name -- skipping"
+            if ($probeJson.checks) {
+                $probeJson.checks | Where-Object { $_.Status -eq 'FAIL' } | ForEach-Object {
+                    Write-Host "    [BLOCKER] $($_.Category): $($_.Check) -- $($_.Detail)" -ForegroundColor Red
+                }
+            }
+            continue
+        } elseif ($po -eq 'WARN') {
+            Write-Warn "Pre-enrollment probe: $pw warning(s) on $name -- proceeding with caution"
+            if ($probeJson.checks) {
+                $probeJson.checks | Where-Object { $_.Status -eq 'WARN' } | ForEach-Object {
+                    Write-Host "    [WARN] $($_.Category): $($_.Check) -- $($_.Detail)" -ForegroundColor Yellow
+                }
+            }
+        } elseif ($po -eq 'PASS') {
+            Write-OK "Pre-enrollment probe PASS on $name"
+        } else {
+            Write-Info "Probe result: $po (skipped or not found) -- continuing"
+        }
+    } else {
+        Write-Warn "Could not parse probe output -- continuing anyway"
+        if ($probe.Output) {
+            $probe.Output -split "`n" | Select-Object -Last 5 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+        }
+    }
+
     # Run wg-workstation-setup.ps1 on remote machine
     Write-Info "Running WireGuard setup on $name ..."
     $setupCmd = @"
