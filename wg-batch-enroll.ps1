@@ -164,7 +164,7 @@ function Invoke-InitialSSH {
         '-i', $SshKey
         '-p', $Port
         "$User@$Host"
-        "powershell -NoProfile -EncodedCommand $encoded"
+        "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded"
     )
 
     $output  = & ssh @sshArgs 2>&1
