@@ -247,6 +247,17 @@ def write_tunnel_config(priv_key, hub_public_key, hub_endpoint, my_ip, tunnel_na
     )
 
     conf_path.write_text(config)
+
+    # WireGuard Manager (MGR) needs SYSTEM + Administrators full control to
+    # DPAPI-encrypt the file. Without this it logs "Unable to ingest and encrypt"
+    # every few seconds.
+    run([
+        "icacls", str(conf_path),
+        "/inheritance:r",
+        "/grant", "*S-1-5-18:(F)",       # SYSTEM
+        "/grant", "*S-1-5-32-544:(F)",   # Administrators
+    ], check=False)
+
     ok(f"Config written to {conf_path}")
     return conf_path
 
