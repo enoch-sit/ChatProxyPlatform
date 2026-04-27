@@ -81,6 +81,11 @@ $protectedContentMarkers = @(
     'PreferredHost "ai01.bhss.edu.hk"'
 )
 
+$contentProtectionExclusions = @(
+    'docs/BHSS_BRANCH_SYNC_RUNBOOK.md',
+    'sync-bhss-from-localdeploy.ps1'
+)
+
 function Write-Log {
     param(
         [string]$Message,
@@ -151,6 +156,18 @@ function Get-GitFileContent {
     return ($result.Output | Out-String)
 }
 
+function Test-ExcludedFromContentProtection {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [Parameter(Mandatory)]
+        [string[]]$ExcludedPaths
+    )
+
+    $normalizedPath = $Path -replace '\\', '/'
+    return $ExcludedPaths -contains $normalizedPath
+}
+
 function Test-ContentMarkerMatch {
     param(
         [Parameter(Mandatory)]
@@ -160,8 +177,14 @@ function Test-ContentMarkerMatch {
         [Parameter(Mandatory)]
         [string]$TargetRevision,
         [Parameter(Mandatory)]
-        [string[]]$Markers
+        [string[]]$Markers,
+        [Parameter(Mandatory)]
+        [string[]]$ExcludedPaths
     )
+
+    if (Test-ExcludedFromContentProtection -Path $Path -ExcludedPaths $ExcludedPaths) {
+        return $false
+    }
 
     $sourceContent = Get-GitFileContent -Revision $SourceRevision -Path $Path
     $targetContent = Get-GitFileContent -Revision $TargetRevision -Path $Path
@@ -197,7 +220,7 @@ function Get-ChangedFiles {
         $status = $parts[0].Trim()
         $path = $parts[$parts.Count - 1].Trim()
         $protectedByPattern = Test-PatternMatch -Path $path -Patterns $protectedPatterns
-        $protectedByContent = Test-ContentMarkerMatch -Path $path -SourceRevision $SourceRevision -TargetRevision $TargetRevision -Markers $protectedContentMarkers
+        $protectedByContent = Test-ContentMarkerMatch -Path $path -SourceRevision $SourceRevision -TargetRevision $TargetRevision -Markers $protectedContentMarkers -ExcludedPaths $contentProtectionExclusions
         $files += [PSCustomObject]@{
             Status = $status
             Path = $path
