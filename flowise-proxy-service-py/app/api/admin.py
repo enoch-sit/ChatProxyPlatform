@@ -7,6 +7,7 @@ from app.services.flowise_service import FlowiseService
 from app.core.logging import logger
 from app.config import settings
 from app.database import get_database
+from app.models.file_upload import FileUpload as FileUploadModel
 from pydantic import BaseModel
 import httpx
 import traceback
@@ -15,7 +16,7 @@ from datetime import datetime
 # Import all request/response schemas from the new central location
 from app.schemas import (
     ChatflowSyncResult, ChatflowStats, ChatflowResponse, UserAssignmentResponse,
-    BulkUserAssignmentResponse, ChatflowUserResponse, AddUsersByEmailRequest,
+    BulkUserAssignmentResponse, ChatflowUserResponse, AddUsersByEmailRequest, AddUsersByIdentifierRequest,
     UserAuditResult, UserCleanupRequest, UserCleanupResult, SyncUserByEmailRequest,
     SyncUserResponse, AddUserToChatflowRequest
 )
@@ -396,16 +397,16 @@ async def sync_user_from_external_by_email(
 @router.post("/chatflows/{flowise_id}/users/bulk-add", response_model=BulkUserAssignmentResponse)
 async def bulk_add_users_to_chatflow(
     flowise_id: str,
-    request: AddUsersByEmailRequest,
+    request: AddUsersByIdentifierRequest,
     current_user: Dict = Depends(require_elevated_role),
     chatflow_service: ChatflowService = Depends(get_chatflow_service)
 ):
     """
-    Bulk add users to a chatflow by email (Admin only).
+    Bulk add users to a chatflow by username or email (Admin only).
     """
     try:
-        return await chatflow_service.add_users_to_chatflow_by_email(
-            emails=request.emails,
+        return await chatflow_service.add_users_to_chatflow_by_identifier(
+            identifiers=request.resolved_identifiers(),
             flowise_id=flowise_id,
             admin_user=current_user
         )
@@ -413,6 +414,29 @@ async def bulk_add_users_to_chatflow(
         raise
     except Exception as e:
         logger.error(f"Error in bulk add users to chatflow {flowise_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post("/chatflows/{flowise_id}/users/bulk-remove", response_model=BulkUserAssignmentResponse)
+async def bulk_remove_users_from_chatflow(
+    flowise_id: str,
+    request: AddUsersByIdentifierRequest,
+    current_user: Dict = Depends(require_elevated_role),
+    chatflow_service: ChatflowService = Depends(get_chatflow_service)
+):
+    """
+    Bulk remove users from a chatflow by username or email.
+    """
+    try:
+        return await chatflow_service.remove_users_from_chatflow_by_identifier(
+            identifiers=request.resolved_identifiers(),
+            flowise_id=flowise_id,
+            admin_user=current_user
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk remove users from chatflow {flowise_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
@@ -483,6 +507,17 @@ class AllocateCreditsRequest(BaseModel):
     userId: str
     credits: int
     expiryDays: Optional[int] = None
+
+
+class AllocateCreditsBatchItem(BaseModel):
+    userId: str
+    credits: int
+    expiryDays: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class AllocateCreditsBatchRequest(BaseModel):
+    allocations: List[AllocateCreditsBatchItem]
 
 
 class SetCreditsRequest(BaseModel):
@@ -589,6 +624,14 @@ async def admin_list_all_credits(
     return await _proxy("GET", f"{ACCOUNTING_URL}/api/credits/allocations/all", _admin_headers(current_user))
 
 
+@router.get("/credits/current-balances")
+async def admin_list_current_credit_balances(
+    current_user: Dict = Depends(require_elevated_role)
+):
+    """List current non-expired credit totals by user (proxy → accounting-service GET /api/credits/current-balances)."""
+    return await _proxy("GET", f"{ACCOUNTING_URL}/api/credits/current-balances", _admin_headers(current_user))
+
+
 @router.get("/credits/balance/{user_id}")
 async def admin_get_user_credit_balance(
     user_id: str,
@@ -608,6 +651,16 @@ async def admin_allocate_credits(
     # provided. Sending null would override the TypeScript default (30 days) in the
     # accounting-service, causing credits to expire immediately.
     return await _proxy("POST", f"{ACCOUNTING_URL}/api/credits/allocate", _admin_headers(current_user), request.dict(exclude_none=True))
+
+
+@router.post("/credits/allocate-batch")
+async def admin_allocate_credits_batch(
+    request: AllocateCreditsBatchRequest,
+    current_user: Dict = Depends(require_elevated_role)
+):
+    """Batch-allocate credits (proxy → accounting-service POST /api/credits/allocate-batch)."""
+    payload = {"allocations": [item.dict(exclude_none=True) for item in request.allocations]}
+    return await _proxy("POST", f"{ACCOUNTING_URL}/api/credits/allocate-batch", _admin_headers(current_user), payload)
 
 
 @router.post("/credits/set")
@@ -751,4 +804,76 @@ async def admin_get_user_sessions(
     except Exception as e:
         logger.error(f"Failed to get sessions for user {user_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get sessions: {str(e)}")
+
+
+@router.get("/chat/users/{user_id}/sessions/{session_id}/history")
+async def admin_get_user_session_history(
+    user_id: str,
+    session_id: str,
+    current_user: Dict = Depends(require_elevated_role)
+):
+    """
+    Get ordered chat history for a specific user's session for elevated roles.
+    """
+    from app.models.chat_message import ChatMessage
+    from app.models.chat_session import ChatSession
+
+    try:
+        session = await ChatSession.find_one(
+            ChatSession.session_id == session_id,
+            ChatSession.user_id == user_id,
+        )
+        if not session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+
+        messages = (
+            await ChatMessage.find(ChatMessage.session_id == session_id)
+            .sort(ChatMessage.created_at)
+            .to_list()
+        )
+
+        history_list = []
+        for msg in messages:
+            message_data = {
+                "id": str(msg.id),
+                "role": msg.role,
+                "content": msg.content,
+                "created_at": msg.created_at,
+                "session_id": session_id,
+                "file_ids": msg.file_ids,
+                "has_files": msg.has_files,
+                "uploads": [],
+            }
+
+            if msg.has_files and msg.file_ids:
+                try:
+                    file_records = await FileUploadModel.find(
+                        {"file_id": {"$in": msg.file_ids}, "user_id": user_id}
+                    ).to_list()
+
+                    for file_record in file_records:
+                        message_data["uploads"].append({
+                            "file_id": file_record.file_id,
+                            "name": file_record.original_name,
+                            "mime": file_record.mime_type,
+                            "size": file_record.file_size,
+                            "uploaded_at": file_record.created_at,
+                            "is_image": file_record.mime_type.startswith("image/") if file_record.mime_type else False,
+                        })
+                except Exception as file_error:
+                    logger.warning(
+                        "Failed to load file metadata for admin history %s/%s: %s",
+                        user_id,
+                        session_id,
+                        file_error,
+                    )
+
+            history_list.append(message_data)
+
+        return {"history": history_list, "count": len(history_list)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get session history for user {user_id}, session {session_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get session history: {str(e)}")
 

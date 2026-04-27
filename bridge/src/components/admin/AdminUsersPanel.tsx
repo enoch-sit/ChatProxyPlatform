@@ -7,7 +7,7 @@ import {
 } from '@mui/joy';
 import { useAdminStore } from '../../store/adminStore';
 import { useAuth } from '../../hooks/useAuth';
-import { resetUserPassword } from '../../api/admin';
+import { resetUserPassword, allocateCreditsBatch } from '../../api/admin';
 import type { AdminUser } from '../../types/admin';
 
 const ROLE_OPTIONS = ['user', 'enduser', 'teacher', 'supervisor', 'admin'];
@@ -17,6 +17,29 @@ function roleColor(role: string): 'danger' | 'warning' | 'success' | 'primary' |
   if (role === 'supervisor') return 'warning';
   if (role === 'teacher') return 'primary';
   return 'neutral';
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  const candidate = error as {
+    response?: { data?: { detail?: unknown; message?: unknown } };
+    message?: unknown;
+  };
+
+  const detail = candidate?.response?.data?.detail;
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail;
+  }
+
+  const message = candidate?.response?.data?.message;
+  if (typeof message === 'string' && message.trim()) {
+    return message;
+  }
+
+  if (typeof candidate?.message === 'string' && candidate.message.trim()) {
+    return candidate.message;
+  }
+
+  return fallback;
 }
 
 const AdminUsersPanel: React.FC = () => {
@@ -32,7 +55,6 @@ const AdminUsersPanel: React.FC = () => {
     deleteUser,
     updateUserRole,
     updateUsersRolesBatch,
-    allocateCredits,
     clearError,
   } = useAdminStore();
 
@@ -49,6 +71,12 @@ const AdminUsersPanel: React.FC = () => {
   const [batchDefaultCredits, setBatchDefaultCredits] = useState('0');
   const [batchSkipVerification, setBatchSkipVerification] = useState(true);
   const [batchError, setBatchError] = useState<string | null>(null);
+  // simple = username+password only (default); advanced = email+username+password
+  const [batchMode, setBatchMode] = useState<'simple' | 'advanced'>('simple');
+  const [batchCreateRole, setBatchCreateRole] = useState('enduser');
+  const [batchResults, setBatchResults] = useState<Array<{ username: string; email: string; success: boolean; message: string; userId?: string }> | null>(null);
+  const [creditResultMap, setCreditResultMap] = useState<Record<string, { success: boolean; message: string }>>({});
+  const [creditErrors, setCreditErrors] = useState<string | null>(null);
 
   // Batch role update state
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -91,38 +119,98 @@ const AdminUsersPanel: React.FC = () => {
     } catch { /* error shown via store */ }
   };
 
+  const parseBatchLines = (raw: string): Array<{ username: string; email?: string; password: string; role: string }> => {
+    const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (batchMode === 'simple') {
+      // Format: username password
+      return lines.map((line) => {
+        const parts = line.split(/\s+/);
+        const username = parts[0];
+        const password = parts[1] || batchDefaultPassword;
+        return { username, password, role: batchCreateRole };
+      });
+    } else {
+      // Advanced format: email username password
+      return lines.map((line) => {
+        const parts = line.split(/[\s,]+/);
+        const email = parts[0];
+        const username = parts[1] || email.split('@')[0];
+        const password = parts[2] || batchDefaultPassword;
+        return { email, username, password, role: batchCreateRole };
+      });
+    }
+  };
+
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      if (!text) return;
+      const rows = text.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
+      // Strip header row if present
+      const firstRow = rows[0]?.toLowerCase() ?? '';
+      const isHeader = firstRow.startsWith('username') || firstRow.startsWith('email');
+      const dataRows = isHeader ? rows.slice(1) : rows;
+      // Convert CSV columns to space-separated lines for the textarea
+      const lines = dataRows.map((row) => row.split(',').map((c) => c.trim()).join(' '));
+      setBatchLines(lines.join('\n'));
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be re-uploaded
+    e.target.value = '';
+  };
+
   const handleBatch = async () => {
+    clearError();
     setBatchError(null);
-    if (!batchDefaultPassword || batchDefaultPassword.length < 8) {
-      setBatchError('Default password must be at least 8 characters.');
+    setBatchResults(null);
+    const usersPayload = parseBatchLines(batchLines);
+    if (usersPayload.length === 0) {
+      setBatchError('Enter at least one user.');
       return;
     }
-    const lines = batchLines.split('\n').map((l) => l.trim()).filter(Boolean);
-    if (lines.length === 0) {
-      setBatchError('Enter at least one email.');
+    const needsFallbackPassword = usersPayload.some((u) => !u.password || u.password.length < 8);
+    if (needsFallbackPassword && (!batchDefaultPassword || batchDefaultPassword.length < 8)) {
+      setBatchError('Default password must be at least 8 characters (used when a row has no password).');
       return;
     }
-    const usersPayload = lines.map((line) => {
-      const parts = line.split(/[\s,]+/);
-      const email = parts[0];
-      const username = parts[1] || email.split('@')[0];
-      const password = parts[2] || batchDefaultPassword;
-      return { email, username, password, role: 'enduser' };
-    });
     try {
       const result = await createUsersBatch({ users: usersPayload, skipVerification: batchSkipVerification });
       const defaultCredits = parseInt(batchDefaultCredits, 10);
+      setCreditResultMap({});
+      setCreditErrors(null);
       if (defaultCredits > 0 && result?.results) {
-        for (const r of (result.results as Array<{ success: boolean; userId?: string }>) ) {
-          if (r.success && r.userId) {
-            await allocateCredits({ userId: r.userId, credits: defaultCredits }).catch(() => {});
+        const successfulUsers = (result.results as Array<{ success: boolean; userId?: string }>)
+          .filter((r) => r.success && r.userId)
+          .map((r) => ({ userId: r.userId!, credits: defaultCredits }));
+        if (successfulUsers.length > 0) {
+          try {
+            const creditResult = await allocateCreditsBatch({ allocations: successfulUsers });
+            const map: Record<string, { success: boolean; message: string }> = {};
+            for (const cr of creditResult.results) {
+              map[cr.userId] = { success: cr.success, message: cr.message };
+            }
+            setCreditResultMap(map);
+            if (creditResult.summary.failed > 0) {
+              setCreditErrors(`${creditResult.summary.failed} of ${creditResult.summary.total} credit allocation(s) failed — see Credits column below.`);
+            }
+          } catch {
+            setCreditErrors('Credit allocation failed — users were created but credits may not have been assigned.');
           }
         }
       }
-      setShowBatch(false);
+      if (result?.results) {
+        setBatchResults(result.results as Array<{ username: string; email: string; success: boolean; message: string; userId?: string }>);
+      }
       setBatchLines('');
-      flash(`Batch complete: ${usersPayload.length} users processed`);
-    } catch { /* error shown via store */ }
+      const successful = (result?.results as Array<{ success: boolean }>)?.filter((r) => r.success).length ?? usersPayload.length;
+      flash(`Batch complete: ${successful} of ${usersPayload.length} users created`);
+      await fetchUsers();
+    } catch (err: unknown) {
+      setBatchError(getErrorMessage(err, 'Batch user creation failed.'));
+    }
   };
 
   const handleVerify = async (u: AdminUser) => {
@@ -339,35 +427,141 @@ const AdminUsersPanel: React.FC = () => {
       </Modal>
 
       {/* Batch Create Modal */}
-      <Modal open={showBatch} onClose={() => { setShowBatch(false); setBatchError(null); }}>
-        <ModalDialog sx={{ minWidth: 500 }}>
+      <Modal open={showBatch} onClose={() => { setShowBatch(false); clearError(); setBatchError(null); setBatchResults(null); setBatchLines(''); setCreditResultMap({}); setCreditErrors(null); }}>
+        <ModalDialog sx={{ minWidth: 540, maxHeight: '90vh', overflowY: 'auto' }}>
           <ModalClose />
-          <Typography level="h4">Batch Create Students</Typography>
-          <Typography level="body-sm" sx={{ mb: 1 }}>
-            One entry per line. Formats accepted:
+          <Typography level="h4">Batch Create Users</Typography>
+
+          {/* Mode toggle */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Chip
+              size="sm"
+              variant={batchMode === 'simple' ? 'solid' : 'outlined'}
+              color="primary"
+              onClick={() => setBatchMode('simple')}
+              sx={{ cursor: 'pointer' }}
+            >
+              Simple (username + password)
+            </Chip>
+            <Chip
+              size="sm"
+              variant={batchMode === 'advanced' ? 'solid' : 'outlined'}
+              color="neutral"
+              onClick={() => setBatchMode('advanced')}
+              sx={{ cursor: 'pointer' }}
+            >
+              Advanced (with email)
+            </Chip>
+          </Box>
+
+          <Typography level="body-xs" sx={{ mb: 1, color: 'text.tertiary' }}>
+            {batchMode === 'simple'
+              ? 'One per line: username password  (password optional if default is set)'
+              : 'One per line: email username password'}
           </Typography>
-          <Typography level="body-xs" sx={{ mb: 1.5, color: 'text.tertiary' }}>
-            <code>email</code> &nbsp;|&nbsp; <code>email username</code> &nbsp;|&nbsp; <code>email username password</code>
-          </Typography>
+
           {batchError && <Alert color="danger" sx={{ mb: 1 }}>{batchError}</Alert>}
+          {!batchError && error && <Alert color="danger" sx={{ mb: 1 }}>{error}</Alert>}
+          {creditErrors && <Alert color="warning" sx={{ mb: 1 }}>{creditErrors}</Alert>}
+
+          {/* Result summary table */}
+          {batchResults && (
+            <Box sx={{ mb: 1.5, maxHeight: 180, overflowY: 'auto' }}>
+              <Sheet variant="outlined" sx={{ borderRadius: 'sm' }}>
+                <Table size="sm">
+                  <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Status</th>
+                      <th>Credits</th>
+                      <th>Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batchResults.map((r, i) => {
+                      const creditStatus = r.userId ? creditResultMap[r.userId] : undefined;
+                      const showCredits = parseInt(batchDefaultCredits, 10) > 0;
+                      return (
+                        <tr key={i}>
+                          <td>{r.username}</td>
+                          <td>{r.email}</td>
+                          <td>
+                            <Chip size="sm" color={r.success ? 'success' : 'danger'}>
+                              {r.success ? 'OK' : 'Failed'}
+                            </Chip>
+                          </td>
+                          <td>
+                            {!showCredits || !r.success ? (
+                              <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
+                            ) : creditStatus ? (
+                              <Chip size="sm" color={creditStatus.success ? 'success' : 'danger'}>
+                                {creditStatus.success ? 'OK' : 'Failed'}
+                              </Chip>
+                            ) : (
+                              <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
+                            )}
+                          </td>
+                          <td><Typography level="body-xs">{r.message}</Typography></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              </Sheet>
+            </Box>
+          )}
+
           <Textarea
             minRows={5}
-            placeholder={'alice@school.edu\nbob@school.edu bob_student\ncarol@school.edu carol Pass@word1'}
+            placeholder={batchMode === 'simple'
+              ? 'alice Password1!\nbob Password2!\ncarol'
+              : 'alice@school.edu alice Password1!\nbob@school.edu bob_student'}
             value={batchLines}
             onChange={(e) => setBatchLines(e.target.value)}
           />
+
+          {/* CSV upload */}
+          <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Button
+              size="sm"
+              variant="outlined"
+              color="neutral"
+              component="label"
+            >
+              Upload CSV
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                title="Upload a CSV file with user data"
+                aria-label="Upload CSV file"
+                className="visually-hidden-file-input"
+                onChange={handleCsvUpload}
+              />
+            </Button>
+            <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+              {batchMode === 'simple' ? 'CSV columns: username,password[,role]' : 'CSV columns: email,username,password[,role]'}
+            </Typography>
+          </Box>
+
           <Stack direction="row" spacing={2} sx={{ mt: 1.5 }}>
             <FormControl sx={{ flex: 1 }}>
               <FormLabel>Default Password (min 8 chars)</FormLabel>
               <Input
                 type="password"
-                placeholder="Used when not specified per-row"
+                placeholder="Fallback when row has no password"
                 value={batchDefaultPassword}
                 onChange={(e) => setBatchDefaultPassword(e.target.value)}
               />
             </FormControl>
-            <FormControl sx={{ width: 120 }}>
-              <FormLabel>Default Credits</FormLabel>
+            <FormControl sx={{ width: 130 }}>
+              <FormLabel>Default Role</FormLabel>
+              <Select value={batchCreateRole} onChange={(_, v) => setBatchCreateRole(v as string)}>
+                {ROLE_OPTIONS.filter((r) => r !== 'admin').map((r) => <Option key={r} value={r}>{r}</Option>)}
+              </Select>
+            </FormControl>
+            <FormControl sx={{ width: 100 }}>
+              <FormLabel>Credits</FormLabel>
               <Input
                 type="number"
                 slotProps={{ input: { min: 0 } }}
@@ -376,6 +570,7 @@ const AdminUsersPanel: React.FC = () => {
               />
             </FormControl>
           </Stack>
+
           <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
             <Checkbox
               checked={batchSkipVerification}
@@ -383,9 +578,21 @@ const AdminUsersPanel: React.FC = () => {
             />
             <Typography level="body-sm">Skip email verification for all</Typography>
           </Box>
-          <Button sx={{ mt: 2 }} onClick={handleBatch} loading={isLoading} disabled={!batchLines.trim() || !batchDefaultPassword}>
-            Create Students
-          </Button>
+
+          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+            <Button
+              onClick={handleBatch}
+              loading={isLoading}
+              disabled={!batchLines.trim()}
+            >
+              Create Users
+            </Button>
+            {batchResults && (
+              <Button variant="outlined" color="neutral" onClick={() => { setShowBatch(false); setBatchResults(null); setBatchLines(''); setCreditResultMap({}); setCreditErrors(null); }}>
+                Done
+              </Button>
+            )}
+          </Stack>
         </ModalDialog>
       </Modal>
 

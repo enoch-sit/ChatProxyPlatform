@@ -544,6 +544,28 @@ adminRouter.get('/users/by-email/:email', authenticate, requireAdminOrTeacher, a
   }
 });
 
+// Get user by username (admin or teacher)
+adminRouter.get('/users/by-username/:username', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
+  try {
+    const { username } = req.params;
+
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+
+    const user = await User.findOne({ username }).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({ user });
+  } catch (error) {
+    logger.error('Error fetching user by username:', error);
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
 
 // Create a new user (admin or teacher)
 adminRouter.post('/users', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
@@ -600,13 +622,18 @@ adminRouter.post('/users/batch', authenticate, requireAdminOrTeacher, async (req
       return res.status(400).json({ error: 'A non-empty array of users is required' });
     }
     
-    // Validate each user has required fields
+    // Validate each user has required fields; auto-generate email when absent
     for (const user of users) {
-      if (!user.username || !user.email) {
+      if (!user.username) {
         return res.status(400).json({ 
-          error: 'Each user must have a username and email',
+          error: 'Each user must have a username',
           invalidUser: user
         });
+      }
+
+      // Auto-generate a placeholder email when none is provided
+      if (!user.email) {
+        user.email = `${user.username.toLowerCase()}@internal.local`;
       }
 
       if (user.password && typeof user.password === 'string' && user.password.length < 8) {

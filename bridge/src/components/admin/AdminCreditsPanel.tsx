@@ -14,6 +14,7 @@ const AdminCreditsPanel: React.FC = () => {
   const { user: currentUser } = useAuth();
   const {
     creditAllocations,
+    currentCreditBalances,
     isLoading,
     error,
     fetchAllCredits,
@@ -138,6 +139,39 @@ const AdminCreditsPanel: React.FC = () => {
           </Stack>
         </Sheet>
       )}
+
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Typography level="title-md">Current Non-Expired Credit By User</Typography>
+      </Box>
+
+      <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', mb: 3 }}>
+        <Table stickyHeader>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Current Credit</th>
+              <th>Active Allocations</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr><td colSpan={3} align="center"><CircularProgress size="sm" /></td></tr>
+            ) : currentCreditBalances.length === 0 ? (
+              <tr><td colSpan={3}>No active credit balances found.</td></tr>
+            ) : currentCreditBalances.map((balance) => (
+              <tr key={balance.userId}>
+                <td>{balance.username ? `${balance.username}${balance.email ? ` (${balance.email})` : ''}` : balance.userId}</td>
+                <td>
+                  <Chip size="sm" color={balance.currentCredits > 0 ? 'success' : 'neutral'}>
+                    {balance.currentCredits.toLocaleString()}
+                  </Chip>
+                </td>
+                <td>{balance.activeAllocationCount}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </Sheet>
 
       {/* All Allocations Table */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>

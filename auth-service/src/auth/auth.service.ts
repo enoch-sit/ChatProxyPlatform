@@ -33,6 +33,64 @@ export interface TokenRefreshResult {
   message: string;
 }
 
+function formatAdminCreateUserError(error: unknown): string {
+  if (
+    error instanceof Error &&
+    /validation failed|minimum allowed length|required|is shorter than the minimum/i.test(error.message)
+  ) {
+    return error.message;
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    error.name === 'ValidationError' &&
+    'errors' in error &&
+    typeof error.errors === 'object' &&
+    error.errors !== null
+  ) {
+    const messages = Object.values(error.errors)
+      .map((validationError) => {
+        if (
+          typeof validationError === 'object' &&
+          validationError !== null &&
+          'message' in validationError &&
+          typeof validationError.message === 'string'
+        ) {
+          return validationError.message;
+        }
+
+        return null;
+      })
+      .filter((message): message is string => Boolean(message));
+
+    if (messages.length > 0) {
+      return messages.join(', ');
+    }
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 11000 &&
+    'keyPattern' in error &&
+    typeof error.keyPattern === 'object' &&
+    error.keyPattern !== null
+  ) {
+    if ('username' in error.keyPattern) {
+      return 'Username already exists';
+    }
+
+    if ('email' in error.keyPattern) {
+      return 'Email already exists';
+    }
+  }
+
+  return 'User creation failed';
+}
+
 /**
  * AuthService class handles user authentication and related operations.
  * It provides methods for user registration, email verification, login, token refresh, and logout.
@@ -437,7 +495,7 @@ export class AuthService {
     } catch (error) {
       // Log any errors that occur during the admin user creation process
       logger.error('Admin create user error:', error);
-      return { success: false, message: 'User creation failed' };
+      return { success: false, message: formatAdminCreateUserError(error) };
     }
   }
 

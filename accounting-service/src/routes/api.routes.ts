@@ -195,6 +195,21 @@ router.get('/credits/balance/:userId', requireSupervisor, CreditController.getUs
 router.post('/credits/allocate', requireSupervisor, CreditController.allocateCredits);
 
 /**
+ * Batch-allocate credits to multiple users (admin and supervisors only)
+ * POST /api/credits/allocate-batch
+ *
+ * Authentication: JWT required
+ * Authorization: Admin or Supervisor role required
+ *
+ * Request body:
+ *   { allocations: Array<{ userId: string, credits: number, expiryDays?: number, notes?: string }> }
+ *
+ * Response:
+ *   200 OK: { results: Array<{ userId, success, message }>, summary: { total, successful, failed } }
+ */
+router.post('/credits/allocate-batch', requireSupervisor, CreditController.allocateBatchCredits);
+
+/**
  * Allocate credits to a user by email (Supervisor/Admin only)
  * POST /api/credits/allocate-by-email
  *
@@ -317,6 +332,12 @@ router.put('/credits/adjust', requireSupervisor, CreditController.adjustCredits)
  *   500 Server Error: If retrieval fails
  */
 router.get('/credits/allocations/all', requireSupervisor, CreditController.getAllAllocations);
+
+/**
+ * Get current non-expired credit totals for all users (admin and supervisors only)
+ * GET /api/credits/current-balances
+ */
+router.get('/credits/current-balances', requireSupervisor, CreditController.getAllCurrentBalances);
 
 // ===== STREAMING SESSION ENDPOINTS =====
 

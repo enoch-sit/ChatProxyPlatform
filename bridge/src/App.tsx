@@ -14,6 +14,7 @@ import AdminPage from './pages/AdminPage';
 import DashboardPage from './pages/DashboardPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Layout from './components/layout/Layout';
+import { APP_ENTRY_PATH } from './api/config';
 import './i18n';
 
 /** Wires the imperative navigation singleton so the Zustand store can redirect. */
@@ -92,13 +93,16 @@ function App() {
             } 
           />
           
-          <Route path="/" element={<Navigate to={isAuthenticated && hasAccessToken ? '/chat' : '/login'} replace />} />
+          <Route
+            path={APP_ENTRY_PATH}
+            element={isAuthenticated && hasAccessToken ? <Navigate to="/chat" replace /> : <LoginPage />}
+          />
           
           <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout key="dashboard-layout">
                   <DashboardPage />
                 </Layout>
               </ProtectedRoute>
@@ -109,7 +113,7 @@ function App() {
             path="/chat"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout key="chat-layout">
                   <ChatPage />
                 </Layout>
               </ProtectedRoute>
@@ -120,7 +124,7 @@ function App() {
             path="/admin"
             element={
               <ProtectedRoute requiredRole={['admin', 'supervisor', 'teacher']}>
-                <Layout>
+                <Layout key="admin-layout">
                   <AdminPage />
                 </Layout>
               </ProtectedRoute>

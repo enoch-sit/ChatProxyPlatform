@@ -22,10 +22,80 @@ from app.schemas import (
 )
 
 class ChatflowService:
+    BATCH_REMOVAL_PROTECTED_ROLES = {"admin", "supervisor", "teacher"}
+
     def __init__(self, db: AsyncIOMotorDatabase, flowise_service: FlowiseService, external_auth_service: ExternalAuthService):
         self.db = db
         self.flowise_service = flowise_service
         self.external_auth_service = external_auth_service
+
+    def _identifier_type(self, identifier: str) -> str:
+        return "email" if "@" in identifier else "username"
+
+    async def _get_local_user_by_identifier(self, identifier: str) -> Optional[User]:
+        if self._identifier_type(identifier) == "email":
+            return await User.find_one(User.email == identifier)
+        return await User.find_one(User.username == identifier)
+
+    def _is_admin_user(self, user: User) -> bool:
+        return (user.role or "").lower() == "admin"
+
+    def _is_batch_removal_protected(self, user: User) -> bool:
+        return (user.role or "").lower() in self.BATCH_REMOVAL_PROTECTED_ROLES
+
+    async def _get_external_user_data_by_identifier(self, identifier: str, admin_token: str) -> Dict[str, Any]:
+        lookup_type = self._identifier_type(identifier)
+        external_user_data = (
+            await self.external_auth_service.get_user_by_email(identifier, admin_token)
+            if lookup_type == "email"
+            else await self.external_auth_service.get_user_by_username(identifier, admin_token)
+        )
+
+        if not external_user_data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User with {lookup_type} '{identifier}' not found in external system.",
+            )
+
+        return external_user_data
+
+    async def _sync_external_user_data(self, external_user_data: Dict[str, Any], identifier: str) -> SyncUserResponse:
+        external_id = external_user_data.get('user_id')
+        if not external_id:
+            raise HTTPException(status_code=400, detail="External user data is missing user_id.")
+
+        local_user = await User.find_one(User.external_id == external_id)
+
+        if not local_user:
+            if not external_user_data.get('username') or not external_user_data.get('email'):
+                raise HTTPException(status_code=400, detail="External user data is missing required fields for new user creation (username, email).")
+
+            local_user = User(
+                external_id=external_id,
+                username=external_user_data['username'],
+                email=external_user_data['email'],
+                role=external_user_data.get('role', 'user'),
+                is_active=external_user_data.get('is_verified', True)
+            )
+        else:
+            local_user.username = external_user_data.get('username', local_user.username)
+            local_user.email = external_user_data.get('email', local_user.email)
+            local_user.role = external_user_data.get('role', local_user.role)
+            local_user.is_active = external_user_data.get('is_verified', local_user.is_active)
+            local_user.updated_at = datetime.utcnow()
+
+        await local_user.save()
+
+        logger.info(f"Successfully synced user '{identifier}' (External ID: {external_id}) to local database.")
+        return SyncUserResponse(
+            status="success",
+            message="User synchronized successfully.",
+            user_details=local_user.model_dump(mode='json')
+        )
+
+    async def sync_user_by_identifier(self, identifier: str, admin_token: str) -> SyncUserResponse:
+        external_user_data = await self._get_external_user_data_by_identifier(identifier, admin_token)
+        return await self._sync_external_user_data(external_user_data, identifier)
 
     async def sync_chatflows_from_flowise(self) -> ChatflowSyncResult:
         """
@@ -232,6 +302,10 @@ class ChatflowService:
 
     async def add_users_to_chatflow_by_email(self, emails: List[str], flowise_id: str, admin_user: Dict) -> BulkUserAssignmentResponse:
         """Assigns multiple users to a chatflow by their email addresses."""
+        return await self.add_users_to_chatflow_by_identifier(emails, flowise_id, admin_user)
+
+    async def add_users_to_chatflow_by_identifier(self, identifiers: List[str], flowise_id: str, admin_user: Dict) -> BulkUserAssignmentResponse:
+        """Assigns multiple users to a chatflow using usernames or emails."""
         successful_assignments = []
         failed_assignments = []
         admin_token = admin_user.get("access_token")
@@ -240,10 +314,10 @@ class ChatflowService:
         if not chatflow:
             raise HTTPException(status_code=404, detail=f"Chatflow with ID '{flowise_id}' not found.")
 
-        for email in emails:
+        for identifier in identifiers:
             try:
-                # 1. Sync user to ensure they exist locally and get their external_id
-                sync_response = await self.sync_user_by_email(email, admin_token)
+                external_user_data = await self._get_external_user_data_by_identifier(identifier, admin_token)
+                sync_response = await self._sync_external_user_data(external_user_data, identifier)
                 if sync_response.status != "success":
                     raise HTTPException(status_code=404, detail=sync_response.message)
                 
@@ -277,11 +351,17 @@ class ChatflowService:
                     status = "Assigned"
                     message = "User successfully assigned to the chatflow."
 
-                successful_assignments.append(UserAssignmentResponse(email=email, status=status, message=message))
+                successful_assignments.append(UserAssignmentResponse(
+                    identifier=identifier,
+                    email=external_user_data.get('email'),
+                    username=external_user_data.get('username'),
+                    status=status,
+                    message=message,
+                ))
 
             except Exception as e:
-                logger.error(f"Failed to assign user '{email}' to chatflow '{flowise_id}': {e}")
-                failed_assignments.append(UserAssignmentResponse(email=email, status="Failed", message=str(e)))
+                logger.error(f"Failed to assign user '{identifier}' to chatflow '{flowise_id}': {e}")
+                failed_assignments.append(UserAssignmentResponse(identifier=identifier, status="Failed", message=str(e)))
         
         return BulkUserAssignmentResponse(
             successful_assignments=successful_assignments,
@@ -306,11 +386,72 @@ class ChatflowService:
                     ChatflowUserResponse(
                         username=user.username,
                         email=user.email,
+                        role=user.role,
                         external_user_id=user.external_id,
                         assigned_at=assignment.assigned_at  # Fixed attribute
                     )
                 )
         return response
+
+    async def remove_users_from_chatflow_by_identifier(self, identifiers: List[str], flowise_id: str, admin_user: Dict) -> BulkUserAssignmentResponse:
+        chatflow = await self.get_chatflow_by_flowise_id(flowise_id)
+        if not chatflow:
+            raise HTTPException(status_code=404, detail=f"Chatflow with ID '{flowise_id}' not found.")
+
+        successful_assignments = []
+        failed_assignments = []
+
+        for identifier in identifiers:
+            try:
+                user = await self._get_local_user_by_identifier(identifier)
+                if not user or not user.external_id:
+                    raise HTTPException(status_code=404, detail=f"User '{identifier}' not found or has no external ID.")
+
+                if self._is_batch_removal_protected(user):
+                    status = "Blocked"
+                    message = f"Users with role '{user.role}' cannot be batch removed from chatflows."
+                    failed_assignments.append(UserAssignmentResponse(
+                        identifier=identifier,
+                        email=user.email,
+                        username=user.username,
+                        status=status,
+                        message=message,
+                    ))
+                    continue
+
+                assignment = await UserChatflow.find_one(
+                    UserChatflow.external_user_id == user.external_id,
+                    UserChatflow.chatflow_id == str(chatflow.id)
+                )
+
+                if not assignment or not assignment.is_active:
+                    raise HTTPException(status_code=404, detail="Active assignment for this user and chatflow not found.")
+
+                assignment.is_active = False
+                assignment.assigned_at = datetime.utcnow()
+                await assignment.save()
+
+                logger.info(
+                    f"Admin '{admin_user.get('email')}' batch-deactivated access for user '{identifier}' from chatflow '{flowise_id}'"
+                )
+                successful_assignments.append(UserAssignmentResponse(
+                    identifier=identifier,
+                    email=user.email,
+                    username=user.username,
+                    status="Deactivated",
+                    message="User access has been successfully revoked.",
+                ))
+
+            except HTTPException as exc:
+                failed_assignments.append(UserAssignmentResponse(identifier=identifier, status="Failed", message=exc.detail))
+            except Exception as e:
+                logger.error(f"Failed to batch remove user '{identifier}' from chatflow '{flowise_id}': {e}")
+                failed_assignments.append(UserAssignmentResponse(identifier=identifier, status="Failed", message=str(e)))
+
+        return BulkUserAssignmentResponse(
+            successful_assignments=successful_assignments,
+            failed_assignments=failed_assignments
+        )
 
     async def remove_user_from_chatflow_by_email(self, email: str, flowise_id: str, admin_user: Dict) -> UserAssignmentResponse:
         chatflow = await self.get_chatflow_by_flowise_id(flowise_id)
@@ -320,6 +461,9 @@ class ChatflowService:
         user = await User.find_one(User.email == email)
         if not user or not user.external_id:
             raise HTTPException(status_code=404, detail=f"User with email '{email}' not found or has no external ID.")
+
+        if self._is_admin_user(user):
+            raise HTTPException(status_code=403, detail="Admin users cannot be removed from chatflows.")
 
         assignment = await UserChatflow.find_one(
             UserChatflow.external_user_id == user.external_id,
@@ -334,48 +478,11 @@ class ChatflowService:
         await assignment.save()
 
         logger.info(f"Admin '{admin_user.get('email')}' deactivated access for user '{email}' from chatflow '{flowise_id}'")
-        return UserAssignmentResponse(email=email, status="Deactivated", message="User access has been successfully revoked.")
+        return UserAssignmentResponse(identifier=email, email=email, username=user.username, status="Deactivated", message="User access has been successfully revoked.")
 
     async def sync_user_by_email(self, email: str, admin_token: str) -> SyncUserResponse:
         try:
-            external_user_data = await self.external_auth_service.get_user_by_email(email, admin_token)
-            if not external_user_data:
-                raise HTTPException(status_code=404, detail=f"User with email '{email}' not found in external system.")
-
-            external_id = external_user_data.get('user_id')
-            if not external_id:
-                raise HTTPException(status_code=400, detail="External user data is missing user_id.")
-
-            local_user = await User.find_one(User.external_id == external_id)
-
-            if not local_user:
-                # For creation, ensure required fields are present
-                if not external_user_data.get('username') or not external_user_data.get('email'):
-                    raise HTTPException(status_code=400, detail="External user data is missing required fields for new user creation (username, email).")
-                
-                local_user = User(
-                    external_id=external_id,
-                    username=external_user_data['username'],
-                    email=external_user_data['email'],
-                    role=external_user_data.get('role', 'user'),
-                    is_active=external_user_data.get('is_verified', True)
-                )
-            else:
-                # For update, only change if data is provided
-                local_user.username = external_user_data.get('username', local_user.username)
-                local_user.email = external_user_data.get('email', local_user.email)
-                local_user.role = external_user_data.get('role', local_user.role)
-                local_user.is_active = external_user_data.get('is_verified', local_user.is_active)
-                local_user.updated_at = datetime.utcnow()
-
-            await local_user.save()
-
-            logger.info(f"Successfully synced user '{email}' (External ID: {external_id}) to local database.")
-            return SyncUserResponse(
-                status="success",
-                message="User synchronized successfully.",
-                user_details=local_user.model_dump(mode='json')
-            )
+            return await self.sync_user_by_identifier(email, admin_token)
         except Exception as e:
             logger.error(f"Failed to sync user '{email}': {e}")
             raise

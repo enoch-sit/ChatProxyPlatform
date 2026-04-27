@@ -1,7 +1,7 @@
 // src/components/layout/Sidebar.tsx
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { NavLink } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import Box from '@mui/joy/Box';
 import List from '@mui/joy/List';
 import ListItem from '@mui/joy/ListItem';
@@ -16,6 +16,15 @@ import { usePermissions } from '../../hooks/usePermissions';
 const Sidebar: React.FC = () => {
   const { t } = useTranslation();
   const { canAccessAdmin } = usePermissions();
+  const location = useLocation();
+
+  const handleNavigate = (to: string) => {
+    if (location.pathname === to) {
+      return;
+    }
+
+    window.location.assign(to);
+  };
 
   const navItems = [
     { 
@@ -61,7 +70,11 @@ const Sidebar: React.FC = () => {
             {navItems.map((item) => (
               item.show && (
                 <ListItem key={item.to}>
-                  <ListItemButton component={NavLink} to={item.to} sx={{ fontWeight: 'md' }}>
+                  <ListItemButton
+                    selected={location.pathname === item.to}
+                    onClick={() => handleNavigate(item.to)}
+                    sx={{ fontWeight: 'md' }}
+                  >
                     <ListItemDecorator>{item.icon}</ListItemDecorator>
                     {item.label}
                   </ListItemButton>
