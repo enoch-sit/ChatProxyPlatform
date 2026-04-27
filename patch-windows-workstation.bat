@@ -9,9 +9,14 @@ set "LOG_DIR=%ROOT%logs"
 set "STATE_FILE=%ROOT%logs\probe-state-latest.env"
 set "SERVICE=%~1"
 set "MODE=%~2"
+set "FORCE_ARG=%~3"
+set "PATCH_FORCE_FLAG="
 
 if "%SERVICE%"=="" set "SERVICE=all"
 if "%MODE%"=="" set "MODE=auto"
+
+if /I "%FORCE_ARG%"=="force" set "PATCH_FORCE_FLAG=-Force"
+if /I "%PATCH_FORCE%"=="1" set "PATCH_FORCE_FLAG=-Force"
 
 REM HARD SAFETY: require explicit patch target
 if "%PATCH_TARGET%"=="" (
@@ -52,7 +57,7 @@ if /I "%SERVICE%"=="bridge" (
   echo [INFO] Bridge build target: %FLOWISE_PROXY_URL%
 )
 
-echo [INFO] Patch guard: PATCH_TARGET=%PATCH_TARGET%  SERVICE=%SERVICE%  MODE=%MODE%
+echo [INFO] Patch guard: PATCH_TARGET=%PATCH_TARGET%  SERVICE=%SERVICE%  MODE=%MODE%  FORCE=%PATCH_FORCE_FLAG%
 
 REM Create timestamp for log file
 for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "TS=%%I"
@@ -64,6 +69,7 @@ echo  Safe Production Patch Wrapper
 echo ============================================================
 echo Service: %SERVICE%
 echo Mode:    %MODE%
+if defined PATCH_FORCE_FLAG echo Force:   enabled
 echo Log:     %LOG_FILE%
 echo.
 
@@ -85,7 +91,7 @@ if not exist "%STATE_FILE%" (
 call :log OK "Loaded pre-patch state file"
 
 call :log INFO "Executing patch.ps1"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%patch.ps1" -Service "%SERVICE%" -Mode "%MODE%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%patch.ps1" -Service "%SERVICE%" -Mode "%MODE%" %PATCH_FORCE_FLAG%
 if errorlevel 1 (
   call :log ERROR "patch.ps1 failed"
   echo [FAIL] patch.ps1 failed.
