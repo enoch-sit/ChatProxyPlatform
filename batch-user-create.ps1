@@ -10,8 +10,12 @@
 .PARAMETER ComputerName
     Target BHSS machine (default: localhost)
     
+.PARAMETER CsvFile
+    Path to CSV file with columns: username,password[,role][,email]
+    When omitted the Python script falls back to its built-in default list.
+    
 .PARAMETER BatchUsers
-    JSON file with user list (optional, uses default if not provided)
+    Legacy: JSON file with user list (deprecated in favour of CsvFile)
     
 .PARAMETER AdminPassword
     Admin user password (from $env or default)
@@ -19,6 +23,7 @@
 
 param(
     [string]$ComputerName = "localhost",
+    [string]$CsvFile = $null,
     [string]$BatchUsers = $null,
     [string]$AdminPassword = $null
 )
@@ -70,6 +75,16 @@ function Run-Batch-Creation {
     
     if ($AdminPassword) {
         $env:ADMIN_PASSWORD = $AdminPassword
+    }
+    
+    if ($CsvFile) {
+        $resolvedCsv = Resolve-Path -Path $CsvFile -ErrorAction SilentlyContinue
+        if (-not $resolvedCsv) {
+            Write-Log "❌ CSV file not found: $CsvFile" "ERROR"
+            return $false
+        }
+        $env:CSV_FILE = $resolvedCsv.Path
+        Write-Log "CSV file: $($env:CSV_FILE)"
     }
     
     Write-Log "Environment: AUTH_SERVICE_URL=$($env:AUTH_SERVICE_URL)"

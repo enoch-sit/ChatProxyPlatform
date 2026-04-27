@@ -27,6 +27,13 @@ const resolveApiBaseUrl = (): string => {
 export const API_BASE_URL = resolveApiBaseUrl();
 
 /**
+ * Canonical app entry path.
+ * Logout and unauthenticated redirects should use this path so any deployment-
+ * specific root detection can run before the login UI is shown.
+ */
+export const APP_ENTRY_PATH = '/';
+
+/**
  * The default timeout for standard API requests, in milliseconds.
  */
 export const API_TIMEOUT = 30000000;

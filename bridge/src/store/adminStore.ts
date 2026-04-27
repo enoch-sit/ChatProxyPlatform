@@ -7,6 +7,7 @@ import {
   getChatflowUsers,
   addUserToChatflow,
   bulkAddUsersToChatflow as bulkAddUsersToChatflowApi,
+  bulkRemoveUsersFromChatflow as bulkRemoveUsersFromChatflowApi,
   removeUserFromChatflow,
   listUsers,
   createUser,
@@ -16,6 +17,7 @@ import {
   updateUserRole,
   updateUsersRolesBatch as updateUsersRolesBatchApi,
   listAllCredits,
+  listCurrentCreditBalances,
   allocateCredits,
   setCredits,
   removeCredits,
@@ -27,6 +29,7 @@ import type { Chatflow, ChatflowUser, ChatflowStats, ChatflowSyncResult } from '
 import type {
   AdminUser,
   CreditAllocation,
+  CurrentCreditBalance,
   AllocateCreditsPayload,
   SetCreditsPayload,
   RemoveCreditsPayload,
@@ -47,6 +50,7 @@ interface AdminState {
   users: AdminUser[];
   // Credits
   creditAllocations: CreditAllocation[];
+  currentCreditBalances: CurrentCreditBalance[];
   // Usage
   systemStats: SystemStats | null;
   // Shared
@@ -62,7 +66,8 @@ interface AdminActions {
   fetchChatflowUsers: (flowiseId: string) => Promise<void>;
   addUserToChatflow: (flowiseId: string, userEmail: string) => Promise<void>;
   removeUserFromChatflow: (flowiseId: string, userEmail: string) => Promise<void>;
-  bulkAddUsersToChatflow: (flowiseId: string, userEmails: string[]) => Promise<{ successful: number; failed: string[] }>;
+  bulkAddUsersToChatflow: (flowiseId: string, identifiers: string[]) => Promise<{ successful: number; failed: string[] }>;
+  bulkRemoveUsersFromChatflow: (flowiseId: string, identifiers: string[]) => Promise<{ successful: number; failed: string[] }>;
   syncChatflows: () => Promise<ChatflowSyncResult>;
   setSelectedChatflow: (chatflow: Chatflow | null) => void;
   clearChatflowUsers: () => void;
@@ -94,6 +99,7 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
   chatflowUsers: [],
   users: [],
   creditAllocations: [],
+  currentCreditBalances: [],
   systemStats: null,
   isLoading: false,
   error: null,
@@ -175,14 +181,14 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
     }
   },
 
-  bulkAddUsersToChatflow: async (flowiseId: string, userEmails: string[]) => {
+  bulkAddUsersToChatflow: async (flowiseId: string, identifiers: string[]) => {
     set({ isLoading: true, error: null });
     try {
-      const result = await bulkAddUsersToChatflowApi(flowiseId, userEmails);
+      const result = await bulkAddUsersToChatflowApi(flowiseId, identifiers);
       const successful = Array.isArray(result.successful_assignments)
         ? result.successful_assignments.length
         : Number(result.successful_assignments || 0);
-      const failed = (result.failed_assignments || []).map((assignment) => assignment.email);
+      const failed = (result.failed_assignments || []).map((assignment) => assignment.identifier || assignment.email || assignment.username || 'unknown');
 
       // 重新獲取用戶列表
       const users = await getChatflowUsers(flowiseId);
@@ -191,6 +197,26 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
       return { successful, failed };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to bulk add users to chatflow';
+      set({ isLoading: false, error: errorMessage });
+      throw error;
+    }
+  },
+
+  bulkRemoveUsersFromChatflow: async (flowiseId: string, identifiers: string[]) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await bulkRemoveUsersFromChatflowApi(flowiseId, identifiers);
+      const successful = Array.isArray(result.successful_assignments)
+        ? result.successful_assignments.length
+        : Number(result.successful_assignments || 0);
+      const failed = (result.failed_assignments || []).map((assignment) => assignment.identifier || assignment.email || assignment.username || 'unknown');
+
+      const users = await getChatflowUsers(flowiseId);
+      set({ chatflowUsers: users, isLoading: false });
+
+      return { successful, failed };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to bulk remove users from chatflow';
       set({ isLoading: false, error: errorMessage });
       throw error;
     }
@@ -332,8 +358,11 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
   fetchAllCredits: async () => {
     set({ isLoading: true, error: null });
     try {
-      const creditAllocations = await listAllCredits();
-      set({ creditAllocations, isLoading: false });
+      const [creditAllocations, currentCreditBalances] = await Promise.all([
+        listAllCredits(),
+        listCurrentCreditBalances(),
+      ]);
+      set({ creditAllocations, currentCreditBalances, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to fetch credits' });
       throw error;
@@ -344,8 +373,11 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await allocateCredits(payload);
-      const creditAllocations = await listAllCredits();
-      set({ creditAllocations, isLoading: false });
+      const [creditAllocations, currentCreditBalances] = await Promise.all([
+        listAllCredits(),
+        listCurrentCreditBalances(),
+      ]);
+      set({ creditAllocations, currentCreditBalances, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to allocate credits' });
       throw error;
@@ -356,8 +388,11 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await setCredits(payload);
-      const creditAllocations = await listAllCredits();
-      set({ creditAllocations, isLoading: false });
+      const [creditAllocations, currentCreditBalances] = await Promise.all([
+        listAllCredits(),
+        listCurrentCreditBalances(),
+      ]);
+      set({ creditAllocations, currentCreditBalances, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to set credits' });
       throw error;
@@ -368,8 +403,11 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await removeCredits(payload);
-      const creditAllocations = await listAllCredits();
-      set({ creditAllocations, isLoading: false });
+      const [creditAllocations, currentCreditBalances] = await Promise.all([
+        listAllCredits(),
+        listCurrentCreditBalances(),
+      ]);
+      set({ creditAllocations, currentCreditBalances, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to remove credits' });
       throw error;
@@ -380,8 +418,11 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await adjustCredits(payload);
-      const creditAllocations = await listAllCredits();
-      set({ creditAllocations, isLoading: false });
+      const [creditAllocations, currentCreditBalances] = await Promise.all([
+        listAllCredits(),
+        listCurrentCreditBalances(),
+      ]);
+      set({ creditAllocations, currentCreditBalances, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to adjust credits' });
       throw error;

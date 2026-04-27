@@ -859,6 +859,105 @@ export class CreditController {
       return res.status(500).json({ message: 'Failed to get all credit allocations' });
     }
   }
+
+  /**
+   * Get current non-expired credit totals for all users (admin/supervisor only)
+   * GET /api/credits/current-balances
+   */
+  async getAllCurrentBalances(req: Request, res: Response) {
+    try {
+      if (!req.user?.userId) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+
+      if (req.user.role !== 'admin' && req.user.role !== 'supervisor') {
+        return res.status(403).json({ message: 'Insufficient permissions' });
+      }
+
+      const balances = await CreditService.getAllCurrentBalances();
+
+      return res.status(200).json({ balances });
+    } catch (error) {
+      logger.error('Error getting current credit balances:', error);
+      return res.status(500).json({ message: 'Failed to get current credit balances' });
+    }
+  }
+
+  /**
+   * Allocate credits to multiple users in a single request (admin/supervisor only).
+   * POST /api/credits/allocate-batch
+   *
+   * Request body:
+   *   { allocations: Array<{ userId: string, credits: number, expiryDays?: number, notes?: string }> }
+   *
+   * Response:
+   *   200 OK: { results: Array<{ userId, success, message }>, summary: { total, successful, failed } }
+   */
+  async allocateBatchCredits(req: Request, res: Response) {
+    try {
+      if (!req.user?.userId) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+      if (req.user.role !== 'admin' && req.user.role !== 'supervisor') {
+        return res.status(403).json({ message: 'Insufficient permissions' });
+      }
+
+      const { allocations } = req.body;
+      if (!Array.isArray(allocations) || allocations.length === 0) {
+        return res.status(400).json({ message: 'allocations must be a non-empty array' });
+      }
+
+      const results: Array<{ userId: string; success: boolean; message: string }> = [];
+
+      for (const entry of allocations) {
+        const { userId, credits, expiryDays, notes } = entry;
+        if (!userId || typeof credits !== 'number' || credits <= 0) {
+          results.push({ userId: userId ?? '(missing)', success: false, message: 'Valid userId and positive credits required' });
+          continue;
+        }
+
+        try {
+          // Resolve userId (may be username or UUID) to canonical account
+          let targetAccount: UserAccount | null = await UserAccount.findByPk(userId);
+          if (!targetAccount) {
+            targetAccount = await UserAccountService.findByUsername(userId);
+          }
+
+          const actualUserId = targetAccount ? targetAccount.userId : userId;
+
+          await UserAccountService.findOrCreateUser({
+            userId: actualUserId,
+            username: targetAccount ? targetAccount.username : userId,
+            email: targetAccount ? targetAccount.email : `temp_${userId}@example.com`,
+            role: targetAccount ? targetAccount.role : 'enduser',
+          });
+
+          await CreditService.allocateCredits({
+            userId: actualUserId,
+            credits,
+            allocatedBy: req.user.userId,
+            expiryDays,
+            notes,
+          });
+
+          results.push({ userId, success: true, message: `Allocated ${credits} credits` });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Allocation failed';
+          logger.error(`Batch credit allocation failed for userId ${userId}:`, err);
+          results.push({ userId, success: false, message: msg });
+        }
+      }
+
+      const successful = results.filter((r) => r.success).length;
+      return res.status(200).json({
+        results,
+        summary: { total: results.length, successful, failed: results.length - successful },
+      });
+    } catch (error) {
+      logger.error('Error in batch credit allocation:', error);
+      return res.status(500).json({ message: 'Failed to process batch credit allocation' });
+    }
+  }
 }
 
 export default new CreditController();

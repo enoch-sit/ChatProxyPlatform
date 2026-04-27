@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "audit:admin-ui": "node ./scripts/admin-ui-audit.mjs",
     "test:e2e": "playwright test",
+    "test:e2e:mocked": "playwright test --grep-invert \"\\[live\\]\"",
+    "test:e2e:live": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\run-e2e.ps1 -LiveOnly",
+    "test:e2e:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\run-e2e.ps1",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {

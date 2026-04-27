@@ -84,9 +84,13 @@
     "userManagement": "用户管理",
     "assignUser": "分配用户",
     "bulkAssign": "批量分配",
-    "bulkAssignTooltip": "每行输入一个电子邮件以分配多个用户。",
+    "bulkRemove": "批量移除",
+    "bulkAssignTooltip": "输入以空格、逗号或换行分隔的用户名或电子邮件，以分配多个用户。",
+    "protectedBatchRemove": "受保护",
     "removeUser": "移除用户",
+    "selectUsers": "选择",
     "userEmail": "用户电子邮件",
+    "userRole": "角色",
     "assignButton": "分配",
     "removeButton": "移除",
     "noUsers": "此课程没有分配用户",
@@ -101,8 +105,8 @@
     "chatflowStatus": "状态",
     "chatflowActions": "操作",
     "manageUsersFor": "管理 {{chatflowName}} 的用户",
-    "userEmailPlaceholder": "输入用户电子邮件",
-    "bulkAssignPlaceholder": "每行输入一个电子邮件"
+    "userEmailPlaceholder": "输入用户名或电子邮件",
+    "bulkAssignPlaceholder": "输入以空格、逗号或换行分隔的用户名或电子邮件"
   },
   "common": {
     "loading": "加载中...",

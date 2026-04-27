@@ -6,12 +6,16 @@
  */
 export interface BulkAssignmentResult {
   successful_assignments: Array<{
+    identifier: string;
     email: string;
+    username?: string;
     status: string;
     message?: string;
   }> | number;
   failed_assignments: Array<{ 
-    email: string;
+    identifier: string;
+    email?: string;
+    username?: string;
     reason?: string;
     status?: string;
     message?: string;
@@ -56,7 +60,7 @@ export interface AdminUser {
 
 export interface CreateUserPayload {
   username: string;
-  email: string;
+  email?: string;
   password: string;
   role?: string;
   skipVerification?: boolean;
@@ -82,10 +86,27 @@ export interface CreditAllocation {
   email?: string;
 }
 
+export interface CurrentCreditBalance {
+  userId: string;
+  username?: string;
+  email?: string;
+  currentCredits: number;
+  activeAllocationCount: number;
+}
+
 export interface AllocateCreditsPayload {
   userId: string;
   credits: number;
   expiryDays?: number;
+}
+
+export interface AllocateCreditsBatchPayload {
+  allocations: Array<{ userId: string; credits: number; expiryDays?: number; notes?: string }>;
+}
+
+export interface AllocateCreditsBatchResult {
+  results: Array<{ userId: string; success: boolean; message: string }>;
+  summary: { total: number; successful: number; failed: number };
 }
 
 export interface SetCreditsPayload {
