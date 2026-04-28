@@ -82,10 +82,13 @@ for /f "delims=" %%C in ('git -C "%ROOT%." rev-parse --short HEAD') do set "COMM
 call :log INFO "Commit %COMMIT%"
 
 REM ---- Phase 1: patch each service in dependency order -------------------
-call :patch_one accounting-service auto || exit /b 1
-call :patch_one auth-service       auto || exit /b 1
-call :patch_one flowise-proxy      auto || exit /b 1
-call :patch_one bridge             auto || exit /b 1
+REM Use 'full' (not 'auto') because patch.ps1 auto-detect skips $changedFiles
+REM when -Service is specified, which causes 'quick' mode (no image rebuild)
+REM and our new .ts/.py code never reaches the running container.
+call :patch_one accounting-service full || exit /b 1
+call :patch_one auth-service       full || exit /b 1
+call :patch_one flowise-proxy      full || exit /b 1
+call :patch_one bridge             full || exit /b 1
 
 REM ---- Phase 2: backfill missing accounting users ------------------------
 if /I "%SKIP_BACKFILL%"=="1" (
