@@ -1,5 +1,5 @@
 # ================================================================
-# Root Terraform Configuration — Dev Environment
+# Root Terraform Configuration — Prod Environment
 # ================================================================
 # Usage:
 #   terraform init -backend-config=backend.hcl
@@ -38,37 +38,12 @@ provider "aws" {
   }
 }
 
-# ── Secrets Manager ────────────────────────────────────────────
 module "secrets" {
   source  = "../../modules/secrets"
   project = "chatproxy"
   env     = var.environment
 }
-# Import existing secrets (already created in AWS before Terraform managed them)
-import {
-  to = module.secrets.aws_secretsmanager_secret.secrets["jwt"]
-  id = "/chatproxy/dev/jwt"
-}
-import {
-  to = module.secrets.aws_secretsmanager_secret.secrets["db/accounting"]
-  id = "/chatproxy/dev/db/accounting"
-}
-import {
-  to = module.secrets.aws_secretsmanager_secret.secrets["db/flowise"]
-  id = "/chatproxy/dev/db/flowise"
-}
-# mongodb/auth and mongodb/proxy don't exist yet — Terraform will CREATE them fresh.
-# They will be populated with real connection strings in Part 13 after EC2 MongoDB is deployed.
-import {
-  to = module.secrets.aws_secretsmanager_secret.secrets["flowise/api-key"]
-  id = "/chatproxy/dev/flowise/api-key"
-}
-import {
-  to = module.secrets.aws_secretsmanager_secret.secrets["ses"]
-  id = "/chatproxy/dev/ses"
-}
 
-# ── Standalone Flowise on AWS ECS/ALB ─────────────────────────
 module "flowise_aws" {
   source = "../../modules/flowise-aws"
 
@@ -107,12 +82,12 @@ output "flowise_ecs_service_name" {
   value = module.flowise_aws.ecs_service_name
 }
 
-# ── Platform VPC + ALB + ECS Cluster ──────────────────────────────────
 module "platform" {
   source = "../../modules/platform"
 
   project              = "chatproxy"
   environment          = var.environment
+  vpc_cidr             = var.platform_vpc_cidr
   availability_zones   = var.availability_zones
   public_subnet_cidrs  = var.platform_public_subnet_cidrs
   private_subnet_cidrs = var.platform_private_subnet_cidrs
@@ -122,7 +97,6 @@ module "platform" {
   create_dns_records   = var.create_dns_records
 }
 
-# ── MongoDB on EC2 t4g.micro ───────────────────────────────────────────
 module "mongodb" {
   source = "../../modules/mongodb-ec2"
 
@@ -135,7 +109,6 @@ module "mongodb" {
   depends_on = [module.secrets, module.platform]
 }
 
-# ── Auth Service on ECS Fargate ────────────────────────────────────────
 module "auth_ecs" {
   source = "../../modules/auth-ecs"
 
@@ -159,8 +132,6 @@ module "auth_ecs" {
   depends_on = [module.platform, module.mongodb]
 }
 
-# ── Outputs ────────────────────────────────────────────────────────────
-
 output "platform_alb_dns_name" {
   value = module.platform.alb_dns_name
 }
@@ -182,7 +153,6 @@ output "auth_service_name" {
   value = module.auth_ecs.service_name
 }
 
-# ── RDS PostgreSQL (accounting service) ────────────────────────────────
 module "rds" {
   source = "../../modules/rds-postgres"
 
@@ -197,7 +167,6 @@ module "rds" {
   depends_on = [module.platform, module.secrets]
 }
 
-# ── Accounting Service on ECS Fargate ──────────────────────────────────
 module "accounting_ecs" {
   source = "../../modules/accounting-ecs"
 
@@ -231,7 +200,6 @@ output "accounting_service_name" {
   value = module.accounting_ecs.service_name
 }
 
-# ── Flowise Proxy Service on ECS Fargate ───────────────────────────────
 module "flowise_proxy_ecs" {
   source = "../../modules/flowise-proxy-ecs"
 
@@ -259,7 +227,6 @@ output "flowise_proxy_service_name" {
   value = module.flowise_proxy_ecs.service_name
 }
 
-# ── Bridge Frontend on ECS Fargate ─────────────────────────────────────
 module "bridge_ecs" {
   source = "../../modules/bridge-ecs"
 
@@ -282,7 +249,6 @@ output "bridge_service_name" {
   value = module.bridge_ecs.service_name
 }
 
-# ── WireGuard VPN Hub (Fleet Management) ──────────────────────────────
 module "wireguard" {
   source = "../../modules/wireguard"
 

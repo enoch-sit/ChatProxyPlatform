@@ -225,6 +225,7 @@ resource "aws_lb_listener" "https" {
 # ── Route53: apex domain → ALB ────────────────────────────────────────
 
 resource "aws_route53_record" "apex" {
+  count   = var.create_dns_records ? 1 : 0
   zone_id = var.hosted_zone_id
   name    = var.domain_name
   type    = "A"

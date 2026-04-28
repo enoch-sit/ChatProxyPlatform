@@ -29,12 +29,6 @@ variable "certificate_arn" {
   type        = string
 }
 
-variable "create_dns_records" {
-  description = "Whether this environment owns the public Route53 records (apex A + flowise CNAME). Set to false to release ownership during a cutover."
-  type        = bool
-  default     = true
-}
-
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string
@@ -143,24 +137,26 @@ variable "ses_from_email" {
 variable "service_discovery_namespace" {
   description = "AWS Cloud Map namespace for ECS service discovery"
   type        = string
-  default     = "chatproxy.dev.local"
+  default     = "chatproxy.prod.local"
 }
 
-# ── Platform VPC (separate CIDR from flowise VPC 10.0.x.x) ───────────
+variable "platform_vpc_cidr" {
+  description = "CIDR block for the platform VPC"
+  type        = string
+  default     = "10.3.0.0/16"
+}
 
 variable "platform_public_subnet_cidrs" {
   description = "Public subnet CIDRs for the platform VPC (ALB + Fargate tasks)"
   type        = list(string)
-  default     = ["10.1.1.0/24", "10.1.2.0/24"]
+  default     = ["10.3.1.0/24", "10.3.2.0/24"]
 }
 
 variable "platform_private_subnet_cidrs" {
   description = "Private subnet CIDRs for the platform VPC (MongoDB EC2, RDS)"
   type        = list(string)
-  default     = ["10.1.11.0/24", "10.1.12.0/24"]
+  default     = ["10.3.11.0/24", "10.3.12.0/24"]
 }
-
-# ── Auth Service ───────────────────────────────────────────────────────
 
 variable "auth_service_image" {
   description = "ECR image URI for the auth service"
@@ -182,8 +178,6 @@ variable "bridge_image" {
   type        = string
 }
 
-# ── WireGuard Fleet Management ─────────────────────────────────────────
-
 variable "wireguard_peers" {
   description = "WireGuard VPN peers (workstations). Add public keys after generating them on each workstation."
   type = list(object({
@@ -194,3 +188,8 @@ variable "wireguard_peers" {
   default = []
 }
 
+variable "create_dns_records" {
+  description = "If true, create Route53 records for the apex and Flowise subdomain. Keep false while dev still owns these records to avoid CNAME/A collisions during prod stand-up."
+  type        = bool
+  default     = false
+}

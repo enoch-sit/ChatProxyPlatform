@@ -1,0 +1,148 @@
+name: Deploy Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to deploy"
+        required: true
+        type: choice
+        options:
+          - auth-service
+          - accounting-service
+          - flowise-proxy
+          - bridge
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: "168437900315"
+  ECR_REGISTRY: 168437900315.dkr.ecr.us-east-1.amazonaws.com
+  ENVIRONMENT: prod
+
+jobs:
+  validate-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate Flowise API key secret for flowise-proxy deploys
+        if: inputs.service == 'flowise-proxy'
+        run: |
+          SECRET_ID="/chatproxy/${{ env.ENVIRONMENT }}/flowise/api-key"
+          aws secretsmanager describe-secret \
+            --secret-id "$SECRET_ID" \
+            --region "${{ env.AWS_REGION }}" >/dev/null
+
+          SECRET_STRING=$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRET_ID" \
+            --region "${{ env.AWS_REGION }}" \
+            --query 'SecretString' \
+            --output text)
+
+          FLOWISE_API_KEY=$(echo "$SECRET_STRING" | jq -r '.FLOWISE_API_KEY // empty')
+
+          if [ -z "$FLOWISE_API_KEY" ]; then
+            echo "::error::Secrets Manager value $SECRET_ID is missing FLOWISE_API_KEY or it is empty"
+            exit 1
+          fi
+
+  build-push:
+    needs: validate-secrets
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          VERSION=$(jq -r ".services[\"${{ inputs.service }}\"]" version.json)
+          SHA=$(git rev-parse --short=7 HEAD)
+          echo "tag=v${VERSION}-${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set source directory
+        id: srcdir
+        run: |
+          case "${{ inputs.service }}" in
+            flowise-proxy) echo "dir=flowise-proxy-service-py" >> "$GITHUB_OUTPUT" ;;
+            *) echo "dir=${{ inputs.service }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Build and push
+        run: |
+          TAG=${{ steps.tag.outputs.tag }}
+          REPO="${{ env.ECR_REGISTRY }}/chatproxy/${{ inputs.service }}"
+          DIR="${{ steps.srcdir.outputs.dir }}"
+
+          docker build -t "$REPO:$TAG" -t "$REPO:latest" "$DIR"
+          docker push "$REPO:$TAG"
+          docker push "$REPO:latest"
+
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7"
+
+      - name: Map service to terraform
+        id: tf
+        run: |
+          case "${{ inputs.service }}" in
+            auth-service)       echo "module=auth_ecs"         ; echo "var=auth_service_image" ;;
+            accounting-service) echo "module=accounting_ecs"   ; echo "var=accounting_service_image" ;;
+            flowise-proxy)      echo "module=flowise_proxy_ecs" ; echo "var=flowise_proxy_service_image" ;;
+            bridge)             echo "module=bridge_ecs"       ; echo "var=bridge_image" ;;
+          esac >> "$GITHUB_OUTPUT"
+
+      - name: Terraform init
+        working-directory: infra/environments/${{ env.ENVIRONMENT }}
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Terraform apply
+        working-directory: infra/environments/${{ env.ENVIRONMENT }}
+        run: |
+          IMAGE="${{ env.ECR_REGISTRY }}/chatproxy/${{ inputs.service }}:${{ needs.build-push.outputs.image-tag }}"
+          terraform apply -auto-approve \
+            -var-file=terraform.ci.tfvars \
+            -var "${{ steps.tf.outputs.var }}=${IMAGE}" \
+            -target="module.${{ steps.tf.outputs.module }}"
+
+      - name: Wait for ECS stability
+        run: |
+          CLUSTER="chatproxy-${{ env.ENVIRONMENT }}-cluster"
+          case "${{ inputs.service }}" in
+            flowise-proxy) SVC="chatproxy-${{ env.ENVIRONMENT }}-flowise-proxy-service" ;;
+            *)             SVC="chatproxy-${{ env.ENVIRONMENT }}-${{ inputs.service }}" ;;
+          esac
+          aws ecs wait services-stable \
+            --cluster "$CLUSTER" \
+            --services "$SVC" \
+            --region ${{ env.AWS_REGION }}

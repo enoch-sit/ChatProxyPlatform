@@ -197,9 +197,18 @@ if ($AutoRollback) {
 
 # ─── Step 1: ECR login ────────────────────────────────────────────────────────
 Write-Host "[1/5] Logging into ECR..." -ForegroundColor Yellow
-aws ecr get-login-password --region $region |
-    docker login --username AWS --password-stdin $ecrBase
-if ($LASTEXITCODE -ne 0) { throw "ECR login failed" }
+$loginPassword = (aws ecr get-login-password --region $region 2>$null).Trim()
+if (-not $loginPassword) { throw "ECR login password retrieval failed" }
+
+$loginResult = $loginPassword | docker login --username AWS --password-stdin $ecrBase 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Password-stdin login failed; retrying with direct password argument."
+    $loginResult = docker login --username AWS --password $loginPassword $ecrBase 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $joined = ($loginResult | Out-String).Trim()
+        throw "ECR login failed: $joined"
+    }
+}
 
 # ─── Step 2: Docker build ─────────────────────────────────────────────────────
 Write-Host "[2/5] Building Docker image..." -ForegroundColor Yellow
@@ -250,7 +259,12 @@ if ($SkipTerraform) {
 Write-Host "[5/5] Running terraform apply..." -ForegroundColor Yellow
 Push-Location $tfDir
 try {
-    terraform apply -var-file=terraform.tfvars -target=$($cfg.TfModule) -auto-approve
+    & terraform @(
+        'apply'
+        '-var-file=terraform.tfvars'
+        "-target=$($cfg.TfModule)"
+        '-auto-approve'
+    )
     if ($LASTEXITCODE -ne 0) { throw "terraform apply failed" }
 } finally {
     Pop-Location

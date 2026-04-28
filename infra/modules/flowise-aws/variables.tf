@@ -59,6 +59,12 @@ variable "desired_count" {
   default = 1
 }
 
+variable "create_dns_records" {
+  description = "Whether to create the Route53 record for the Flowise subdomain. Set to false in environments that share a hosted zone with another active environment to avoid CNAME collisions."
+  type        = bool
+  default     = true
+}
+
 variable "secret_flowise_config_arn" {
   description = "ARN of Secrets Manager secret containing FLOWISE_SECRETKEY_OVERWRITE, FLOWISE_USERNAME, FLOWISE_PASSWORD"
   type        = string

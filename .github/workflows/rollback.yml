@@ -3,6 +3,13 @@ name: Rollback
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Environment to rollback"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
       service:
         description: "Service to rollback"
         required: true
@@ -24,7 +31,6 @@ permissions:
 env:
   AWS_REGION: us-east-1
   AWS_ACCOUNT_ID: "168437900315"
-  ENVIRONMENT: dev
 
 jobs:
   rollback:
@@ -41,8 +47,11 @@ jobs:
       - name: Determine rollback target
         id: target
         run: |
-          CLUSTER="chatproxy-${{ env.ENVIRONMENT }}-cluster"
-          SVC="chatproxy-${{ env.ENVIRONMENT }}-${{ inputs.service }}"
+          CLUSTER="chatproxy-${{ inputs.environment }}-cluster"
+          case "${{ inputs.service }}" in
+            flowise-proxy) SVC="chatproxy-${{ inputs.environment }}-flowise-proxy-service" ;;
+            *)             SVC="chatproxy-${{ inputs.environment }}-${{ inputs.service }}" ;;
+          esac
           
           if [ -n "${{ inputs.task_definition_arn }}" ]; then
             echo "task_def=${{ inputs.task_definition_arn }}" >> "$GITHUB_OUTPUT"
@@ -73,8 +82,11 @@ jobs:
 
       - name: Rollback ECS service
         run: |
-          CLUSTER="chatproxy-${{ env.ENVIRONMENT }}-cluster"
-          SVC="chatproxy-${{ env.ENVIRONMENT }}-${{ inputs.service }}"
+          CLUSTER="chatproxy-${{ inputs.environment }}-cluster"
+          case "${{ inputs.service }}" in
+            flowise-proxy) SVC="chatproxy-${{ inputs.environment }}-flowise-proxy-service" ;;
+            *)             SVC="chatproxy-${{ inputs.environment }}-${{ inputs.service }}" ;;
+          esac
           
           echo "Rolling back ${{ inputs.service }} to ${{ steps.target.outputs.task_def }}"
           
@@ -87,8 +99,11 @@ jobs:
 
       - name: Wait for stability
         run: |
-          CLUSTER="chatproxy-${{ env.ENVIRONMENT }}-cluster"
-          SVC="chatproxy-${{ env.ENVIRONMENT }}-${{ inputs.service }}"
+          CLUSTER="chatproxy-${{ inputs.environment }}-cluster"
+          case "${{ inputs.service }}" in
+            flowise-proxy) SVC="chatproxy-${{ inputs.environment }}-flowise-proxy-service" ;;
+            *)             SVC="chatproxy-${{ inputs.environment }}-${{ inputs.service }}" ;;
+          esac
           
           aws ecs wait services-stable \
             --cluster "$CLUSTER" \
