@@ -142,11 +142,83 @@ If workstation appears offline:
 - `probe-workstation-state.ps1` - PowerShell diagnostic script
 - `PROBE_SCRIPTS_README.md` - This file
 
+## Deployment Helper Scripts
+
+After diagnostics are complete, use these scripts to prepare for deployment:
+
+### check-deployment-readiness.ps1
+Verifies all prerequisites before deployment:
+```powershell
+.\check-deployment-readiness.ps1
+```
+
+Checks:
+- SSH service running and listening on port 22
+- Docker daemon responsive
+- WireGuard VPN active (10.10.0.2)
+- Git branch on deploy/localdeploy
+- Environment files (.env) present
+- Disk space available
+
+**Output:** Shows ✓/✗ for each check. Exit code 0 = ready, 1 = not ready.
+
+### start-docker.ps1
+Starts Docker Desktop and waits for it to be ready:
+```powershell
+.\start-docker.ps1
+```
+
+If Docker is offline after running diagnostics:
+1. **On workstation:** Pull latest and run:
+   ```powershell
+   git pull origin deploy/localdeploy
+   .\start-docker.ps1
+   ```
+
+2. **Verify readiness:**
+   ```powershell
+   .\check-deployment-readiness.ps1
+   ```
+
+3. **From management machine, deploy:**
+   ```powershell
+   .\fleet.ps1 -Action patch -Target aidcec-demo-windows-workstation -PatchMode full
+   ```
+
+## Diagnostic Workflow
+
+1. **Run probe on workstation:**
+   ```powershell
+   .\probe-workstation-state.ps1 | Tee-Object workstation-state.log
+   ```
+
+2. **Share output with management machine** (manual copy, scp, etc.)
+
+3. **Analyze for blockers:**
+   - ✓ SSH running + listening? → Can SSH now
+   - ✗ Docker not running? → Run `.\start-docker.ps1`
+   - ✓ WireGuard active? → VPN tunnel OK
+   - ✗ Missing .env files? → Create them before deployment
+
+4. **Check readiness:**
+   ```powershell
+   .\check-deployment-readiness.ps1
+   ```
+
+5. **If ready, deploy:**
+   ```powershell
+   # From management machine:
+   .\fleet.ps1 -Action patch -Target aidcec-demo-windows-workstation -PatchMode full
+   ```
+
 ## Git Commits
 
 ```
-f8785a3 add: probe-workstation-state.bat for remote diagnostics
+d90e33c fix: probe-workstation-state.ps1 - replace Unicode chars with ASCII
+8d46b15 add: deployment helper scripts (start-docker, check-deployment-readiness)
+7af9895 add: PROBE_SCRIPTS_README.md with usage guide
 a82d526 add: probe-workstation-state.ps1 (PowerShell version)
+f8785a3 add: probe-workstation-state.bat for remote diagnostics
 ```
 
 Branch: `deploy/localdeploy`
