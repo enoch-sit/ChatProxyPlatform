@@ -14,6 +14,7 @@ import type {
   AdminUser,
   CreditAllocation,
   CurrentCreditBalance,
+  UsersDirectoryEntry,
   AllocateCreditsPayload,
   AllocateCreditsBatchPayload,
   AllocateCreditsBatchResult,
@@ -194,6 +195,11 @@ export const listAllCredits = async (): Promise<CreditAllocation[]> => {
 export const listCurrentCreditBalances = async (): Promise<CurrentCreditBalance[]> => {
   const response = await apiClient.get('/api/v1/admin/credits/current-balances');
   return Array.isArray(response.data) ? response.data : (response.data.balances ?? []);
+};
+
+export const listUsersDirectory = async (): Promise<UsersDirectoryEntry[]> => {
+  const response = await apiClient.get('/api/v1/admin/credits/users-directory');
+  return Array.isArray(response.data) ? response.data : (response.data.users ?? []);
 };
 
 export const getUserCreditBalance = async (userId: string): Promise<CreditAllocation> => {
