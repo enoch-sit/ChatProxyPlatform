@@ -339,6 +339,13 @@ router.get('/credits/allocations/all', requireSupervisor, CreditController.getAl
  */
 router.get('/credits/current-balances', requireSupervisor, CreditController.getAllCurrentBalances);
 
+/**
+ * Get directory of ALL user accounts (including zero-balance) with aggregated
+ * active credit info (admin/supervisor only).
+ * GET /api/credits/users-directory
+ */
+router.get('/credits/users-directory', requireSupervisor, CreditController.getUsersDirectory);
+
 // ===== STREAMING SESSION ENDPOINTS =====
 
 /**
@@ -628,6 +635,23 @@ router.post(
     '/admin/users',
     requireAdmin,
     UserAccountController.createAccountByAdmin
+);
+
+/**
+ * Idempotently ensure a UserAccount row exists for a given user. Designed to
+ * be called by other services (e.g. auth-service) right after they create a
+ * user, so admins can immediately allocate credits without waiting for the
+ * user's first login. Safe to retry; returns 200 if account already existed,
+ * 201 if newly created.
+ *
+ * POST /api/users/ensure
+ * Auth: JWT, supervisor/admin/teacher
+ * Body: { sub | userId: string, email: string, username?: string, role?: string }
+ */
+router.post(
+    '/users/ensure',
+    requireSupervisor,
+    UserAccountController.ensureAccount
 );
 
 export default router;

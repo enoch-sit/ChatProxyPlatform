@@ -234,7 +234,13 @@ const AdminChatHistoryPanel: React.FC = () => {
                   )}
                 </Stack>
                 <Typography level="body-sm" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {msg.content}
+                  {msg.content && msg.content.length > 0
+                    ? msg.content
+                    : (msg.streamEvents && msg.streamEvents.length > 0
+                        ? msg.streamEvents
+                            .map((e: any) => (e && e.event === 'token' && typeof e.data === 'string' ? e.data : ''))
+                            .join('')
+                        : '')}
                 </Typography>
               </Box>
             </Box>

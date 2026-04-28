@@ -884,6 +884,31 @@ export class CreditController {
   }
 
   /**
+   * Get directory of ALL user accounts (including zero-balance) joined with
+   * aggregated active credit info. Admin/supervisor only.
+   * GET /api/credits/users-directory
+   *
+   * Response:
+   *   200 OK: { users: Array<{ userId, username, email, role, currentCredits, activeAllocationCount }> }
+   */
+  async getUsersDirectory(req: Request, res: Response) {
+    try {
+      if (!req.user?.userId) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+      if (req.user.role !== 'admin' && req.user.role !== 'supervisor') {
+        return res.status(403).json({ message: 'Insufficient permissions' });
+      }
+
+      const users = await CreditService.getUsersDirectory();
+      return res.status(200).json({ users });
+    } catch (error) {
+      logger.error('Error getting users directory:', error);
+      return res.status(500).json({ message: 'Failed to get users directory' });
+    }
+  }
+
+  /**
    * Allocate credits to multiple users in a single request (admin/supervisor only).
    * POST /api/credits/allocate-batch
    *

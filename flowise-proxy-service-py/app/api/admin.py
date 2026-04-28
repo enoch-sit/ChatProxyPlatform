@@ -632,6 +632,15 @@ async def admin_list_current_credit_balances(
     return await _proxy("GET", f"{ACCOUNTING_URL}/api/credits/current-balances", _admin_headers(current_user))
 
 
+@router.get("/credits/users-directory")
+async def admin_list_users_directory(
+    current_user: Dict = Depends(require_elevated_role)
+):
+    """List ALL user accounts joined with their current credit balance, including
+    zero-balance users (proxy → accounting-service GET /api/credits/users-directory)."""
+    return await _proxy("GET", f"{ACCOUNTING_URL}/api/credits/users-directory", _admin_headers(current_user))
+
+
 @router.get("/credits/balance/{user_id}")
 async def admin_get_user_credit_balance(
     user_id: str,

@@ -18,6 +18,7 @@ import {
   updateUsersRolesBatch as updateUsersRolesBatchApi,
   listAllCredits,
   listCurrentCreditBalances,
+  listUsersDirectory,
   allocateCredits,
   setCredits,
   removeCredits,
@@ -30,6 +31,7 @@ import type {
   AdminUser,
   CreditAllocation,
   CurrentCreditBalance,
+  UsersDirectoryEntry,
   AllocateCreditsPayload,
   SetCreditsPayload,
   RemoveCreditsPayload,
@@ -51,6 +53,7 @@ interface AdminState {
   // Credits
   creditAllocations: CreditAllocation[];
   currentCreditBalances: CurrentCreditBalance[];
+  usersDirectory: UsersDirectoryEntry[];
   // Usage
   systemStats: SystemStats | null;
   // Shared
@@ -81,6 +84,7 @@ interface AdminActions {
   updateUsersRolesBatch: (updates: BatchRoleUpdateItem[]) => Promise<{ successful: number; failed: Array<{ userId: string; message: string }> }>;
   // Credits
   fetchAllCredits: () => Promise<void>;
+  fetchUsersDirectory: () => Promise<void>;
   allocateCredits: (payload: AllocateCreditsPayload) => Promise<void>;
   setCredits: (payload: SetCreditsPayload) => Promise<void>;
   removeCredits: (payload: RemoveCreditsPayload) => Promise<void>;
@@ -100,6 +104,7 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
   users: [],
   creditAllocations: [],
   currentCreditBalances: [],
+  usersDirectory: [],
   systemStats: null,
   isLoading: false,
   error: null,
@@ -358,13 +363,25 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
   fetchAllCredits: async () => {
     set({ isLoading: true, error: null });
     try {
-      const [creditAllocations, currentCreditBalances] = await Promise.all([
+      const [creditAllocations, currentCreditBalances, usersDirectory] = await Promise.all([
         listAllCredits(),
         listCurrentCreditBalances(),
+        listUsersDirectory(),
       ]);
-      set({ creditAllocations, currentCreditBalances, isLoading: false });
+      set({ creditAllocations, currentCreditBalances, usersDirectory, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to fetch credits' });
+      throw error;
+    }
+  },
+
+  fetchUsersDirectory: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const usersDirectory = await listUsersDirectory();
+      set({ usersDirectory, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to fetch users directory' });
       throw error;
     }
   },
@@ -373,11 +390,12 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await allocateCredits(payload);
-      const [creditAllocations, currentCreditBalances] = await Promise.all([
+      const [creditAllocations, currentCreditBalances, usersDirectory] = await Promise.all([
         listAllCredits(),
         listCurrentCreditBalances(),
+        listUsersDirectory(),
       ]);
-      set({ creditAllocations, currentCreditBalances, isLoading: false });
+      set({ creditAllocations, currentCreditBalances, usersDirectory, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to allocate credits' });
       throw error;
@@ -388,11 +406,12 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await setCredits(payload);
-      const [creditAllocations, currentCreditBalances] = await Promise.all([
+      const [creditAllocations, currentCreditBalances, usersDirectory] = await Promise.all([
         listAllCredits(),
         listCurrentCreditBalances(),
+        listUsersDirectory(),
       ]);
-      set({ creditAllocations, currentCreditBalances, isLoading: false });
+      set({ creditAllocations, currentCreditBalances, usersDirectory, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to set credits' });
       throw error;
@@ -403,11 +422,12 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await removeCredits(payload);
-      const [creditAllocations, currentCreditBalances] = await Promise.all([
+      const [creditAllocations, currentCreditBalances, usersDirectory] = await Promise.all([
         listAllCredits(),
         listCurrentCreditBalances(),
+        listUsersDirectory(),
       ]);
-      set({ creditAllocations, currentCreditBalances, isLoading: false });
+      set({ creditAllocations, currentCreditBalances, usersDirectory, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to remove credits' });
       throw error;
@@ -418,11 +438,12 @@ export const useAdminStore = create<AdminState & AdminActions>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await adjustCredits(payload);
-      const [creditAllocations, currentCreditBalances] = await Promise.all([
+      const [creditAllocations, currentCreditBalances, usersDirectory] = await Promise.all([
         listAllCredits(),
         listCurrentCreditBalances(),
+        listUsersDirectory(),
       ]);
-      set({ creditAllocations, currentCreditBalances, isLoading: false });
+      set({ creditAllocations, currentCreditBalances, usersDirectory, isLoading: false });
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to adjust credits' });
       throw error;
