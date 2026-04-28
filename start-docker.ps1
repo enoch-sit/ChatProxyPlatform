@@ -57,7 +57,7 @@ while ($elapsed -lt $TimeoutSeconds) {
     try {
         $result = & docker ps 2>&1
         if ($result -and -not ($result -like "*Cannot connect*" -or $result -like "*error*")) {
-            Write-Status "✓ Docker daemon is responsive!" "Green"
+            Write-Status "[OK] Docker daemon is responsive!" "Green"
             $ready = $true
             break
         }
