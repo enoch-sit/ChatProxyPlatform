@@ -1,0 +1,157 @@
+#!/usr/bin/env pwsh
+<#
+.SYNOPSIS
+    probe-workstation-state.ps1 - Comprehensive workstation diagnostics
+    
+.DESCRIPTION
+    Gathers full diagnostic information about workstation state for remote troubleshooting.
+    Run on the workstation machine and send output back to management machine.
+    
+.EXAMPLE
+    .\probe-workstation-state.ps1 | Tee-Object -FilePath workstation-state.log
+    
+.NOTES
+    This script gathers:
+    - System info and network config
+    - WireGuard interface status
+    - SSH service status
+    - Docker containers and logs
+    - Firewall rules
+    - Process status
+    - Port listening status
+    - Git branch info
+#>
+
+$ErrorActionPreference = "Continue"
+
+function Write-Header { param([string]$msg) Write-Host "`n╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan; Write-Host "║ $msg" -ForegroundColor Cyan; Write-Host "╚═══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan }
+function Write-Section { param([string]$msg) Write-Host "`n[$(Get-Date -Format 'HH:mm:ss')] $msg" -ForegroundColor Yellow }
+
+Write-Header "ChatProxy Platform - Workstation State Probe"
+Write-Host "Machine: $env:COMPUTERNAME"
+Write-Host "User: $env:USERNAME"
+Write-Host "Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "SYSTEM INFO"
+# ──────────────────────────────────────────────────────────────────────────────
+Get-ComputerInfo | Select-Object CsComputerName, OsName, OsVersion, OsBuildNumber, OsArchitecture, CsSystemBootTime | Format-List
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "NETWORK CONFIGURATION"
+# ──────────────────────────────────────────────────────────────────────────────
+Get-NetIPConfiguration -Detailed | Format-List
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "WIREGUARD STATUS"
+# ──────────────────────────────────────────────────────────────────────────────
+try {
+    $wgShow = & wg show 2>&1
+    if ($wgShow -match "interface") {
+        Write-Host $wgShow
+    } else {
+        Write-Host "WireGuard not active or no interfaces"
+    }
+} catch {
+    Write-Host "WireGuard not found: $_"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "OPENSSH SERVICE STATUS"
+# ──────────────────────────────────────────────────────────────────────────────
+Get-Service sshd -ErrorAction SilentlyContinue | Format-List Name, DisplayName, Status, StartType
+if ($null -eq (Get-Service sshd -ErrorAction SilentlyContinue)) {
+    Write-Host "SSH service (sshd) not found"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "SSH PORT LISTENING"
+# ──────────────────────────────────────────────────────────────────────────────
+Get-NetTCPConnection -LocalPort 22 -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, State | Format-Table
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "DOCKER VERSION & STATUS"
+# ──────────────────────────────────────────────────────────────────────────────
+& docker --version 2>&1
+& docker info 2>&1 | Select-Object -First 20
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "DOCKER CONTAINERS"
+# ──────────────────────────────────────────────────────────────────────────────
+& docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "KEY PROCESSES"
+# ──────────────────────────────────────────────────────────────────────────────
+@("docker", "node", "python", "ssh", "wg") | ForEach-Object {
+    $procs = Get-Process -Name $_ -ErrorAction SilentlyContinue
+    if ($procs) {
+        Write-Host "$_ processes:"
+        $procs | Select-Object Name, Id, CPU, Memory, StartTime | Format-Table
+    }
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "LISTENING PORTS"
+# ──────────────────────────────────────────────────────────────────────────────
+Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort, @{Name="Process"; Expression={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).Name}} | Format-Table
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "FIREWALL RULES - SSH"
+# ──────────────────────────────────────────────────────────────────────────────
+& netsh advfirewall firewall show rule name="SSH*" dir=in 2>&1 | Select-Object -First 50
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "DISK SPACE"
+# ──────────────────────────────────────────────────────────────────────────────
+Get-Volume | Where-Object { $_.DriveLetter } | Select-Object DriveLetter, FileSystemLabel, @{Name="SizeGB"; Expression={[math]::Round($_.Size/1GB, 2)}}, @{Name="FreeGB"; Expression={[math]::Round($_.SizeRemaining/1GB, 2)}} | Format-Table
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section ".ENV FILES"
+# ──────────────────────────────────────────────────────────────────────────────
+$envFiles = @("auth-service\.env", "accounting-service\.env", "bridge\.env", "flowise\.env", "flowise-proxy-service-py\.env")
+foreach ($env in $envFiles) {
+    if (Test-Path $env) {
+        Write-Host "✓ $env exists"
+    } else {
+        Write-Host "✗ $env NOT FOUND"
+    }
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "DOCKER LOGS (Last 50 lines per container)"
+# ──────────────────────────────────────────────────────────────────────────────
+$containers = & docker ps -q 2>$null
+foreach ($container in $containers) {
+    $name = & docker inspect --format='{{.Name}}' $container 2>$null
+    Write-Host "`n--- Container: $name ---"
+    & docker logs --tail 50 $container 2>&1 | Select-Object -Last 50
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "GIT STATUS"
+# ──────────────────────────────────────────────────────────────────────────────
+try {
+    & git --version 2>&1
+    if (Test-Path ".git") {
+        Write-Host "`nCurrent Branch:"
+        & git branch --show-current
+        Write-Host "`nRecent Commits:"
+        & git log --oneline -5
+    } else {
+        Write-Host "Not in a git repository"
+    }
+} catch {
+    Write-Host "Git not found: $_"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Section "ROUTING TABLE"
+# ──────────────────────────────────────────────────────────────────────────────
+& route print 2>&1 | Select-Object -First 100
+
+# ──────────────────────────────────────────────────────────────────────────────
+Write-Header "PROBE COMPLETE - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+Write-Host "`nTo save output: .\probe-workstation-state.ps1 | Tee-Object -FilePath workstation-state.log"
+Write-Host "`nTo send back to management: Copy workstation-state.log or run:"
+Write-Host "  scp -i fleet_ed25519 workstation-state.log fleet@10.10.0.3:/workstation-state-remote.log"
