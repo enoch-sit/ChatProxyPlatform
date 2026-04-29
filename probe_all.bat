@@ -13,8 +13,7 @@ cd /d "%~dp0"
 
 if not exist logs mkdir logs
 
-for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value ^| find "="') do set DT=%%I
-set TS=%DT:~0,8%-%DT:~8,6%
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Get-Date -Format 'yyyyMMdd-HHmmss'"`) do set TS=%%I
 set OUT=logs\probe_all-%TS%.txt
 
 echo ChatProxyPlatform probe_all - %DATE% %TIME%> "%OUT%"
