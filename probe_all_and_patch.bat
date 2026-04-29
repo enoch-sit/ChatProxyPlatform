@@ -364,10 +364,16 @@ if defined FLOWISE_PROXY_TOKEN (
 )
 
 echo.
-echo   --- last 40 lines of flowise-proxy logs ---
+echo   --- last 120 lines of flowise-proxy logs ---
 echo   --- flowise-proxy logs ---            >> "%LOG%"
-docker logs flowise-proxy --tail 40 2>&1
-docker logs flowise-proxy --tail 40 >> "%LOG%" 2>&1
+docker logs flowise-proxy --tail 120 2>&1
+docker logs flowise-proxy --tail 120 >> "%LOG%" 2>&1
+
+echo.
+echo   --- last 80 lines of mongodb-proxy logs ---
+echo   --- mongodb-proxy logs ---            >> "%LOG%"
+docker logs mongodb-proxy --tail 80 2>&1
+docker logs mongodb-proxy --tail 80 >> "%LOG%" 2>&1
 
 REM ---------------------------------------------------------------------------
 echo.
