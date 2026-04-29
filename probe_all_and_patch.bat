@@ -297,6 +297,8 @@ set ADMIN_USERNAME_VAL=admin
 if defined ADMIN_USERNAME set ADMIN_USERNAME_VAL=%ADMIN_USERNAME%
 set ADMIN_PASSWORD_VAL=admin@admin
 if defined ADMIN_PASSWORD set ADMIN_PASSWORD_VAL=%ADMIN_PASSWORD%
+set FLOWISE_API_KEY_PROBE_VAL=
+if defined FLOWISE_API_KEY_PROBE set FLOWISE_API_KEY_PROBE_VAL=%FLOWISE_API_KEY_PROBE%
 
 echo   --- OPTIONS /api/v1/chatflows/my-chatflows (preflight) ---
 echo   --- OPTIONS preflight ---            >> "%LOG%"
@@ -318,7 +320,13 @@ echo.>> "%LOG%"
 echo.
 echo   --- POST /api/v1/chat/authenticate (bridge login path) ---
 echo   --- POST bridge authenticate ---     >> "%LOG%"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%\scripts\probe_flowise_proxy_endpoints.ps1" -Username "%ADMIN_USERNAME_VAL%" -Password "%ADMIN_PASSWORD_VAL%"
+if defined FLOWISE_API_KEY_PROBE_VAL (
+  echo   [INFO] probing admin Flowise API key save/test path with FLOWISE_API_KEY_PROBE.
+  echo   [INFO] probing admin Flowise API key save/test path>> "%LOG%"
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%\scripts\probe_flowise_proxy_endpoints.ps1" -Username "%ADMIN_USERNAME_VAL%" -Password "%ADMIN_PASSWORD_VAL%" -FlowiseApiKey "%FLOWISE_API_KEY_PROBE_VAL%"
+) else (
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%\scripts\probe_flowise_proxy_endpoints.ps1" -Username "%ADMIN_USERNAME_VAL%" -Password "%ADMIN_PASSWORD_VAL%"
+)
 
 echo.
 echo   --- last 120 lines of flowise-proxy logs ---
