@@ -30,9 +30,11 @@ async def validate_user_chatflow_access(local_user_id: str, chatflow_id: str) ->
     """Validate if user has access to specific chatflow using local user ID"""
     try:
         user_chatflow = await UserChatflow.find_one(
-            UserChatflow.user_id == local_user_id,
-            UserChatflow.chatflow_id == chatflow_id,
-            UserChatflow.is_active == True
+            {
+                "external_user_id": local_user_id,
+                "chatflow_id": chatflow_id,
+                "is_active": True,
+            }
         )
         return user_chatflow is not None
     except Exception as e:
@@ -52,9 +54,7 @@ async def list_chatflows(
 
         # Elevated roles (admin/supervisor/teacher) see ALL active chatflows
         if user_role in ELEVATED_ROLES:
-            chatflows = await Chatflow.find(
-                Chatflow.sync_status != "deleted",
-            ).to_list()
+            chatflows = await Chatflow.find({"sync_status": {"$ne": "deleted"}}).to_list()
             logger.info(f"🔑 Elevated user {current_user.get('email')} ({user_role}): returning all {len(chatflows)} chatflows")
             return [
                 {
@@ -76,8 +76,10 @@ async def list_chatflows(
 
         # Get user's active chatflow access records using the user's external_id
         user_chatflows = await UserChatflow.find(
-            UserChatflow.external_user_id == local_user.external_id, # Use external_id from the local user object
-            UserChatflow.is_active == True
+            {
+                "external_user_id": local_user.external_id,
+                "is_active": True,
+            }
         ).to_list()
         
         logger.info(f"🔍 Found {len(user_chatflows)} active chatflow assignments for user {local_user.email}")
@@ -90,8 +92,10 @@ async def list_chatflows(
         
         # Get chatflow details from local database
         chatflows = await Chatflow.find(
-            In(Chatflow.id, chatflow_ids), # Match against the document's internal _id
-            Chatflow.sync_status != "deleted",
+            {
+                "_id": {"$in": chatflow_ids},
+                "sync_status": {"$ne": "deleted"},
+            }
         ).to_list()
         
         logger.info(f"🔍 Found {len(chatflows)} deployed chatflows matching user access")
@@ -126,9 +130,7 @@ async def get_my_chatflows(
 
         # Elevated roles (admin/supervisor/teacher) see ALL active chatflows
         if user_role in ELEVATED_ROLES:
-            chatflows = await Chatflow.find(
-                Chatflow.sync_status != "deleted",
-            ).to_list()
+            chatflows = await Chatflow.find({"sync_status": {"$ne": "deleted"}}).to_list()
             logger.info(f"🔑 Elevated user {current_user.get('email')} ({user_role}): returning all {len(chatflows)} chatflows")
             return [
                 {
@@ -155,8 +157,10 @@ async def get_my_chatflows(
         
         # Get user's active chatflow access records using LOCAL user ID
         user_chatflows = await UserChatflow.find(
-            UserChatflow.external_user_id == current_user["sub"],  # Use local MongoDB ObjectId as string
-            UserChatflow.is_active == True
+            {
+                "external_user_id": current_user["sub"],
+                "is_active": True,
+            }
         ).to_list()
         
         if not user_chatflows:
@@ -184,8 +188,10 @@ async def get_my_chatflows(
         object_ids = [ObjectId(cid) for cid in chatflow_ids if ObjectId.is_valid(cid)]
 
         chatflows = await Chatflow.find(
-            In(Chatflow.id, object_ids),  # This works
-            Chatflow.sync_status != "deleted",
+            {
+                "_id": {"$in": object_ids},
+                "sync_status": {"$ne": "deleted"},
+            }
         ).to_list()
         
         # Create response with user-friendly information

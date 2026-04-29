@@ -42,12 +42,10 @@ async def get_user_credits(
 async def get_my_assigned_chatflows(current_user: Dict = Depends(authenticate_user)):
     """Get a list of chatflow IDs the current authenticated user is actively assigned to."""
     try:
-        user_id = current_user.get("user_id")
+        external_user_id = current_user.get("sub") or current_user.get("external_id") or current_user.get("user_id")
 
         # Find all assignments for the user
-        user_chatflows = await UserChatflow.find(
-            UserChatflow.user_id == user_id
-        ).to_list()
+        user_chatflows = await UserChatflow.find({"external_user_id": external_user_id}).to_list()
 
         assigned_ids = [uc.chatflow_id for uc in user_chatflows]
 
@@ -69,11 +67,9 @@ async def get_chat_history(
 
     # 1. Verify the session exists; elevated roles (admin/supervisor/teacher) bypass ownership check
     if is_elevated:
-        session = await ChatSession.find_one(ChatSession.session_id == session_id)
+        session = await ChatSession.find_one({"session_id": session_id})
     else:
-        session = await ChatSession.find_one(
-            ChatSession.session_id == session_id, ChatSession.user_id == user_id
-        )
+        session = await ChatSession.find_one({"session_id": session_id, "user_id": user_id})
     if not session:
         raise HTTPException(
             status_code=404, detail="Chat session not found or access denied"
@@ -145,7 +141,7 @@ async def get_all_user_sessions(current_user: Dict = Depends(authenticate_user))
 
     # Find all sessions for the current user, sorted by creation date.
     sessions = (
-        await ChatSession.find(ChatSession.user_id == user_id)
+        await ChatSession.find({"user_id": user_id})
         .sort(-ChatSession.created_at)
         .to_list()
     )
@@ -174,7 +170,7 @@ async def delete_user_chat_history(current_user: Dict = Depends(authenticate_use
     
     try:
         # Find all sessions for the user
-        sessions_to_delete = await ChatSession.find(ChatSession.user_id == user_id).to_list()
+        sessions_to_delete = await ChatSession.find({"user_id": user_id}).to_list()
         session_ids = [s.session_id for s in sessions_to_delete]
         
         # Delete all messages for these sessions
@@ -183,9 +179,7 @@ async def delete_user_chat_history(current_user: Dict = Depends(authenticate_use
         ).delete()
         
         # Delete all sessions
-        sessions_deleted_result = await ChatSession.find(
-            ChatSession.user_id == user_id
-        ).delete()
+        sessions_deleted_result = await ChatSession.find({"user_id": user_id}).delete()
         
         return {
             "message": "All chat history has been deleted.",
@@ -210,9 +204,7 @@ async def delete_session(
     
     try:
         # Verify session belongs to the user before deleting
-        session = await ChatSession.find_one(
-            ChatSession.session_id == session_id, ChatSession.user_id == user_id
-        )
+        session = await ChatSession.find_one({"session_id": session_id, "user_id": user_id})
         if not session:
             raise HTTPException(status_code=404, detail="Session not found or access denied")
             

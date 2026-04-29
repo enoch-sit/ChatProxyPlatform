@@ -237,14 +237,14 @@ class ChatflowService:
         """
         Get the timestamp of the last successful sync using Beanie ODM.
         """
-        result = await Chatflow.find_one(sort=[(Chatflow.synced_at, -1)])
+        result = await Chatflow.find_one(sort=[("synced_at", -1)])
         return result.synced_at if result else None
 
     async def get_chatflow_by_flowise_id(self, flowise_id: str) -> Optional[Chatflow]:
         """
         Get chatflow by Flowise ID using Beanie ODM.
         """
-        return await Chatflow.find_one(Chatflow.flowise_id == flowise_id)
+        return await Chatflow.find_one({"flowise_id": flowise_id})
 
     async def add_user_to_chatflow_by_email(self, email: str, flowise_id: str, admin_user: Dict) -> UserAssignmentResponse:
         """Assigns a single user to a chatflow by their email address."""
