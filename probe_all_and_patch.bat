@@ -280,7 +280,7 @@ if "!PROXY_MONGO_RESET_NEEDED!"=="1" (
           echo   [OK] flowise-proxy is up after Mongo reset.
           echo   [OK] flowise-proxy up after Mongo reset>> "%LOG%"
         ) else (
-          echo   [WARN] flowise-proxy /docs not 200 within 60s after Mongo reset.
+          echo   [WARN] flowise-proxy /docs not 200 within 10s after Mongo reset.
           echo   [WARN] flowise-proxy not up after Mongo reset>> "%LOG%"
         )
       )
@@ -318,50 +318,7 @@ echo.>> "%LOG%"
 echo.
 echo   --- POST /api/v1/chat/authenticate (bridge login path) ---
 echo   --- POST bridge authenticate ---     >> "%LOG%"
-set FLOWISE_PROXY_TOKEN=
-set FLOWISE_PROXY_TOKEN_FILE=%TEMP%\flowise-proxy-token.txt
-if exist "%FLOWISE_PROXY_TOKEN_FILE%" del /f /q "%FLOWISE_PROXY_TOKEN_FILE%" >nul 2>&1
-powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%\scripts\probe_flowise_proxy_auth.ps1" -Username "%ADMIN_USERNAME_VAL%" -Password "%ADMIN_PASSWORD_VAL%" -TokenFile "%FLOWISE_PROXY_TOKEN_FILE%"
-if exist "%FLOWISE_PROXY_TOKEN_FILE%" (
-  set /p FLOWISE_PROXY_TOKEN=<"%FLOWISE_PROXY_TOKEN_FILE%"
-)
-if defined FLOWISE_PROXY_TOKEN (
-  echo   [OK] bridge authenticate returned an access token.
-  echo   [OK] bridge authenticate returned access token>> "%LOG%"
-
-  echo.
-  echo   --- GET /api/v1/chatflows/my-chatflows (auth) ---
-  echo   --- GET my-chatflows auth ---       >> "%LOG%"
-  curl -s -o "%TEMP%\my-chatflows-auth.json" -w "  status=%%{http_code}\n" --max-time 8 ^
-    -H "Authorization: Bearer !FLOWISE_PROXY_TOKEN!" ^
-    http://localhost:8000/api/v1/chatflows/my-chatflows
-  curl -s -o nul -w "  status=%%{http_code}" --max-time 8 ^
-    -H "Authorization: Bearer !FLOWISE_PROXY_TOKEN!" ^
-    http://localhost:8000/api/v1/chatflows/my-chatflows >> "%LOG%" 2>&1
-  echo.>> "%LOG%"
-  echo   body:
-  type "%TEMP%\my-chatflows-auth.json"
-  echo   body:>> "%LOG%"
-  type "%TEMP%\my-chatflows-auth.json" >> "%LOG%"
-
-  echo.
-  echo   --- GET /api/v1/chat/sessions (auth) ---
-  echo   --- GET sessions auth ---           >> "%LOG%"
-  curl -s -o "%TEMP%\sessions-auth.json" -w "  status=%%{http_code}\n" --max-time 8 ^
-    -H "Authorization: Bearer !FLOWISE_PROXY_TOKEN!" ^
-    http://localhost:8000/api/v1/chat/sessions
-  curl -s -o nul -w "  status=%%{http_code}" --max-time 8 ^
-    -H "Authorization: Bearer !FLOWISE_PROXY_TOKEN!" ^
-    http://localhost:8000/api/v1/chat/sessions >> "%LOG%" 2>&1
-  echo.>> "%LOG%"
-  echo   body:
-  type "%TEMP%\sessions-auth.json"
-  echo   body:>> "%LOG%"
-  type "%TEMP%\sessions-auth.json" >> "%LOG%"
-) else (
-  echo   [WARN] bridge authenticate did not return an access token.
-  echo   [WARN] bridge authenticate failed>> "%LOG%"
-)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%\scripts\probe_flowise_proxy_endpoints.ps1" -Username "%ADMIN_USERNAME_VAL%" -Password "%ADMIN_PASSWORD_VAL%"
 
 echo.
 echo   --- last 120 lines of flowise-proxy logs ---
