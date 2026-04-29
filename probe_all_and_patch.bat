@@ -125,6 +125,23 @@ echo [4/8] Detecting flowise-proxy CORS env drift>> "%LOG%"
 set PROXY_FIX_NEEDED=0
 set EXPECTED_CORS=http://localhost:3082,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:8000
 
+REM flowise-proxy .env must also expose MONGO_PASSWORD for mongodb-proxy compose env.
+set PROXY_MONGO_ENV_OK=0
+findstr /B /R "^MONGO_PASSWORD=" flowise-proxy-service-py\.env >nul 2>&1
+if not errorlevel 1 set PROXY_MONGO_ENV_OK=1
+if "!PROXY_MONGO_ENV_OK!"=="0" (
+  echo   [WARN] flowise-proxy .env missing MONGO_PASSWORD - deriving it from MONGODB_URL.
+  echo   [WARN] proxy .env missing MONGO_PASSWORD - deriving from MONGODB_URL>> "%LOG%"
+  powershell -NoProfile -Command "$f='flowise-proxy-service-py\.env'; $mongoUrl = (Get-Content $f | Where-Object { $_ -match '^MONGODB_URL=' } | Select-Object -First 1); if (-not $mongoUrl) { Write-Error 'MONGODB_URL missing from flowise-proxy-service-py\.env'; exit 1 }; $password = ([uri]$mongoUrl.Substring($mongoUrl.IndexOf('=') + 1)).UserInfo.Split(':',2)[1]; if (-not $password) { Write-Error 'Could not extract Mongo password from MONGODB_URL'; exit 1 }; $content = Get-Content $f; $content += ('MONGO_PASSWORD=' + $password); Set-Content -Path $f -Value $content -Encoding ASCII"
+  if errorlevel 1 (
+    echo   [WARN] failed to derive MONGO_PASSWORD from MONGODB_URL.
+    echo   [WARN] failed deriving proxy MONGO_PASSWORD from MONGODB_URL>> "%LOG%"
+  ) else (
+    echo   [OK] flowise-proxy .env MONGO_PASSWORD restored from MONGODB_URL.
+    echo   [OK] proxy .env MONGO_PASSWORD restored from MONGODB_URL>> "%LOG%"
+  )
+)
+
 REM .env must declare CORS_ALLOW_ORIGINS containing localhost:3082 (not "*")
 set ENV_CORS_OK=0
 findstr /B /R "^CORS_ALLOW_ORIGINS=" flowise-proxy-service-py\.env >nul 2>&1
