@@ -320,8 +320,21 @@ echo   --- POST /api/v1/chat/authenticate (bridge login path) ---
 echo   --- POST bridge authenticate ---     >> "%LOG%"
 set FLOWISE_PROXY_TOKEN=
 set FLOWISE_PROXY_TOKEN_FILE=%TEMP%\flowise-proxy-token.txt
+set FLOWISE_PROXY_AUTH_SCRIPT=%TEMP%\flowise-proxy-auth.ps1
 if exist "%FLOWISE_PROXY_TOKEN_FILE%" del /f /q "%FLOWISE_PROXY_TOKEN_FILE%" >nul 2>&1
-powershell -NoProfile -Command "$body = @{ username = '%ADMIN_USERNAME_VAL%'; password = '%ADMIN_PASSWORD_VAL%' } | ConvertTo-Json -Compress; try { $r = Invoke-RestMethod -Uri 'http://localhost:8000/api/v1/chat/authenticate' -Method Post -ContentType 'application/json' -Body $body; if ($r.access_token) { Set-Content -Path '%FLOWISE_PROXY_TOKEN_FILE%' -Value $r.access_token -Encoding ASCII } else { exit 1 } } catch { exit 1 }"
+if exist "%FLOWISE_PROXY_AUTH_SCRIPT%" del /f /q "%FLOWISE_PROXY_AUTH_SCRIPT%" >nul 2>&1
+>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo $body = @{ username = '%ADMIN_USERNAME_VAL%'; password = '%ADMIN_PASSWORD_VAL%' } ^| ConvertTo-Json -Compress
+>>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo try {
+>>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo   $r = Invoke-RestMethod -Uri 'http://localhost:8000/api/v1/chat/authenticate' -Method Post -ContentType 'application/json' -Body $body
+>>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo   if ($r.access_token) {
+>>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo     Set-Content -Path '%FLOWISE_PROXY_TOKEN_FILE%' -Value $r.access_token -Encoding ASCII
+>>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo   } else {
+>>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo     exit 1
+>>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo   }
+>>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo } catch {
+>>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo   exit 1
+>>"%FLOWISE_PROXY_AUTH_SCRIPT%" echo }
+powershell -NoProfile -ExecutionPolicy Bypass -File "%FLOWISE_PROXY_AUTH_SCRIPT%"
 if exist "%FLOWISE_PROXY_TOKEN_FILE%" (
   set /p FLOWISE_PROXY_TOKEN=<"%FLOWISE_PROXY_TOKEN_FILE%"
 )
