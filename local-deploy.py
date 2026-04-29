@@ -163,6 +163,9 @@ def write_auth_env(svc_dir: Path, shared: dict, overwrite=False):
         "JWT_ACCESS_EXPIRES_IN":  "1h",
         "JWT_REFRESH_EXPIRES_IN": "7d",
         # MongoDB — service name within auth-service compose network
+        # NOTE: auth-service runtime reads MONGO_URI (see auth-service/src/config/db.config.ts).
+        # Migration scripts read MONGODB_URI; both are written for compatibility.
+        "MONGO_URI":   "mongodb://mongodb-auth:27017/auth_db",
         "MONGODB_URI": "mongodb://mongodb-auth:27017/auth_db",
         # Email — MailHog (dev only)
         "SMTP_HOST":   "mailhog",
