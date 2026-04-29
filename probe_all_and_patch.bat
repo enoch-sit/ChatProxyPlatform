@@ -10,9 +10,12 @@ REM      has it). If found, force-recreate + wait for Mongo connect.
 REM   3. Detect flowise-proxy CORS env drift (container CORS_ALLOW_ORIGINS is
 REM      empty / "*" / missing http://localhost:3082). If found, rewrite .env
 REM      and force-recreate the flowise-proxy container.
-REM   4. Probe /api/v1/chatflows/my-chatflows for 500; dump flowise-proxy logs
+REM   4. Detect flowise-proxy Mongo auth drift. If logs show Authentication
+REM      failed, reset the proxy Mongo volume and recreate mongodb-proxy plus
+REM      flowise-proxy so root credentials reinitialize from compose.
+REM   5. Probe /api/v1/chatflows/my-chatflows for 500; dump flowise-proxy logs
 REM      and CORS preflight headers if it fails.
-REM   5. Post-probe + smoke-test admin login.
+REM   6. Post-probe + smoke-test admin login.
 REM
 REM Targeted force-recreates only. Read-mostly otherwise.
 REM ============================================================================
@@ -32,8 +35,8 @@ echo probe_all_and_patch %DATE% %TIME%> "%LOG%"
 
 REM ---------------------------------------------------------------------------
 echo.
-echo [1/7] Pre-probe...
-echo [1/7] Pre-probe>> "%LOG%"
+echo [1/8] Pre-probe...
+echo [1/8] Pre-probe>> "%LOG%"
 if not exist probe_all.bat (
   echo [FAIL] probe_all.bat not found in current directory.
   echo [FAIL] probe_all.bat not found>> "%LOG%"
@@ -46,8 +49,8 @@ echo   Pre-probe: %PRE_PROBE%>> "%LOG%"
 
 REM ---------------------------------------------------------------------------
 echo.
-echo [2/7] Detecting auth-service env drift...
-echo [2/7] Detecting auth-service env drift>> "%LOG%"
+echo [2/8] Detecting auth-service env drift...
+echo [2/8] Detecting auth-service env drift>> "%LOG%"
 
 set AUTH_FIX_NEEDED=0
 
@@ -74,8 +77,8 @@ if errorlevel 1 (
 REM ---------------------------------------------------------------------------
 if "!AUTH_FIX_NEEDED!"=="1" (
   echo.
-  echo [3/7] Force-recreating auth-service container...
-  echo [3/7] Force-recreating auth-service>> "%LOG%"
+  echo [3/8] Force-recreating auth-service container...
+  echo [3/8] Force-recreating auth-service>> "%LOG%"
   pushd auth-service
   docker compose -f docker-compose.dev.yml up -d --force-recreate auth-service >> "..\%LOG%" 2>&1
   set RC=!errorlevel!
@@ -109,14 +112,14 @@ if "!AUTH_FIX_NEEDED!"=="1" (
   )
 ) else (
   echo.
-  echo [3/7] No auth-service fix needed; skipping recreate.
-  echo [3/7] no fix needed>> "%LOG%"
+  echo [3/8] No auth-service fix needed; skipping recreate.
+  echo [3/8] no fix needed>> "%LOG%"
 )
 
 REM ---------------------------------------------------------------------------
 echo.
-echo [4/7] Detecting flowise-proxy CORS env drift...
-echo [4/7] Detecting flowise-proxy CORS env drift>> "%LOG%"
+echo [4/8] Detecting flowise-proxy CORS env drift...
+echo [4/8] Detecting flowise-proxy CORS env drift>> "%LOG%"
 
 set PROXY_FIX_NEEDED=0
 set EXPECTED_CORS=http://localhost:3082,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:8000
@@ -152,8 +155,8 @@ if errorlevel 1 (
 REM ---------------------------------------------------------------------------
 if "!PROXY_FIX_NEEDED!"=="1" (
   echo.
-  echo [5/7] Force-recreating flowise-proxy container...
-  echo [5/7] Force-recreating flowise-proxy>> "%LOG%"
+  echo [5/8] Force-recreating flowise-proxy container...
+  echo [5/8] Force-recreating flowise-proxy>> "%LOG%"
   pushd flowise-proxy-service-py
   if exist docker-compose.linux.yml (
     docker compose -f docker-compose.linux.yml up -d --force-recreate flowise-proxy >> "..\%LOG%" 2>&1
@@ -191,14 +194,74 @@ if "!PROXY_FIX_NEEDED!"=="1" (
   )
 ) else (
   echo.
-  echo [5/7] No flowise-proxy fix needed; skipping recreate.
-  echo [5/7] no proxy fix needed>> "%LOG%"
+  echo [5/8] No flowise-proxy fix needed; skipping recreate.
+  echo [5/8] no proxy fix needed>> "%LOG%"
 )
 
 REM ---------------------------------------------------------------------------
 echo.
-echo [6/7] CORS preflight + chatflows probe...
-echo [6/7] CORS preflight + chatflows probe>> "%LOG%"
+echo [6/8] Detecting flowise-proxy Mongo auth drift...
+echo [6/8] Detecting flowise-proxy Mongo auth drift>> "%LOG%"
+
+set PROXY_MONGO_RESET_NEEDED=0
+docker logs flowise-proxy 2>&1 | findstr /C:"pymongo.errors.OperationFailure: Authentication failed." >nul
+if errorlevel 1 (
+  echo   [OK] flowise-proxy logs do not show Mongo auth failure.
+  echo   [OK] no proxy Mongo auth failure signature>> "%LOG%"
+) else (
+  echo   [WARN] flowise-proxy logs show Mongo auth failure.
+  echo   [WARN] proxy Mongo auth failure signature detected>> "%LOG%"
+  set PROXY_MONGO_RESET_NEEDED=1
+)
+
+if "!PROXY_MONGO_RESET_NEEDED!"=="1" (
+  echo.
+  echo [6b] Resetting flowise-proxy Mongo volume and recreating proxy stack...
+  echo [6b] Resetting proxy Mongo volume + stack>> "%LOG%"
+  pushd flowise-proxy-service-py
+  docker compose down -v >> "..\%LOG%" 2>&1
+  set RC=!errorlevel!
+  if not "!RC!"=="0" (
+    popd
+    echo   [WARN] docker compose down -v failed with RC=!RC!
+    echo   [WARN] proxy compose down -v RC=!RC!>> "%LOG%"
+  ) else (
+    docker compose up -d mongodb flowise-proxy >> "..\%LOG%" 2>&1
+    set RC=!errorlevel!
+    popd
+    if not "!RC!"=="0" (
+      echo   [WARN] docker compose up failed after proxy Mongo reset with RC=!RC!
+      echo   [WARN] proxy compose up after reset RC=!RC!>> "%LOG%"
+    ) else (
+      echo   [OK] flowise-proxy Mongo volume reset and stack recreated.
+      echo   [OK] proxy Mongo reset + recreate complete>> "%LOG%"
+
+      echo.
+      echo [6c] Waiting up to 60s for flowise-proxy /docs after Mongo reset...
+      set PROXY_UP=0
+      for /l %%N in (1,1,30) do (
+        if "!PROXY_UP!"=="0" (
+          curl -s -o nul -w "%%{http_code}" --max-time 2 http://localhost:8000/docs > "%TEMP%\px.txt" 2>nul
+          set /p PROXY_CODE=<"%TEMP%\px.txt"
+          if "!PROXY_CODE!"=="200" set PROXY_UP=1
+        )
+        if "!PROXY_UP!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 2" >nul
+      )
+      if "!PROXY_UP!"=="1" (
+        echo   [OK] flowise-proxy is up after Mongo reset.
+        echo   [OK] flowise-proxy up after Mongo reset>> "%LOG%"
+      ) else (
+        echo   [WARN] flowise-proxy /docs not 200 within 60s after Mongo reset.
+        echo   [WARN] flowise-proxy not up after Mongo reset>> "%LOG%"
+      )
+    )
+  )
+)
+
+REM ---------------------------------------------------------------------------
+echo.
+echo [7/8] CORS preflight + chatflows probe...
+echo [7/8] CORS preflight + chatflows probe>> "%LOG%"
 
 echo   --- OPTIONS /api/v1/chatflows/my-chatflows (preflight) ---
 echo   --- OPTIONS preflight ---            >> "%LOG%"
@@ -224,8 +287,8 @@ docker logs flowise-proxy --tail 40 >> "%LOG%" 2>&1
 
 REM ---------------------------------------------------------------------------
 echo.
-echo [7/7] Post-probe...
-echo [7/7] Post-probe>> "%LOG%"
+echo [8/8] Post-probe...
+echo [8/8] Post-probe>> "%LOG%"
 call probe_all.bat >nul 2>&1
 for /f "delims=" %%F in ('dir /b /od logs\probe_all-*.txt') do set POST_PROBE=logs\%%F
 echo   Post-probe: %POST_PROBE%
@@ -233,8 +296,8 @@ echo   Post-probe: %POST_PROBE%>> "%LOG%"
 
 REM ---------------------------------------------------------------------------
 echo.
-echo [7b] Smoke-testing admin login...
-echo [7b] Smoke-testing admin login>> "%LOG%"
+echo [8b] Smoke-testing admin login...
+echo [8b] Smoke-testing admin login>> "%LOG%"
 
 set ADMIN_USERNAME_VAL=admin
 if defined ADMIN_USERNAME set ADMIN_USERNAME_VAL=%ADMIN_USERNAME%
