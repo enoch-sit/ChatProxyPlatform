@@ -94,6 +94,15 @@ export interface CurrentCreditBalance {
   activeAllocationCount: number;
 }
 
+export interface UsersDirectoryEntry {
+  userId: string;
+  username?: string;
+  email?: string;
+  role?: string;
+  currentCredits: number;
+  activeAllocationCount: number;
+}
+
 export interface AllocateCreditsPayload {
   userId: string;
   credits: number;
