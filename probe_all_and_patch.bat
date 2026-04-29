@@ -123,6 +123,7 @@ echo [4/8] Detecting flowise-proxy CORS env drift...
 echo [4/8] Detecting flowise-proxy CORS env drift>> "%LOG%"
 
 set PROXY_FIX_NEEDED=0
+set PROXY_MONGO_ENV_REPAIRED=0
 set EXPECTED_CORS=http://localhost:3082,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:8000
 
 REM flowise-proxy .env must also expose MONGO_PASSWORD for mongodb-proxy compose env.
@@ -139,6 +140,7 @@ if "!PROXY_MONGO_ENV_OK!"=="0" (
   ) else (
     echo   [OK] flowise-proxy .env MONGO_PASSWORD restored from MONGODB_URL.
     echo   [OK] proxy .env MONGO_PASSWORD restored from MONGODB_URL>> "%LOG%"
+    set PROXY_MONGO_ENV_REPAIRED=1
   )
 )
 
@@ -222,6 +224,12 @@ echo [6/8] Detecting flowise-proxy Mongo auth drift...
 echo [6/8] Detecting flowise-proxy Mongo auth drift>> "%LOG%"
 
 set PROXY_MONGO_RESET_NEEDED=0
+if "!PROXY_MONGO_ENV_REPAIRED!"=="1" (
+  echo   [WARN] flowise-proxy Mongo env was repaired - forcing mongodb-proxy reset.
+  echo   [WARN] proxy Mongo env repaired - forcing reset>> "%LOG%"
+  set PROXY_MONGO_RESET_NEEDED=1
+)
+
 docker logs flowise-proxy 2>&1 | findstr /C:"pymongo.errors.OperationFailure: Authentication failed." >nul
 if errorlevel 1 (
   echo   [OK] flowise-proxy logs do not show Mongo auth failure.
@@ -229,6 +237,26 @@ if errorlevel 1 (
 ) else (
   echo   [WARN] flowise-proxy logs show Mongo auth failure.
   echo   [WARN] proxy Mongo auth failure signature detected>> "%LOG%"
+  set PROXY_MONGO_RESET_NEEDED=1
+)
+
+docker logs flowise-proxy 2>&1 | findstr /C:"No address associated with hostname" >nul
+if errorlevel 1 (
+  echo   [OK] flowise-proxy logs do not show Mongo hostname resolution failure.
+  echo   [OK] no proxy Mongo hostname resolution failure>> "%LOG%"
+) else (
+  echo   [WARN] flowise-proxy logs show Mongo hostname resolution failure.
+  echo   [WARN] proxy Mongo hostname resolution failure detected>> "%LOG%"
+  set PROXY_MONGO_RESET_NEEDED=1
+)
+
+docker logs mongodb-proxy 2>&1 | findstr /C:"missing 'MONGO_INITDB_ROOT_USERNAME' or 'MONGO_INITDB_ROOT_PASSWORD'" >nul
+if errorlevel 1 (
+  echo   [OK] mongodb-proxy logs do not show missing root env.
+  echo   [OK] no mongodb-proxy missing root env signature>> "%LOG%"
+) else (
+  echo   [WARN] mongodb-proxy logs show missing root env.
+  echo   [WARN] mongodb-proxy missing root env signature detected>> "%LOG%"
   set PROXY_MONGO_RESET_NEEDED=1
 )
 
