@@ -226,33 +226,62 @@ if "!PROXY_MONGO_RESET_NEEDED!"=="1" (
     echo   [WARN] docker compose down -v failed with RC=!RC!
     echo   [WARN] proxy compose down -v RC=!RC!>> "%LOG%"
   ) else (
-    docker compose up -d mongodb flowise-proxy >> "..\%LOG%" 2>&1
+    docker compose up -d mongodb >> "..\%LOG%" 2>&1
     set RC=!errorlevel!
-    popd
     if not "!RC!"=="0" (
+      popd
       echo   [WARN] docker compose up failed after proxy Mongo reset with RC=!RC!
       echo   [WARN] proxy compose up after reset RC=!RC!>> "%LOG%"
     ) else (
-      echo   [OK] flowise-proxy Mongo volume reset and stack recreated.
-      echo   [OK] proxy Mongo reset + recreate complete>> "%LOG%"
+      echo   [OK] mongodb-proxy recreated; waiting for health before starting flowise-proxy.
+      echo   [OK] mongodb-proxy recreated after volume reset>> "%LOG%"
 
       echo.
-      echo [6c] Waiting up to 60s for flowise-proxy /docs after Mongo reset...
-      set PROXY_UP=0
+      echo [6c] Waiting up to 60s for mongodb-proxy health...
+      set PROXY_MONGO_HEALTHY=0
       for /l %%N in (1,1,30) do (
-        if "!PROXY_UP!"=="0" (
-          curl -s -o nul -w "%%{http_code}" --max-time 2 http://localhost:8000/docs > "%TEMP%\px.txt" 2>nul
-          set /p PROXY_CODE=<"%TEMP%\px.txt"
-          if "!PROXY_CODE!"=="200" set PROXY_UP=1
+        if "!PROXY_MONGO_HEALTHY!"=="0" (
+          for /f "usebackq delims=" %%H in (`docker inspect mongodb-proxy --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}" 2^>nul`) do set PROXY_MONGO_STATUS=%%H
+          if /I "!PROXY_MONGO_STATUS!"=="healthy" set PROXY_MONGO_HEALTHY=1
         )
-        if "!PROXY_UP!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 2" >nul
+        if "!PROXY_MONGO_HEALTHY!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 2" >nul
       )
-      if "!PROXY_UP!"=="1" (
-        echo   [OK] flowise-proxy is up after Mongo reset.
-        echo   [OK] flowise-proxy up after Mongo reset>> "%LOG%"
+      if "!PROXY_MONGO_HEALTHY!"=="1" (
+        echo   [OK] mongodb-proxy is healthy.
+        echo   [OK] mongodb-proxy healthy after reset>> "%LOG%"
       ) else (
-        echo   [WARN] flowise-proxy /docs not 200 within 60s after Mongo reset.
-        echo   [WARN] flowise-proxy not up after Mongo reset>> "%LOG%"
+        echo   [WARN] mongodb-proxy did not report healthy within 60s.
+        echo   [WARN] mongodb-proxy not healthy within 60s>> "%LOG%"
+      )
+
+      docker compose up -d flowise-proxy >> "..\%LOG%" 2>&1
+      set RC=!errorlevel!
+      popd
+      if not "!RC!"=="0" (
+        echo   [WARN] docker compose up failed when starting flowise-proxy after Mongo reset with RC=!RC!
+        echo   [WARN] flowise-proxy compose up after Mongo reset RC=!RC!>> "%LOG%"
+      ) else (
+        echo   [OK] flowise-proxy Mongo volume reset and stack recreated.
+        echo   [OK] proxy Mongo reset + recreate complete>> "%LOG%"
+
+        echo.
+        echo [6d] Waiting up to 60s for flowise-proxy /docs after Mongo reset...
+        set PROXY_UP=0
+        for /l %%N in (1,1,30) do (
+          if "!PROXY_UP!"=="0" (
+            curl -s -o nul -w "%%{http_code}" --max-time 2 http://localhost:8000/docs > "%TEMP%\px.txt" 2>nul
+            set /p PROXY_CODE=<"%TEMP%\px.txt"
+            if "!PROXY_CODE!"=="200" set PROXY_UP=1
+          )
+          if "!PROXY_UP!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 2" >nul
+        )
+        if "!PROXY_UP!"=="1" (
+          echo   [OK] flowise-proxy is up after Mongo reset.
+          echo   [OK] flowise-proxy up after Mongo reset>> "%LOG%"
+        ) else (
+          echo   [WARN] flowise-proxy /docs not 200 within 60s after Mongo reset.
+          echo   [WARN] flowise-proxy not up after Mongo reset>> "%LOG%"
+        )
       )
     )
   )
@@ -262,6 +291,11 @@ REM ---------------------------------------------------------------------------
 echo.
 echo [7/8] CORS preflight + chatflows probe...
 echo [7/8] CORS preflight + chatflows probe>> "%LOG%"
+
+set ADMIN_USERNAME_VAL=admin
+if defined ADMIN_USERNAME set ADMIN_USERNAME_VAL=%ADMIN_USERNAME%
+set ADMIN_PASSWORD_VAL=admin@admin
+if defined ADMIN_PASSWORD set ADMIN_PASSWORD_VAL=%ADMIN_PASSWORD%
 
 echo   --- OPTIONS /api/v1/chatflows/my-chatflows (preflight) ---
 echo   --- OPTIONS preflight ---            >> "%LOG%"
@@ -274,12 +308,56 @@ findstr /I "HTTP/ access-control-allow-origin access-control-allow-credentials" 
 findstr /I "HTTP/ access-control-allow-origin access-control-allow-credentials" "%TEMP%\preflight.txt" >> "%LOG%"
 
 echo.
-echo   --- GET /api/v1/chatflows/my-chatflows (no auth, expect 401, NOT 500) ---
-echo   --- GET my-chatflows ---             >> "%LOG%"
+echo   --- GET /api/v1/chatflows/my-chatflows (no auth, expect 401/403, NOT 500) ---
+echo   --- GET my-chatflows unauth ---      >> "%LOG%"
 curl -s -o nul -w "  status=%%{http_code}\n" --max-time 5 http://localhost:8000/api/v1/chatflows/my-chatflows
 curl -s -o nul -w "  status=%%{http_code}" --max-time 5 http://localhost:8000/api/v1/chatflows/my-chatflows >> "%LOG%" 2>&1
 echo.>> "%LOG%"
 
+echo.
+echo   --- POST /api/v1/chat/authenticate (bridge login path) ---
+echo   --- POST bridge authenticate ---     >> "%LOG%"
+set FLOWISE_PROXY_TOKEN=
+for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "$body = @{ username = '%ADMIN_USERNAME_VAL%'; password = '%ADMIN_PASSWORD_VAL%' } | ConvertTo-Json -Compress; try { $r = Invoke-RestMethod -Uri 'http://localhost:8000/api/v1/chat/authenticate' -Method Post -ContentType 'application/json' -Body $body; if ($r.access_token) { $r.access_token } else { exit 1 } } catch { exit 1 }"`) do set FLOWISE_PROXY_TOKEN=%%T
+if defined FLOWISE_PROXY_TOKEN (
+  echo   [OK] bridge authenticate returned an access token.
+  echo   [OK] bridge authenticate returned access token>> "%LOG%"
+
+  echo.
+  echo   --- GET /api/v1/chatflows/my-chatflows (auth) ---
+  echo   --- GET my-chatflows auth ---       >> "%LOG%"
+  curl -s -o "%TEMP%\my-chatflows-auth.json" -w "  status=%%{http_code}\n" --max-time 8 ^
+    -H "Authorization: Bearer !FLOWISE_PROXY_TOKEN!" ^
+    http://localhost:8000/api/v1/chatflows/my-chatflows
+  curl -s -o nul -w "  status=%%{http_code}" --max-time 8 ^
+    -H "Authorization: Bearer !FLOWISE_PROXY_TOKEN!" ^
+    http://localhost:8000/api/v1/chatflows/my-chatflows >> "%LOG%" 2>&1
+  echo.>> "%LOG%"
+  echo   body:
+  type "%TEMP%\my-chatflows-auth.json"
+  echo   body:>> "%LOG%"
+  type "%TEMP%\my-chatflows-auth.json" >> "%LOG%"
+
+  echo.
+  echo   --- GET /api/v1/chat/sessions (auth) ---
+  echo   --- GET sessions auth ---           >> "%LOG%"
+  curl -s -o "%TEMP%\sessions-auth.json" -w "  status=%%{http_code}\n" --max-time 8 ^
+    -H "Authorization: Bearer !FLOWISE_PROXY_TOKEN!" ^
+    http://localhost:8000/api/v1/chat/sessions
+  curl -s -o nul -w "  status=%%{http_code}" --max-time 8 ^
+    -H "Authorization: Bearer !FLOWISE_PROXY_TOKEN!" ^
+    http://localhost:8000/api/v1/chat/sessions >> "%LOG%" 2>&1
+  echo.>> "%LOG%"
+  echo   body:
+  type "%TEMP%\sessions-auth.json"
+  echo   body:>> "%LOG%"
+  type "%TEMP%\sessions-auth.json" >> "%LOG%"
+) else (
+  echo   [WARN] bridge authenticate did not return an access token.
+  echo   [WARN] bridge authenticate failed>> "%LOG%"
+)
+
+echo.
 echo   --- last 40 lines of flowise-proxy logs ---
 echo   --- flowise-proxy logs ---            >> "%LOG%"
 docker logs flowise-proxy --tail 40 2>&1
@@ -298,11 +376,6 @@ REM ---------------------------------------------------------------------------
 echo.
 echo [8b] Smoke-testing admin login...
 echo [8b] Smoke-testing admin login>> "%LOG%"
-
-set ADMIN_USERNAME_VAL=admin
-if defined ADMIN_USERNAME set ADMIN_USERNAME_VAL=%ADMIN_USERNAME%
-set ADMIN_PASSWORD_VAL=admin@admin
-if defined ADMIN_PASSWORD set ADMIN_PASSWORD_VAL=%ADMIN_PASSWORD%
 
 curl -s -o nul -w "  /health -> HTTP %%{http_code}\n" --max-time 5 http://localhost:3000/health
 curl -s -o nul -w "  POST /api/auth/login -> HTTP %%{http_code}\n" --max-time 5 ^
