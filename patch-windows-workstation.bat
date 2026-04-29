@@ -15,13 +15,13 @@ if "%MODE%"=="" set "MODE=auto"
 
 REM HARD SAFETY: require explicit patch target
 if "%PATCH_TARGET%"=="" (
-  echo [FAIL] PATCH_TARGET is required. Set PATCH_TARGET=BHSS or PATCH_TARGET=AWS before patching.
-  echo        Example: set PATCH_TARGET=BHSS
+  echo [FAIL] PATCH_TARGET is required. Set PATCH_TARGET=BHSS, AWS, or LOCAL before patching.
+  echo        Example: set PATCH_TARGET=LOCAL
   exit /b 1
 )
 
-if /I not "%PATCH_TARGET%"=="BHSS" if /I not "%PATCH_TARGET%"=="AWS" (
-  echo [FAIL] PATCH_TARGET must be BHSS or AWS. Current: %PATCH_TARGET%
+if /I not "%PATCH_TARGET%"=="BHSS" if /I not "%PATCH_TARGET%"=="AWS" if /I not "%PATCH_TARGET%"=="LOCAL" (
+  echo [FAIL] PATCH_TARGET must be BHSS, AWS, or LOCAL. Current: %PATCH_TARGET%
   exit /b 1
 )
 
