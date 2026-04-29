@@ -302,6 +302,11 @@ Write-Host "[3/5] Mode: $($Mode.ToUpper())" -ForegroundColor Cyan
 # Step 3b: Run tests (if test mode or full mode)
 # ═══════════════════════════════════════════════════════════════════════════════
 if ($Mode -eq "test" -or $Mode -eq "full") {
+    if ($env:SKIP_TESTS -eq "1") {
+        Write-Host ""
+        Write-Host "  [WARN] SKIP_TESTS=1 set; bypassing host-side test step." -ForegroundColor Yellow
+        Write-Log "SKIP_TESTS=1; host-side tests bypassed" "WARN"
+    } else {
     Write-Host ""
     Write-Host "  Running tests for changed services..." -ForegroundColor Yellow
 
@@ -342,6 +347,7 @@ if ($Mode -eq "test" -or $Mode -eq "full") {
         Write-Log "Aborting deploy due to test failures." "FAIL"
         exit 1
     }
+    } # end SKIP_TESTS else
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
