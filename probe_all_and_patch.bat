@@ -124,6 +124,7 @@ echo [4/8] Detecting flowise-proxy CORS env drift>> "%LOG%"
 
 set PROXY_FIX_NEEDED=0
 set PROXY_MONGO_ENV_REPAIRED=0
+set PROXY_FLOWISE_KEY_REPAIRED=0
 set EXPECTED_CORS=http://localhost:3082,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:8000
 
 REM flowise-proxy .env must also expose MONGO_PASSWORD for mongodb-proxy compose env.
@@ -327,6 +328,84 @@ if "!PROXY_MONGO_RESET_NEEDED!"=="1" (
         ) else (
           echo   [WARN] flowise-proxy /docs not 200 within 10s after Mongo reset.
           echo   [WARN] flowise-proxy not up after Mongo reset>> "%LOG%"
+        )
+      )
+    )
+  )
+)
+
+REM flowise-proxy .env should not keep the placeholder Flowise API key.
+set PROXY_FLOWISE_KEY=
+for /f "usebackq tokens=1,* delims==" %%A in (`findstr /B /R "^FLOWISE_API_KEY=" flowise-proxy-service-py\.env 2^>nul`) do set PROXY_FLOWISE_KEY=%%B
+if /I "!PROXY_FLOWISE_KEY!"=="your_flowise_api_key_here" (
+  echo   [WARN] flowise-proxy .env still has placeholder FLOWISE_API_KEY.
+  echo   [WARN] proxy .env has placeholder FLOWISE_API_KEY>> "%LOG%"
+  if defined FLOWISE_API_KEY_REPAIR (
+    echo   [INFO] replacing placeholder FLOWISE_API_KEY from FLOWISE_API_KEY_REPAIR.
+    echo   [INFO] replacing placeholder FLOWISE_API_KEY from FLOWISE_API_KEY_REPAIR>> "%LOG%"
+    powershell -NoProfile -Command "$f='flowise-proxy-service-py\.env'; $replacement='FLOWISE_API_KEY=%FLOWISE_API_KEY_REPAIR%'; $content = Get-Content $f | ForEach-Object { if ($_ -match '^FLOWISE_API_KEY=') { $replacement } else { $_ } }; Set-Content -Path $f -Value $content -Encoding ASCII"
+    if errorlevel 1 (
+      echo   [WARN] failed to replace placeholder FLOWISE_API_KEY from FLOWISE_API_KEY_REPAIR.
+      echo   [WARN] failed replacing placeholder FLOWISE_API_KEY>> "%LOG%"
+    ) else (
+      echo   [OK] flowise-proxy .env FLOWISE_API_KEY updated from FLOWISE_API_KEY_REPAIR.
+      echo   [OK] proxy .env FLOWISE_API_KEY updated from FLOWISE_API_KEY_REPAIR>> "%LOG%"
+      set PROXY_FIX_NEEDED=1
+      set PROXY_FLOWISE_KEY_REPAIRED=1
+    )
+  ) else (
+    echo   [WARN] set FLOWISE_API_KEY_REPAIR to auto-repair the proxy Flowise API key in this run.
+    echo   [WARN] FLOWISE_API_KEY_REPAIR not set for placeholder Flowise API key>> "%LOG%"
+  )
+)
+
+REM Validate the upstream Flowise key after the proxy stack is healthy enough to answer requests.
+echo.
+echo [6e] Validating upstream Flowise API key from flowise-proxy .env...
+echo [6e] Validating upstream Flowise API key>> "%LOG%"
+set FLOWISE_KEY_STATUS=unknown
+set FLOWISE_KEY_HTTP=
+set FLOWISE_PROXY_KEY=
+for /f "usebackq tokens=1,* delims==" %%A in (`findstr /B /R "^FLOWISE_API_KEY=" flowise-proxy-service-py\.env 2^>nul`) do set FLOWISE_PROXY_KEY=%%B
+if not defined FLOWISE_PROXY_KEY (
+  echo   [WARN] flowise-proxy .env has no FLOWISE_API_KEY entry.
+  echo   [WARN] proxy .env missing FLOWISE_API_KEY>> "%LOG%"
+  set FLOWISE_KEY_STATUS=missing
+) else if "!FLOWISE_PROXY_KEY!"=="" (
+  echo   [WARN] flowise-proxy .env FLOWISE_API_KEY is empty.
+  echo   [WARN] proxy .env FLOWISE_API_KEY empty>> "%LOG%"
+  set FLOWISE_KEY_STATUS=missing
+) else (
+  curl -s -o nul -w "%%{http_code}" --max-time 10 -H "Authorization: Bearer !FLOWISE_PROXY_KEY!" http://localhost:3002/api/v1/chatflows > "%TEMP%\flowise-key-http.txt" 2>nul
+  set /p FLOWISE_KEY_HTTP=<"%TEMP%\flowise-key-http.txt"
+  if "!FLOWISE_KEY_HTTP!"=="200" (
+    echo   [OK] upstream Flowise API key is valid.
+    echo   [OK] upstream Flowise API key valid>> "%LOG%"
+    set FLOWISE_KEY_STATUS=valid
+  ) else (
+    echo   [WARN] upstream Flowise API key validation failed with HTTP !FLOWISE_KEY_HTTP!.
+    echo   [WARN] upstream Flowise API key invalid HTTP !FLOWISE_KEY_HTTP!>> "%LOG%"
+    set FLOWISE_KEY_STATUS=invalid
+    if defined FLOWISE_API_KEY_REPAIR if not "!PROXY_FLOWISE_KEY_REPAIRED!"=="1" (
+      echo   [INFO] updating FLOWISE_API_KEY from FLOWISE_API_KEY_REPAIR and recreating flowise-proxy.
+      echo   [INFO] updating FLOWISE_API_KEY from FLOWISE_API_KEY_REPAIR>> "%LOG%"
+      powershell -NoProfile -Command "$f='flowise-proxy-service-py\.env'; $replacement='FLOWISE_API_KEY=%FLOWISE_API_KEY_REPAIR%'; $content = Get-Content $f | ForEach-Object { if ($_ -match '^FLOWISE_API_KEY=') { $replacement } else { $_ } }; Set-Content -Path $f -Value $content -Encoding ASCII"
+      if errorlevel 1 (
+        echo   [WARN] failed to update invalid FLOWISE_API_KEY from FLOWISE_API_KEY_REPAIR.
+        echo   [WARN] failed updating invalid FLOWISE_API_KEY>> "%LOG%"
+      ) else (
+        set PROXY_FIX_NEEDED=1
+        set PROXY_FLOWISE_KEY_REPAIRED=1
+        pushd flowise-proxy-service-py
+        docker compose up -d --force-recreate flowise-proxy >> "%ROOT_DIR%\%LOG%" 2>&1
+        set RC=!errorlevel!
+        popd
+        if not "!RC!"=="0" (
+          echo   [WARN] flowise-proxy recreate failed after FLOWISE_API_KEY repair with RC=!RC!.
+          echo   [WARN] flowise-proxy recreate failed after FLOWISE_API_KEY repair RC=!RC!>> "%LOG%"
+        ) else (
+          echo   [OK] flowise-proxy recreated after FLOWISE_API_KEY repair.
+          echo   [OK] flowise-proxy recreated after FLOWISE_API_KEY repair>> "%LOG%"
         )
       )
     )
