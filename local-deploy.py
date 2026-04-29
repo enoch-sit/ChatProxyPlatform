@@ -261,8 +261,9 @@ def write_flowise_proxy_env(svc_dir: Path, shared: dict, overwrite=False):
         # Collection setup
         "FORCE_COLLECTION_SETUP":       "false",
         "FAIL_ON_COLLECTION_SETUP_ERROR": "false",
-        # CORS
-        "CORS_ALLOW_ORIGINS": "*",
+        # CORS — explicit origins required because flowise-proxy uses
+        # allow_credentials=True; Starlette will not echo Origin if value is "*".
+        "CORS_ALLOW_ORIGINS": "http://localhost:3082,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:8000",
         # Chatflow sync
         "ENABLE_CHATFLOW_SYNC":         "true",
         "CHATFLOW_SYNC_INTERVAL_MINUTES": "60",
