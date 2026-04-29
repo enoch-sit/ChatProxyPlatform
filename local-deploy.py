@@ -124,31 +124,40 @@ def load_env_local(path: Path) -> dict:
 
 def get_or_create_shared_secrets(env_local: Path, overwrite=False) -> dict:
     """
-    Load shared JWT secrets from .env.local.
+    Load shared JWT and Mongo secrets from .env.local.
     Generate fresh ones if missing or overwrite=True.
-    Returns dict with jwt_access_secret, jwt_refresh_secret.
+    Returns dict with JWT secrets and the shared Mongo password.
     """
     existing = load_env_local(env_local)
 
-    if not overwrite and "JWT_ACCESS_SECRET" in existing and "JWT_REFRESH_SECRET" in existing:
+    if (
+        not overwrite
+        and "JWT_ACCESS_SECRET" in existing
+        and "JWT_REFRESH_SECRET" in existing
+        and "MONGO_PASSWORD" in existing
+    ):
         info("Loaded existing shared secrets from .env.local")
         return {
             "JWT_ACCESS_SECRET": existing["JWT_ACCESS_SECRET"],
             "JWT_REFRESH_SECRET": existing["JWT_REFRESH_SECRET"],
+            "MONGO_PASSWORD": existing["MONGO_PASSWORD"],
         }
 
     jwt_access  = secrets.token_hex(32)
     jwt_refresh = secrets.token_hex(32)
+    mongo_password = secrets.token_urlsafe(24)
 
     write_env(env_local, {
         "# ChatProxy shared secrets — do not commit this file": "",
         "JWT_ACCESS_SECRET":  jwt_access,
         "JWT_REFRESH_SECRET": jwt_refresh,
+        "MONGO_PASSWORD": mongo_password,
     }, overwrite=True)
-    ok("Generated fresh shared JWT secrets → .env.local")
+    ok("Generated fresh shared JWT and Mongo secrets → .env.local")
     return {
         "JWT_ACCESS_SECRET":  jwt_access,
         "JWT_REFRESH_SECRET": jwt_refresh,
+        "MONGO_PASSWORD": mongo_password,
     }
 
 # ── Per-service .env writers ──────────────────────────────────────────────────
@@ -233,8 +242,7 @@ def write_flowise_env(svc_dir: Path, overwrite=False):
 
 
 def write_flowise_proxy_env(svc_dir: Path, shared: dict, overwrite=False):
-    # MongoDB root password is hardcoded in docker-compose.yml for this service
-    mongo_pass = "65424b6a739b4198ae2a3e08b35deeda"
+    mongo_pass = shared["MONGO_PASSWORD"]
     write_env(svc_dir / ".env", {
         # JWT — must match auth-service and accounting-service
         "JWT_SECRET_KEY":    shared["JWT_ACCESS_SECRET"],
@@ -251,6 +259,7 @@ def write_flowise_proxy_env(svc_dir: Path, shared: dict, overwrite=False):
         "EXTERNAL_AUTH_URL":      "http://auth-service:3000",
         "ACCOUNTING_SERVICE_URL": "http://accounting-service:3001",
         # MongoDB — container_name mongodb-proxy, host port 27020
+        "MONGO_PASSWORD":        mongo_pass,
         "MONGODB_URL":           f"mongodb://admin:{mongo_pass}@mongodb-proxy:27017/flowise_proxy?authSource=admin",
         "MONGODB_DATABASE_NAME": "flowise_proxy",
         # Server
