@@ -22,6 +22,7 @@ REM ============================================================================
 
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
+set ROOT_DIR=%CD%
 
 if not exist logs mkdir logs
 for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Get-Date -Format 'yyyyMMdd-HHmmss'"`) do set TS=%%I
@@ -219,14 +220,14 @@ if "!PROXY_MONGO_RESET_NEEDED!"=="1" (
   echo [6b] Resetting flowise-proxy Mongo volume and recreating proxy stack...
   echo [6b] Resetting proxy Mongo volume + stack>> "%LOG%"
   pushd flowise-proxy-service-py
-  docker compose down -v >> "..\%LOG%" 2>&1
+  docker compose down -v >> "%ROOT_DIR%\%LOG%" 2>&1
   set RC=!errorlevel!
   if not "!RC!"=="0" (
     popd
     echo   [WARN] docker compose down -v failed with RC=!RC!
     echo   [WARN] proxy compose down -v RC=!RC!>> "%LOG%"
   ) else (
-    docker compose up -d mongodb >> "..\%LOG%" 2>&1
+    docker compose up -d mongodb >> "%ROOT_DIR%\%LOG%" 2>&1
     set RC=!errorlevel!
     if not "!RC!"=="0" (
       popd
@@ -254,7 +255,7 @@ if "!PROXY_MONGO_RESET_NEEDED!"=="1" (
         echo   [WARN] mongodb-proxy not healthy within 60s>> "%LOG%"
       )
 
-      docker compose up -d flowise-proxy >> "..\%LOG%" 2>&1
+      docker compose up -d flowise-proxy >> "%ROOT_DIR%\%LOG%" 2>&1
       set RC=!errorlevel!
       popd
       if not "!RC!"=="0" (
@@ -318,7 +319,12 @@ echo.
 echo   --- POST /api/v1/chat/authenticate (bridge login path) ---
 echo   --- POST bridge authenticate ---     >> "%LOG%"
 set FLOWISE_PROXY_TOKEN=
-for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "$body = @{ username = '%ADMIN_USERNAME_VAL%'; password = '%ADMIN_PASSWORD_VAL%' } | ConvertTo-Json -Compress; try { $r = Invoke-RestMethod -Uri 'http://localhost:8000/api/v1/chat/authenticate' -Method Post -ContentType 'application/json' -Body $body; if ($r.access_token) { $r.access_token } else { exit 1 } } catch { exit 1 }"`) do set FLOWISE_PROXY_TOKEN=%%T
+set FLOWISE_PROXY_TOKEN_FILE=%TEMP%\flowise-proxy-token.txt
+if exist "%FLOWISE_PROXY_TOKEN_FILE%" del /f /q "%FLOWISE_PROXY_TOKEN_FILE%" >nul 2>&1
+powershell -NoProfile -Command "$body = @{ username = '%ADMIN_USERNAME_VAL%'; password = '%ADMIN_PASSWORD_VAL%' } | ConvertTo-Json -Compress; try { $r = Invoke-RestMethod -Uri 'http://localhost:8000/api/v1/chat/authenticate' -Method Post -ContentType 'application/json' -Body $body; if ($r.access_token) { Set-Content -Path '%FLOWISE_PROXY_TOKEN_FILE%' -Value $r.access_token -Encoding ASCII } else { exit 1 } } catch { exit 1 }"
+if exist "%FLOWISE_PROXY_TOKEN_FILE%" (
+  set /p FLOWISE_PROXY_TOKEN=<"%FLOWISE_PROXY_TOKEN_FILE%"
+)
 if defined FLOWISE_PROXY_TOKEN (
   echo   [OK] bridge authenticate returned an access token.
   echo   [OK] bridge authenticate returned access token>> "%LOG%"
