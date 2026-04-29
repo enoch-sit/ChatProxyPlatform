@@ -92,15 +92,15 @@ if "!AUTH_FIX_NEEDED!"=="1" (
   echo   [OK] auth-service recreated.
 
   echo.
-  echo [3b] Waiting up to 60s for auth-service to connect to MongoDB...
+  echo [3b] Waiting up to 10s for auth-service to connect to MongoDB...
   echo [3b] Waiting for MongoDB connection>> "%LOG%"
   set CONNECTED=0
-  for /l %%N in (1,1,30) do (
+  for /l %%N in (1,1,10) do (
     if "!CONNECTED!"=="0" (
       docker logs auth-service 2>nul | findstr /C:"MongoDB connected successfully" >nul
       if not errorlevel 1 set CONNECTED=1
     )
-    if "!CONNECTED!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 2" >nul
+    if "!CONNECTED!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 1" >nul
   )
   if "!CONNECTED!"=="1" (
     echo   [OK] MongoDB connected.
@@ -174,15 +174,15 @@ if "!PROXY_FIX_NEEDED!"=="1" (
   )
 
   echo.
-  echo [5b] Waiting up to 60s for flowise-proxy /docs to respond...
+  echo [5b] Waiting up to 10s for flowise-proxy /docs to respond...
   set PROXY_UP=0
-  for /l %%N in (1,1,30) do (
+  for /l %%N in (1,1,10) do (
     if "!PROXY_UP!"=="0" (
       curl -s -o nul -w "%%{http_code}" --max-time 2 http://localhost:8000/docs > "%TEMP%\px.txt" 2>nul
       set /p PROXY_CODE=<"%TEMP%\px.txt"
       if "!PROXY_CODE!"=="200" set PROXY_UP=1
     )
-    if "!PROXY_UP!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 2" >nul
+    if "!PROXY_UP!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 1" >nul
   )
   if "!PROXY_UP!"=="1" (
     echo   [OK] flowise-proxy is up.
@@ -238,14 +238,14 @@ if "!PROXY_MONGO_RESET_NEEDED!"=="1" (
       echo   [OK] mongodb-proxy recreated after volume reset>> "%LOG%"
 
       echo.
-      echo [6c] Waiting up to 60s for mongodb-proxy health...
+      echo [6c] Waiting up to 10s for mongodb-proxy health...
       set PROXY_MONGO_HEALTHY=0
-      for /l %%N in (1,1,30) do (
+      for /l %%N in (1,1,10) do (
         if "!PROXY_MONGO_HEALTHY!"=="0" (
           for /f "usebackq delims=" %%H in (`docker inspect mongodb-proxy --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}" 2^>nul`) do set PROXY_MONGO_STATUS=%%H
           if /I "!PROXY_MONGO_STATUS!"=="healthy" set PROXY_MONGO_HEALTHY=1
         )
-        if "!PROXY_MONGO_HEALTHY!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 2" >nul
+        if "!PROXY_MONGO_HEALTHY!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 1" >nul
       )
       if "!PROXY_MONGO_HEALTHY!"=="1" (
         echo   [OK] mongodb-proxy is healthy.
@@ -266,15 +266,15 @@ if "!PROXY_MONGO_RESET_NEEDED!"=="1" (
         echo   [OK] proxy Mongo reset + recreate complete>> "%LOG%"
 
         echo.
-        echo [6d] Waiting up to 60s for flowise-proxy /docs after Mongo reset...
+        echo [6d] Waiting up to 10s for flowise-proxy /docs after Mongo reset...
         set PROXY_UP=0
-        for /l %%N in (1,1,30) do (
+        for /l %%N in (1,1,10) do (
           if "!PROXY_UP!"=="0" (
             curl -s -o nul -w "%%{http_code}" --max-time 2 http://localhost:8000/docs > "%TEMP%\px.txt" 2>nul
             set /p PROXY_CODE=<"%TEMP%\px.txt"
             if "!PROXY_CODE!"=="200" set PROXY_UP=1
           )
-          if "!PROXY_UP!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 2" >nul
+          if "!PROXY_UP!"=="0" powershell -NoProfile -Command "Start-Sleep -Seconds 1" >nul
         )
         if "!PROXY_UP!"=="1" (
           echo   [OK] flowise-proxy is up after Mongo reset.
