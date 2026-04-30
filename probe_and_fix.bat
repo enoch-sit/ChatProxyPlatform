@@ -61,12 +61,12 @@ echo [OK] Fetch complete.
 
 REM ── Step 2b: Show pending remote commits ─────────────────────
 set "PENDING_COUNT=0"
-for /f %%N in ('git -C "%ROOT%" rev-list --count HEAD..origin/main 2^>nul') do set "PENDING_COUNT=%%N"
+for /f %%N in ('git -C "%ROOT%" rev-list --count HEAD..origin/bhss 2^>nul') do set "PENDING_COUNT=%%N"
 if "%PENDING_COUNT%"=="0" (
-  echo [OK] No pending commits on origin/main.
+  echo [OK] No pending commits on origin/bhss.
 ) else (
-  echo [INFO] %PENDING_COUNT% commits available on origin/main:
-  git -C "%ROOT%" log --oneline HEAD..origin/main
+  echo [INFO] %PENDING_COUNT% commits available on origin/bhss:
+  git -C "%ROOT%" log --oneline HEAD..origin/bhss
 )
 echo.
 
@@ -81,7 +81,7 @@ echo [PATCH IMPACT ANALYSIS]  %PENDING_COUNT% commits incoming
 set "IA_TMP=%TEMP%\probe_impact_%RANDOM%.txt"
 del "%IA_TMP%" 2>nul
 
-powershell -NoProfile -Command "$root=$env:ROOT; $tmp=$env:IA_TMP; $changed=@(git -C $root diff --name-only HEAD..origin/main 2>$null); $buckets=@{}; foreach ($svc in @('auth-service','accounting-service','flowise-proxy-service-py','flowise','bridge','root')) { $buckets[$svc]=@{f=0;mx=''} }; $ord=@{'IMAGE REBUILD'=3;'SOURCE -- rebuild likely'=2;'CONFIG/SCRIPTS'=1;''=0}; function gimpact { param([string]$x); if ($x -match 'Dockerfile|requirements\.txt|package\.json|package-lock\.json') { return 'IMAGE REBUILD' }; if ($x -match '\.ts$|\.tsx$|\.py$|\.js$') { return 'SOURCE -- rebuild likely' }; 'CONFIG/SCRIPTS' }; $envHit='NONE'; $aff=@(); foreach ($f in $changed) { if ($f -match '\.env') { $envHit=$f }; $bk='root'; foreach ($s in @('auth-service','accounting-service','flowise-proxy-service-py','flowise','bridge')) { if ($f -like ($s+'/*')) { $bk=$s; break } }; $imp=gimpact $f; $buckets[$bk].f++; if ($ord[$imp] -gt $ord[$buckets[$bk].mx]) { $buckets[$bk].mx=$imp } }; Write-Host ('  {0,-30} {1,-5} {2}' -f 'Service','Files','Max Impact'); Write-Host ('  '+('-'*60)); $omx=''; foreach ($s in @('auth-service','accounting-service','flowise-proxy-service-py','flowise','bridge','root')) { $b=$buckets[$s]; if ($b.f -gt 0) { $aff+=$s; Write-Host ('  {0,-30} {1,-5} {2}' -f $s,$b.f,$b.mx); if ($ord[$b.mx] -gt $ord[$omx]) { $omx=$b.mx } } }; if ($envHit -ne 'NONE') { Write-Host ('  [WARN] .env file in diff: '+$envHit+' -- VERIFY intentional!') -ForegroundColor Yellow } else { Write-Host ('  {0,-30} {1}' -f '.env files in diff:','NONE (safe)') }; $affStr=if ($aff.Count -gt 0) { $aff -join ',' } else { 'none' }; @('IMPACT_ENV_FILES_IN_DIFF='+$envHit,'IMPACT_SERVICES_AFFECTED='+$affStr,'IMPACT_MAX_CHANGE_TYPE='+$omx) | Set-Content $tmp"
+powershell -NoProfile -Command "$root=$env:ROOT; $tmp=$env:IA_TMP; $changed=@(git -C $root diff --name-only HEAD..origin/bhss 2>$null); $buckets=@{}; foreach ($svc in @('auth-service','accounting-service','flowise-proxy-service-py','flowise','bridge','root')) { $buckets[$svc]=@{f=0;mx=''} }; $ord=@{'IMAGE REBUILD'=3;'SOURCE -- rebuild likely'=2;'CONFIG/SCRIPTS'=1;''=0}; function gimpact { param([string]$x); if ($x -match 'Dockerfile|requirements\.txt|package\.json|package-lock\.json') { return 'IMAGE REBUILD' }; if ($x -match '\.ts$|\.tsx$|\.py$|\.js$') { return 'SOURCE -- rebuild likely' }; 'CONFIG/SCRIPTS' }; $envHit='NONE'; $aff=@(); foreach ($f in $changed) { if ($f -match '\.env') { $envHit=$f }; $bk='root'; foreach ($s in @('auth-service','accounting-service','flowise-proxy-service-py','flowise','bridge')) { if ($f -like ($s+'/*')) { $bk=$s; break } }; $imp=gimpact $f; $buckets[$bk].f++; if ($ord[$imp] -gt $ord[$buckets[$bk].mx]) { $buckets[$bk].mx=$imp } }; Write-Host ('  {0,-30} {1,-5} {2}' -f 'Service','Files','Max Impact'); Write-Host ('  '+('-'*60)); $omx=''; foreach ($s in @('auth-service','accounting-service','flowise-proxy-service-py','flowise','bridge','root')) { $b=$buckets[$s]; if ($b.f -gt 0) { $aff+=$s; Write-Host ('  {0,-30} {1,-5} {2}' -f $s,$b.f,$b.mx); if ($ord[$b.mx] -gt $ord[$omx]) { $omx=$b.mx } } }; if ($envHit -ne 'NONE') { Write-Host ('  [WARN] .env file in diff: '+$envHit+' -- VERIFY intentional!') -ForegroundColor Yellow } else { Write-Host ('  {0,-30} {1}' -f '.env files in diff:','NONE (safe)') }; $affStr=if ($aff.Count -gt 0) { $aff -join ',' } else { 'none' }; @('IMPACT_ENV_FILES_IN_DIFF='+$envHit,'IMPACT_SERVICES_AFFECTED='+$affStr,'IMPACT_MAX_CHANGE_TYPE='+$omx) | Set-Content $tmp"
 
 if not exist "%IA_TMP%" goto :impact_done
 for /f "usebackq tokens=1,* delims==" %%K in ("%IA_TMP%") do set "%%K=%%L"
@@ -90,37 +90,37 @@ del "%IA_TMP%" 2>nul
 :impact_done
 echo.
 
-REM ── Step 3: Switch to main ───────────────────────────────────
-echo [INFO] Switching to main branch...
+REM ── Step 3: Switch to bhss ────────────────────────────────────
+echo [INFO] Switching to bhss branch...
 for /f "usebackq delims=" %%B in (`git -C "%ROOT%" rev-parse --abbrev-ref HEAD 2^>nul`) do set "CURRENT_BRANCH=%%B"
 
-if /i "%CURRENT_BRANCH%"=="main" (
-  echo [OK] Already on main.
+if /i "%CURRENT_BRANCH%"=="bhss" (
+  echo [OK] Already on bhss.
 ) else (
-  echo [INFO] Currently on "%CURRENT_BRANCH%", checking out main...
-  git -C "%ROOT%" checkout main
+  echo [INFO] Currently on "%CURRENT_BRANCH%", checking out bhss...
+  git -C "%ROOT%" checkout bhss
   if errorlevel 1 (
-    echo [FAIL] Could not checkout main. Resolve manually and re-run.
+    echo [FAIL] Could not checkout bhss. Resolve manually and re-run.
     exit /b 1
   )
-  echo [OK] Switched to main.
+  echo [OK] Switched to bhss.
 )
 
 REM ── Step 4: Fix upstream tracking ────────────────────────────
-echo [INFO] Setting upstream to origin/main...
-git -C "%ROOT%" branch --set-upstream-to=origin/main main
+echo [INFO] Setting upstream to origin/bhss...
+git -C "%ROOT%" branch --set-upstream-to=origin/bhss bhss
 if errorlevel 1 (
-  echo [FAIL] Could not set upstream. Does origin/main exist?
+  echo [FAIL] Could not set upstream. Does origin/bhss exist?
   exit /b 1
 )
-echo [OK] Upstream set to origin/main.
+echo [OK] Upstream set to origin/bhss.
 
 REM ── Step 5: Pull latest (fast-forward only) ──────────────────
-echo [INFO] Pulling latest from origin/main (fast-forward only)...
+echo [INFO] Pulling latest from origin/bhss (fast-forward only)...
 git -C "%ROOT%" pull --ff-only
 if errorlevel 1 (
-  echo [FAIL] Pull failed. Local commits may diverge from origin/main.
-  echo        Run: git log --oneline HEAD...origin/main
+  echo [FAIL] Pull failed. Local commits may diverge from origin/bhss.
+  echo        Run: git log --oneline HEAD...origin/bhss
   echo        Then resolve before patching.
   exit /b 1
 )
@@ -170,6 +170,33 @@ if "%DIAG_EXIT%"=="0" (
 ) else (
   echo [WARN] Diagnostic had issues. Review output above.
 )
+echo.
+
+REM ── [HTTP SERVICE HEALTH PROBE] localhost endpoints ──────────
+echo [HTTP SERVICE HEALTH PROBE]
+echo   Probing all services at localhost...
+echo.
+powershell -NoProfile -Command ^
+  "$services = @(" ^
+  "  @{name='auth-service';     url='http://localhost:3000/health'}," ^
+  "  @{name='accounting-service';url='http://localhost:3001/health'}," ^
+  "  @{name='flowise-proxy';    url='http://localhost:8000/health'}," ^
+  "  @{name='bridge';           url='http://localhost:3082/'}," ^
+  "  @{name='flowise';          url='http://localhost:3002/'}" ^
+  "); $allOk=$true;" ^
+  "foreach ($svc in $services) {" ^
+  "  try {" ^
+  "    $r = Invoke-WebRequest -Uri $svc.url -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop;" ^
+  "    Write-Host ('  [OK]   {0,-25} HTTP {1}  {2}' -f $svc.name, $r.StatusCode, $svc.url) -ForegroundColor Green" ^
+  "  } catch {" ^
+  "    $code = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 'N/A' };" ^
+  "    Write-Host ('  [FAIL] {0,-25} HTTP {1}  {2}' -f $svc.name, $code, $svc.url) -ForegroundColor Red;" ^
+  "    $allOk=$false" ^
+  "  }" ^
+  "};" ^
+  "Write-Host '';" ^
+  "if ($allOk) { Write-Host '  All services healthy at localhost' -ForegroundColor Green }" ^
+  "else { Write-Host '  One or more services NOT responding - check containers above' -ForegroundColor Yellow }"
 echo.
 
 REM ── Offer to auto-start services if needed ──────────────────

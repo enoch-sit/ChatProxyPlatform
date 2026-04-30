@@ -162,6 +162,7 @@ $proxyEnv = Join-Path $WorkspaceRoot 'flowise-proxy-service-py\.env'
 if (Test-Path $proxyEnv) {
     Backup-EnvFile $proxyEnv
     Set-EnvVar -EnvPath $proxyEnv -Key 'JWT_SECRET_KEY' -Value $proxyJwtSecretKey
+    Set-EnvVar -EnvPath $proxyEnv -Key 'MONGO_PASSWORD' -Value $mongoPassword
 
     # MONGODB_URL: replace the whole line with the new password embedded
     $proxyLines = [System.IO.File]::ReadAllLines($proxyEnv)

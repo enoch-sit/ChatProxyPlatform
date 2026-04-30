@@ -47,14 +47,23 @@ export function mapHistoryToMessages(history: any[]): Message[] {
       uploads: uploads,
     };
 
-    if (item.role === "assistant" && item.content.trim().startsWith("[")) {
+    if (item.role === "assistant" && typeof item.content === "string" && item.content.trim().startsWith("[")) {
       try {
         const events = JSON.parse(item.content);
         // Filter to only include token events in history
-        const tokenEvents = events.filter((event: any) => event.event === 'token');
+        const tokenEvents = Array.isArray(events)
+          ? events.filter((event: any) => event && event.event === 'token')
+          : [];
+        // Reconstruct plain text from the token stream so consumers that
+        // only render `content` (e.g. AdminChatHistoryPanel) can show the
+        // AI response. Keep streamEvents for richer renderers.
+        const reconstructed = tokenEvents
+          .map((event: any) => (typeof event.data === 'string' ? event.data : ''))
+          .join('');
         return {
           ...baseMessage,
-          content: '', // You may leave this empty or summarize
+          role: item.role,
+          content: reconstructed,
           sender: "bot",
           streamEvents: tokenEvents,
         };
@@ -62,6 +71,7 @@ export function mapHistoryToMessages(history: any[]): Message[] {
         // fallback
         return {
           ...baseMessage,
+          role: item.role,
           content: item.content,
           sender: "bot",
         };
@@ -69,6 +79,7 @@ export function mapHistoryToMessages(history: any[]): Message[] {
     }
     return {
       ...baseMessage,
+      role: item.role,
       content: item.content,
       sender: item.role === "user" ? "user" : "bot",
     };

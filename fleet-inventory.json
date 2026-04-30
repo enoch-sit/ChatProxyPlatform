@@ -17,6 +17,19 @@
       "role": "dev",
       "services": ["auth-service", "accounting-service", "bridge", "flowise", "flowise-proxy-service-py"],
       "enabled": true
+    },
+    {
+      "name": "BHSS-AI-SERVER01",
+      "description": "BHSS school AI server (ai01.bhss.edu.hk)",
+      "wireguardIp": "10.10.0.3",
+      "initialHost": "ai01.bhss.edu.hk",
+      "sshUser": "admin",
+      "sshPort": 22,
+      "role": "workstation",
+      "wireguardPublicKey": "uxk1J7dG3HHL7E/T8CWCE0PZUwObsC7XCGKQK5OsCAg=",
+      "enrolledAt": "2026-04-23",
+      "services": ["auth-service", "accounting-service", "bridge", "flowise", "flowise-proxy-service-py"],
+      "enabled": true
     }
   ],
   "defaults": {

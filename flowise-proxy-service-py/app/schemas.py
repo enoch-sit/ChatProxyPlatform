@@ -6,8 +6,19 @@ from datetime import datetime
 # Request Models
 # =================================================================================
 
+class AddUsersByIdentifierRequest(BaseModel):
+    """Request to add users to a chatflow using usernames or emails."""
+    identifiers: List[str] = Field(default_factory=list)
+    emails: List[EmailStr] = Field(default_factory=list)
+
+    def resolved_identifiers(self) -> List[str]:
+        if self.identifiers:
+            return [identifier.strip() for identifier in self.identifiers if identifier.strip()]
+        return [str(email).strip() for email in self.emails if str(email).strip()]
+
 class AddUsersByEmailRequest(BaseModel):
-    """Request to add users to a chatflow using their emails."""
+    """Legacy request to add users to a chatflow using their emails."""
+    chatflow_id: str
     emails: List[EmailStr]
 
 class UserCleanupRequest(BaseModel):
@@ -57,7 +68,9 @@ class ChatflowResponse(BaseModel):
 
 class UserAssignmentResponse(BaseModel):
     """Response for a single user-to-chatflow assignment operation."""
-    email: EmailStr
+    identifier: str
+    email: Optional[str] = None
+    username: Optional[str] = None
     status: str
     message: Optional[str] = None
 
@@ -69,7 +82,8 @@ class BulkUserAssignmentResponse(BaseModel):
 class ChatflowUserResponse(BaseModel):
     """Represents a user assigned to a chatflow."""
     username: str
-    email: EmailStr
+    email: str
+    role: str
     external_user_id: str
     assigned_at: datetime
 

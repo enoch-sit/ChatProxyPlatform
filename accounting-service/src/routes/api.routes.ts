@@ -195,6 +195,21 @@ router.get('/credits/balance/:userId', requireSupervisor, CreditController.getUs
 router.post('/credits/allocate', requireSupervisor, CreditController.allocateCredits);
 
 /**
+ * Batch-allocate credits to multiple users (admin and supervisors only)
+ * POST /api/credits/allocate-batch
+ *
+ * Authentication: JWT required
+ * Authorization: Admin or Supervisor role required
+ *
+ * Request body:
+ *   { allocations: Array<{ userId: string, credits: number, expiryDays?: number, notes?: string }> }
+ *
+ * Response:
+ *   200 OK: { results: Array<{ userId, success, message }>, summary: { total, successful, failed } }
+ */
+router.post('/credits/allocate-batch', requireSupervisor, CreditController.allocateBatchCredits);
+
+/**
  * Allocate credits to a user by email (Supervisor/Admin only)
  * POST /api/credits/allocate-by-email
  *
@@ -317,6 +332,19 @@ router.put('/credits/adjust', requireSupervisor, CreditController.adjustCredits)
  *   500 Server Error: If retrieval fails
  */
 router.get('/credits/allocations/all', requireSupervisor, CreditController.getAllAllocations);
+
+/**
+ * Get current non-expired credit totals for all users (admin and supervisors only)
+ * GET /api/credits/current-balances
+ */
+router.get('/credits/current-balances', requireSupervisor, CreditController.getAllCurrentBalances);
+
+/**
+ * Get directory of ALL user accounts (including zero-balance) with aggregated
+ * active credit info (admin/supervisor only).
+ * GET /api/credits/users-directory
+ */
+router.get('/credits/users-directory', requireSupervisor, CreditController.getUsersDirectory);
 
 // ===== STREAMING SESSION ENDPOINTS =====
 
@@ -607,6 +635,23 @@ router.post(
     '/admin/users',
     requireAdmin,
     UserAccountController.createAccountByAdmin
+);
+
+/**
+ * Idempotently ensure a UserAccount row exists for a given user. Designed to
+ * be called by other services (e.g. auth-service) right after they create a
+ * user, so admins can immediately allocate credits without waiting for the
+ * user's first login. Safe to retry; returns 200 if account already existed,
+ * 201 if newly created.
+ *
+ * POST /api/users/ensure
+ * Auth: JWT, supervisor/admin/teacher
+ * Body: { sub | userId: string, email: string, username?: string, role?: string }
+ */
+router.post(
+    '/users/ensure',
+    requireSupervisor,
+    UserAccountController.ensureAccount
 );
 
 export default router;

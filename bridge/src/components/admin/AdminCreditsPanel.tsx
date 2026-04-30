@@ -6,7 +6,7 @@ import {
 } from '@mui/joy';
 import { useAdminStore } from '../../store/adminStore';
 import { useAuth } from '../../hooks/useAuth';
-import type { CreditAllocation } from '../../types/admin';
+import type { CreditAllocation, UsersDirectoryEntry } from '../../types/admin';
 
 type CreditAction = 'allocate' | 'set' | 'adjust' | 'remove';
 
@@ -14,6 +14,8 @@ const AdminCreditsPanel: React.FC = () => {
   const { user: currentUser } = useAuth();
   const {
     creditAllocations,
+    currentCreditBalances,
+    usersDirectory,
     isLoading,
     error,
     fetchAllCredits,
@@ -50,6 +52,15 @@ const AdminCreditsPanel: React.FC = () => {
   const openModal = (action: CreditAction, allocation?: CreditAllocation) => {
     setActionType(action);
     setTargetUserId(allocation?.userId ?? '');
+    setCreditAmount('');
+    setExpiryDays('');
+    setAdjustReason('');
+    setShowModal(true);
+  };
+
+  const openModalForUser = (action: CreditAction, user: UsersDirectoryEntry) => {
+    setActionType(action);
+    setTargetUserId(user.userId);
     setCreditAmount('');
     setExpiryDays('');
     setAdjustReason('');
@@ -138,6 +149,86 @@ const AdminCreditsPanel: React.FC = () => {
           </Stack>
         </Sheet>
       )}
+
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Typography level="title-md">Current Non-Expired Credit By User</Typography>
+      </Box>
+
+      <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', mb: 3 }}>
+        <Table stickyHeader>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Current Credit</th>
+              <th>Active Allocations</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr><td colSpan={3} align="center"><CircularProgress size="sm" /></td></tr>
+            ) : currentCreditBalances.length === 0 ? (
+              <tr><td colSpan={3}>No active credit balances found.</td></tr>
+            ) : currentCreditBalances.map((balance) => (
+              <tr key={balance.userId}>
+                <td>{balance.username ? `${balance.username}${balance.email ? ` (${balance.email})` : ''}` : balance.userId}</td>
+                <td>
+                  <Chip size="sm" color={balance.currentCredits > 0 ? 'success' : 'neutral'}>
+                    {balance.currentCredits.toLocaleString()}
+                  </Chip>
+                </td>
+                <td>{balance.activeAllocationCount}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </Sheet>
+
+      {/* All Allocations Table */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Typography level="title-md">All Users — Directory</Typography>
+        <Button size="sm" variant="outlined" onClick={() => fetchAllCredits()}>Refresh</Button>
+      </Box>
+
+      <Sheet variant="outlined" sx={{ borderRadius: 'sm', overflow: 'auto', mb: 3, maxHeight: 320 }}>
+        <Table stickyHeader>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Current Credits</th>
+              <th>Active Allocations</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr><td colSpan={6} align="center"><CircularProgress size="sm" /></td></tr>
+            ) : usersDirectory.length === 0 ? (
+              <tr><td colSpan={6}>No users found.</td></tr>
+            ) : usersDirectory.map((u) => (
+              <tr key={u.userId}>
+                <td>{u.username ?? '—'}</td>
+                <td>{u.email ?? '—'}</td>
+                <td>{u.role ?? '—'}</td>
+                <td>
+                  <Chip size="sm" color={u.currentCredits > 0 ? 'success' : 'neutral'}>
+                    {u.currentCredits.toLocaleString()}
+                  </Chip>
+                </td>
+                <td>{u.activeAllocationCount}</td>
+                <td>
+                  <Stack direction="row" spacing={0.5}>
+                    <Button size="sm" variant="outlined" color="success" onClick={() => openModalForUser('allocate', u)}>Allocate</Button>
+                    <Button size="sm" variant="outlined" color="primary" onClick={() => openModalForUser('set', u)}>Set</Button>
+                    <Button size="sm" variant="outlined" color="neutral" onClick={() => openModalForUser('adjust', u)}>Adjust</Button>
+                  </Stack>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </Sheet>
 
       {/* All Allocations Table */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>

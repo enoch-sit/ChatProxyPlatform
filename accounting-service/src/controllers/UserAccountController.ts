@@ -108,4 +108,69 @@ export class UserAccountController {
             });
         }
     }
+
+    /**
+     * Idempotent "ensure" endpoint. Used by other services (e.g. auth-service)
+     * to make sure a UserAccount row exists for a given user immediately after
+     * that user is created in the auth database, so admins can find and
+     * allocate credits to them before the user has logged in once.
+     *
+     * Accepts the same shape as createAccountByAdmin (sub/email/username/role)
+     * but is safe to call repeatedly: returns 200 with the existing account if
+     * the user is already known, 201 if a new row was created.
+     *
+     * Authentication: JWT, supervisor/admin/teacher (requireSupervisor).
+     */
+    static async ensureAccount(req: Request, res: Response): Promise<Response> {
+        const { sub, userId, email, username, role } = req.body;
+        const effectiveSub = (typeof sub === 'string' && sub) || (typeof userId === 'string' && userId) || '';
+        const callerId = req.user?.userId;
+
+        if (!effectiveSub || !email || typeof email !== 'string') {
+            return res.status(400).json({ message: 'sub (or userId) and email are required.' });
+        }
+
+        if (!isValidIdentifier(effectiveSub)) {
+            return res.status(400).json({ message: 'Invalid sub format.' });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ message: 'Invalid email format provided.' });
+        }
+
+        const normalizedRole = role === 'user' ? 'enduser' : (role || 'enduser');
+        const finalUsername = username || email.split('@')[0] || `user_${effectiveSub.substring(0, 8)}`;
+
+        try {
+            const existed = await UserAccountService.userExists(effectiveSub);
+            const account = await UserAccountService.findOrCreateUser({
+                userId: effectiveSub,
+                email,
+                username: finalUsername,
+                role: normalizedRole,
+                sub: effectiveSub,
+            });
+
+            logger.info(`UserAccountController.ensureAccount - caller=${callerId} sub=${effectiveSub} existed=${existed}`);
+
+            const responseUser = {
+                userId: account.userId,
+                sub: account.sub,
+                email: account.email,
+                username: account.username,
+                role: account.role,
+                createdAt: account.createdAt,
+                updatedAt: account.updatedAt,
+            };
+
+            return res.status(existed ? 200 : 201).json(responseUser);
+        } catch (error: any) {
+            logger.error(`UserAccountController.ensureAccount - Error for sub '${effectiveSub}' by caller ${callerId}:`, error);
+            return res.status(500).json({
+                message: 'Failed to ensure user account.',
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
 }

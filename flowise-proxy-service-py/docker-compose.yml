@@ -44,9 +44,11 @@ services:
   mongodb:
     image: mongo:7-jammy
     container_name: mongodb-proxy
+    env_file:
+    - .env
     environment:
     - MONGO_INITDB_ROOT_USERNAME=admin
-    - MONGO_INITDB_ROOT_PASSWORD=65424b6a739b4198ae2a3e08b35deeda
+    - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
     - MONGO_INITDB_DATABASE=flowise_proxy
     volumes:
     - mongodb_data:/data/db
@@ -55,7 +57,7 @@ services:
     - flowise-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "-u", "admin", "-p", "${MONGO_PASSWORD}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
       interval: 30s
       timeout: 10s
       retries: 3

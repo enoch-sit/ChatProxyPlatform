@@ -5,6 +5,7 @@ import { Box, CircularProgress, Typography } from '@mui/joy';
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import type { UserRole } from '../../types/auth';
+import { APP_ENTRY_PATH } from '../../api/config';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -17,7 +18,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredRole,
   requiredPermission,
-  fallbackPath = '/login',
+  fallbackPath = APP_ENTRY_PATH,
 }) => {
   const { isAuthenticated, isLoading, hasHydrated, user, tokens, hasRole, hasPermission } = useAuth();
   const location = useLocation();

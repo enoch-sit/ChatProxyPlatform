@@ -1,11 +1,11 @@
 from beanie import Document, PydanticObjectId
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
 class User(Document):
     username: Optional[str] = Field(..., max_length=50)
-    email: Optional[EmailStr]
+    email: Optional[str]
     role: str = Field(default="user")
     is_active: bool = Field(default=True)
     external_id: Optional[str] = Field(None, index=True, unique=True, sparse=True)
