@@ -84,9 +84,13 @@
     "userManagement": "使用者管理",
     "assignUser": "指派使用者",
     "bulkAssign": "批次指派",
-    "bulkAssignTooltip": "每行輸入一個電子郵件以指派多個使用者。",
+    "bulkRemove": "批次移除",
+    "bulkAssignTooltip": "輸入以空格、逗號或換行分隔的使用者名稱或電子郵件，以指派多個使用者。",
+    "protectedBatchRemove": "受保護",
     "removeUser": "移除使用者",
+    "selectUsers": "選取",
     "userEmail": "使用者電子郵件",
+    "userRole": "角色",
     "assignButton": "指派",
     "removeButton": "移除",
     "noUsers": "此聊天流程沒有指派使用者",
@@ -101,8 +105,8 @@
     "chatflowStatus": "狀態",
     "chatflowActions": "操作",
     "manageUsersFor": "管理 {{chatflowName}} 的使用者",
-    "userEmailPlaceholder": "輸入使用者電子郵件",
-    "bulkAssignPlaceholder": "每行輸入一個電子郵件"
+    "userEmailPlaceholder": "輸入使用者名稱或電子郵件",
+    "bulkAssignPlaceholder": "輸入以空格、逗號或換行分隔的使用者名稱或電子郵件"
   },
   "common": {
     "loading": "載入中...",

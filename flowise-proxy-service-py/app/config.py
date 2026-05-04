@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     # Streaming Configuration
     MAX_STREAMING_DURATION: int = int(os.getenv("MAX_STREAMING_DURATION", "180000"))  # Increased from 120000ms to 180000ms (3 minutes)    # CORS Configuration
     CORS_ORIGIN: str = os.getenv("CORS_ORIGIN", "*")
+    # CORS_ALLOW_ORIGINS: comma-separated list of explicit origins. Required when
+    # allow_credentials=True (Starlette refuses to echo Origin if value is "*"
+    # while credentials are allowed). Falls back to CORS_ORIGIN, then "*".
+    CORS_ALLOW_ORIGINS: str = os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        os.getenv("CORS_ORIGIN", "*"),
+    )
       # Server Configuration
     DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
     HOST: str = os.getenv("HOST", "0.0.0.0")

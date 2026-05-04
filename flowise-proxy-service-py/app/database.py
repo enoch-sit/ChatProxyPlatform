@@ -9,12 +9,11 @@ from app.models.chat_message import ChatMessage
 from app.models.file_upload import FileUpload
 import logging
 import uuid  # Added import
-
 logger = logging.getLogger(__name__)
 
 
 class DatabaseManager:
-    client: AsyncIOMotorClient = None
+    client = None
     database = None
     init_count: int = 0  # Added counter
     current_client_instance_id: uuid.UUID | None = (
@@ -40,6 +39,12 @@ async def connect_to_mongo():
         )
 
     try:
+        if database.client is not None:
+            try:
+                database.client.close()
+            except Exception:
+                pass
+
         logger.info(
             f"Attempting to connect to MongoDB at {settings.MONGODB_URL} (call_id: {call_instance_id})"
         )
@@ -121,10 +126,9 @@ async def close_mongo_connection():
             logger.info(
                 f"Disconnected from MongoDB (client_instance_id: {database.current_client_instance_id}, init_count: {database.init_count})"
             )
-            # Optionally, reset client and database on DatabaseManager to None here if that's the desired state after closing.
-            # database.client = None
-            # database.database = None
-            # database.current_client_instance_id = None
+            database.client = None
+            database.database = None
+            database.current_client_instance_id = None
         else:
             logger.info("MongoDB connection already closed or not established.")
     except Exception as e:
@@ -139,9 +143,20 @@ async def get_database():
         )
         await connect_to_mongo()
     else:
-        logger.debug(
-            f"GET_DATABASE: database.database is already set (client_instance_id: {database.current_client_instance_id}). Current init_count: {database.init_count}"
-        )
+        try:
+            await database.client.admin.command("ping")
+        except Exception as exc:
+            logger.warning(
+                f"GET_DATABASE: existing MongoDB handle is stale (client_instance_id: {database.current_client_instance_id}). Reconnecting. Error: {exc}"
+            )
+            database.client = None
+            database.database = None
+            database.current_client_instance_id = None
+            await connect_to_mongo()
+        else:
+            logger.debug(
+                f"GET_DATABASE: database.database is already set (client_instance_id: {database.current_client_instance_id}). Current init_count: {database.init_count}"
+            )
     return database.database
 
 

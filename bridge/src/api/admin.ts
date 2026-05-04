@@ -13,7 +13,11 @@ import type {
   BulkAssignmentResult,
   AdminUser,
   CreditAllocation,
+  CurrentCreditBalance,
+  UsersDirectoryEntry,
   AllocateCreditsPayload,
+  AllocateCreditsBatchPayload,
+  AllocateCreditsBatchResult,
   SetCreditsPayload,
   RemoveCreditsPayload,
   AdjustCreditsPayload,
@@ -24,6 +28,8 @@ import type {
   BatchRoleUpdateResponse,
 } from '../types/admin';
 import type { Chatflow, ChatflowStats, ChatflowUser, ChatflowSyncResult } from '../types/chatflow';
+import type { Message } from '../types/chat';
+import { mapHistoryToMessages } from '../utils/chatParser';
 
 /**
  * Triggers a synchronization of chatflows from the Flowise instance.
@@ -104,7 +110,7 @@ export const addUserToChatflow = async (id: string, email: string): Promise<{ me
  */
 export const bulkAddUsersToChatflow = async (id: string, emails: string[]): Promise<BulkAssignmentResult> => {
   const response = await apiClient.post(`/api/v1/admin/chatflows/${id}/users/bulk-add`, {
-    emails
+    identifiers: emails
   });
   return response.data;
 };
@@ -117,6 +123,13 @@ export const removeUserFromChatflow = async (id: string, email: string): Promise
   await apiClient.delete(`/api/v1/admin/chatflows/${id}/users`, {
     data: { email }
   });
+};
+
+export const bulkRemoveUsersFromChatflow = async (id: string, identifiers: string[]): Promise<BulkAssignmentResult> => {
+  const response = await apiClient.post(`/api/v1/admin/chatflows/${id}/users/bulk-remove`, {
+    identifiers
+  });
+  return response.data;
 };
 
 /**
@@ -179,6 +192,16 @@ export const listAllCredits = async (): Promise<CreditAllocation[]> => {
   return Array.isArray(response.data) ? response.data : (response.data.allocations ?? []);
 };
 
+export const listCurrentCreditBalances = async (): Promise<CurrentCreditBalance[]> => {
+  const response = await apiClient.get('/api/v1/admin/credits/current-balances');
+  return Array.isArray(response.data) ? response.data : (response.data.balances ?? []);
+};
+
+export const listUsersDirectory = async (): Promise<UsersDirectoryEntry[]> => {
+  const response = await apiClient.get('/api/v1/admin/credits/users-directory');
+  return Array.isArray(response.data) ? response.data : (response.data.users ?? []);
+};
+
 export const getUserCreditBalance = async (userId: string): Promise<CreditAllocation> => {
   const response = await apiClient.get(`/api/v1/admin/credits/balance/${userId}`);
   return response.data;
@@ -186,6 +209,11 @@ export const getUserCreditBalance = async (userId: string): Promise<CreditAlloca
 
 export const allocateCredits = async (payload: AllocateCreditsPayload): Promise<{ message: string }> => {
   const response = await apiClient.post('/api/v1/admin/credits/allocate', payload);
+  return response.data;
+};
+
+export const allocateCreditsBatch = async (payload: AllocateCreditsBatchPayload): Promise<AllocateCreditsBatchResult> => {
+  const response = await apiClient.post('/api/v1/admin/credits/allocate-batch', payload);
   return response.data;
 };
 
@@ -257,6 +285,11 @@ export const adminListChatUsers = async (): Promise<AdminChatUser[]> => {
 export const adminGetUserSessions = async (userId: string): Promise<AdminChatSession[]> => {
   const response = await apiClient.get(`/api/v1/admin/chat/users/${userId}/sessions`);
   return response.data;
+};
+
+export const adminGetSessionHistory = async (userId: string, sessionId: string): Promise<Message[]> => {
+  const response = await apiClient.get<{ history: unknown[] }>(`/api/v1/admin/chat/users/${userId}/sessions/${sessionId}/history`);
+  return mapHistoryToMessages(response.data.history || []);
 };
 
 // =============================================================================

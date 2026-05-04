@@ -423,6 +423,7 @@ resource "aws_ecs_service" "flowise" {
 }
 
 resource "aws_route53_record" "flowise" {
+  count   = var.create_dns_records ? 1 : 0
   zone_id = var.hosted_zone_id
   name    = var.flowise_subdomain
   type    = "CNAME"

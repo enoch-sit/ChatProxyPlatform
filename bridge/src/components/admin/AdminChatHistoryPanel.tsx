@@ -3,8 +3,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Box, Button, Typography, Sheet, Input, CircularProgress, Alert, Chip, Stack,
 } from '@mui/joy';
-import { adminListChatUsers, adminGetUserSessions } from '../../api/admin';
-import { getSessionHistory } from '../../api/sessions';
+import { adminGetSessionHistory, adminListChatUsers, adminGetUserSessions } from '../../api/admin';
 import type { AdminChatUser, AdminChatSession } from '../../api/admin';
 import type { Message } from '../../types/chat';
 
@@ -19,14 +18,17 @@ const AdminChatHistoryPanel: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<AdminChatUser | null>(null);
   const [sessions, setSessions] = useState<AdminChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
 
   // Messages for selected session
   const [selectedSession, setSelectedSession] = useState<AdminChatSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
 
   useEffect(() => {
     setUsersLoading(true);
+    setUsersError(null);
     adminListChatUsers()
       .then(setUsers)
       .catch((e) => setUsersError(e?.message || 'Failed to load users'))
@@ -37,12 +39,15 @@ const AdminChatHistoryPanel: React.FC = () => {
     setSelectedUser(u);
     setSelectedSession(null);
     setMessages([]);
+    setSessionsError(null);
+    setMessagesError(null);
     setSessionsLoading(true);
     try {
       const result = await adminGetUserSessions(u.user_id);
       setSessions(result);
-    } catch {
+    } catch (error) {
       setSessions([]);
+      setSessionsError(error instanceof Error ? error.message : 'Failed to load sessions');
     } finally {
       setSessionsLoading(false);
     }
@@ -50,12 +55,14 @@ const AdminChatHistoryPanel: React.FC = () => {
 
   const handleSelectSession = async (s: AdminChatSession) => {
     setSelectedSession(s);
+    setMessagesError(null);
     setMessagesLoading(true);
     try {
-      const msgs = await getSessionHistory(s.session_id);
+      const msgs = await adminGetSessionHistory(selectedUser!.user_id, s.session_id);
       setMessages(msgs);
-    } catch {
+    } catch (error) {
       setMessages([]);
+      setMessagesError(error instanceof Error ? error.message : 'Failed to load conversation');
     } finally {
       setMessagesLoading(false);
     }
@@ -91,14 +98,14 @@ const AdminChatHistoryPanel: React.FC = () => {
   });
 
   return (
-    <Box sx={{ display: 'flex', minHeight: 0, gap: 1, overflow: 'hidden' }}>
+    <Box sx={{ display: 'flex', flex: 1, height: '100%', minHeight: 0, gap: 1, overflow: 'hidden' }}>
       {/* Left pane: user list */}
       <Sheet
         variant="outlined"
-        sx={{ width: 220, borderRadius: 'sm', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }}
+        sx={{ width: 240, borderRadius: 'sm', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', flexShrink: 0 }}
       >
         <Box sx={{ p: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Typography level="title-sm" sx={{ mb: 0.5 }}>Students</Typography>
+          <Typography level="title-sm" sx={{ mb: 0.5 }}>Users</Typography>
           <Input
             size="sm"
             placeholder="Search..."
@@ -109,6 +116,9 @@ const AdminChatHistoryPanel: React.FC = () => {
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
           {usersLoading && <Box sx={{ p: 2, textAlign: 'center' }}><CircularProgress size="sm" /></Box>}
           {usersError && <Alert color="danger" size="sm" sx={{ m: 1 }}>{usersError}</Alert>}
+          {!usersLoading && !usersError && filteredUsers.length === 0 && (
+            <Typography level="body-sm" sx={{ p: 2, color: 'text.tertiary' }}>No matching users found.</Typography>
+          )}
           {filteredUsers.map((u) => (
             <Box
               key={u.user_id}
@@ -131,15 +141,16 @@ const AdminChatHistoryPanel: React.FC = () => {
       {/* Middle pane: session list */}
       <Sheet
         variant="outlined"
-        sx={{ width: 240, borderRadius: 'sm', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }}
+        sx={{ width: 280, borderRadius: 'sm', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', flexShrink: 0 }}
       >
         <Box sx={{ p: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Typography level="title-sm">
-            {selectedUser ? `${selectedUser.username}'s Sessions` : 'Select a student'}
+            {selectedUser ? `${selectedUser.username}'s Sessions` : 'Select a user'}
           </Typography>
         </Box>
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
           {sessionsLoading && <Box sx={{ p: 2, textAlign: 'center' }}><CircularProgress size="sm" /></Box>}
+          {sessionsError && <Alert color="danger" size="sm" sx={{ m: 1 }}>{sessionsError}</Alert>}
           {!sessionsLoading && selectedUser && sessions.length === 0 && (
             <Typography level="body-sm" sx={{ p: 2, color: 'text.tertiary' }}>No sessions found.</Typography>
           )}
@@ -169,7 +180,7 @@ const AdminChatHistoryPanel: React.FC = () => {
       {/* Right pane: conversation */}
       <Sheet
         variant="outlined"
-        sx={{ flex: 1, borderRadius: 'sm', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        sx={{ flex: 1, minWidth: 0, borderRadius: 'sm', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}
       >
         <Box sx={{ p: 1, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography level="title-sm">
@@ -184,12 +195,13 @@ const AdminChatHistoryPanel: React.FC = () => {
 
         <Box sx={{ flex: 1, overflowY: 'auto', p: 1.5 }}>
           {messagesLoading && <Box sx={{ textAlign: 'center', p: 4 }}><CircularProgress /></Box>}
+          {messagesError && <Alert color="danger" size="sm" sx={{ mb: 2 }}>{messagesError}</Alert>}
           {!messagesLoading && selectedSession && messages.length === 0 && (
             <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>No messages in this session.</Typography>
           )}
           {!messagesLoading && !selectedSession && (
             <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
-              Select a student and then a session to view the conversation.
+              Select a user and then a session to view the conversation.
             </Typography>
           )}
           {messages.map((msg, idx) => (
@@ -222,7 +234,13 @@ const AdminChatHistoryPanel: React.FC = () => {
                   )}
                 </Stack>
                 <Typography level="body-sm" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {msg.content}
+                  {msg.content && msg.content.length > 0
+                    ? msg.content
+                    : (msg.streamEvents && msg.streamEvents.length > 0
+                        ? msg.streamEvents
+                            .map((e: any) => (e && e.event === 'token' && typeof e.data === 'string' ? e.data : ''))
+                            .join('')
+                        : '')}
                 </Typography>
               </Box>
             </Box>

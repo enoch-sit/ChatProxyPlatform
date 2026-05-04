@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback, useRef, useLayoutEffect } from 'react';
 import {
   Box, Button, Typography, Sheet, Table, Modal, ModalDialog,
-  ModalClose, Input, Textarea, CircularProgress, Alert, Chip,
+  ModalClose, Input, Textarea, CircularProgress, Alert, Chip, Checkbox,
   Tabs, TabList, Tab, TabPanel,
 } from '@mui/joy';
 import { useAdminStore } from '../store/adminStore';
@@ -15,6 +15,29 @@ import AdminCreditsPanel from '../components/admin/AdminCreditsPanel';
 import AdminUsagePanel from '../components/admin/AdminUsagePanel';
 import AdminChatHistoryPanel from '../components/admin/AdminChatHistoryPanel';
 import AdminFlowiseSettingsPanel from '../components/admin/AdminFlowiseSettingsPanel';
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  const candidate = error as {
+    response?: { data?: { detail?: unknown; message?: unknown } };
+    message?: unknown;
+  };
+
+  const detail = candidate?.response?.data?.detail;
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail;
+  }
+
+  const message = candidate?.response?.data?.message;
+  if (typeof message === 'string' && message.trim()) {
+    return message;
+  }
+
+  if (typeof candidate?.message === 'string' && candidate.message.trim()) {
+    return candidate.message;
+  }
+
+  return fallback;
+}
 
 const AdminPage: React.FC = () => {
   const { t } = useTranslation();
@@ -41,8 +64,8 @@ const AdminPage: React.FC = () => {
     fetchChatflows,
     fetchStats,
     fetchChatflowUsers,
-    addUserToChatflow,
     bulkAddUsersToChatflow,
+    bulkRemoveUsersFromChatflow,
     removeUserFromChatflow,
     setSelectedChatflow,
     clearError,
@@ -56,7 +79,24 @@ const AdminPage: React.FC = () => {
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [bulkUserEmails, setBulkUserEmails] = useState('');
+  const [selectedUsersForBulkRemove, setSelectedUsersForBulkRemove] = useState<string[]>([]);
+  const [userManagementError, setUserManagementError] = useState<string | null>(null);
   const tabsContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const isBatchProtectedRole = useCallback((role?: string) => {
+    const normalizedRole = (role || '').toLowerCase();
+    return normalizedRole === 'admin' || normalizedRole === 'supervisor' || normalizedRole === 'teacher';
+  }, []);
+
+  const isAdminRole = useCallback((role?: string) => (role || '').toLowerCase() === 'admin', []);
+
+  const selectableUserEmails = chatflowUsers
+    .filter((user) => !isBatchProtectedRole(user.role))
+    .map((user) => user.email);
+  const allSelectableUsersSelected = selectableUserEmails.length > 0
+    && selectableUserEmails.every((email) => selectedUsersForBulkRemove.includes(email));
+  const someSelectableUsersSelected = selectedUsersForBulkRemove.length > 0
+    && !allSelectableUsersSelected;
 
   const resetAdminViewport = useCallback(() => {
     // Reset every relevant scroll container to avoid opening admin views with displaced content.
@@ -114,6 +154,10 @@ const AdminPage: React.FC = () => {
     });
   }, [activeTab, resetAdminViewport]);
 
+  useEffect(() => {
+    setSelectedUsersForBulkRemove((current) => current.filter((email) => selectableUserEmails.includes(email)));
+  }, [selectableUserEmails]);
+
   // Handle sync (placeholder - you might want to add this to the store)
   const handleSync = async () => {
     try {
@@ -133,7 +177,10 @@ const AdminPage: React.FC = () => {
   // Handle user management modal
   const handleManageUsers = async (chatflow: Chatflow) => {
     try {
+      clearError();
+      setUserManagementError(null);
       setSelectedChatflow(chatflow);
+      setSelectedUsersForBulkRemove([]);
       setShowUserModal(true);
       await fetchChatflowUsers(chatflow.flowise_id);
     } catch (err) {
@@ -145,12 +192,25 @@ const AdminPage: React.FC = () => {
   // Add single user
   const handleAddUser = async () => {
     if (!selectedChatflow || !userEmail.trim()) return;
-    
+
+    clearError();
+    setUserManagementError(null);
+    setSuccessMessage(null);
+
     try {
-      await addUserToChatflow(selectedChatflow.flowise_id, userEmail);
-      setSuccessMessage(`User ${userEmail} added to ${selectedChatflow.name}.`);
-      setUserEmail('');
+      const identifier = userEmail.trim();
+      const results = await bulkAddUsersToChatflow(selectedChatflow.flowise_id, [identifier]);
+
+      if (results.successful > 0) {
+        setSuccessMessage(`User ${identifier} added to ${selectedChatflow.name}.`);
+        setUserEmail('');
+        return;
+      }
+
+      const failedPreview = results.failed[0] || identifier;
+      setUserManagementError(`Could not assign ${failedPreview}. Enter a valid username or email.`);
     } catch (err) {
+      setUserManagementError(getErrorMessage(err, 'Failed to add user to chatflow.'));
       console.error('Failed to add user:', err);
       // Error handled by store
     }
@@ -159,28 +219,68 @@ const AdminPage: React.FC = () => {
   // Remove user
   const handleRemoveUser = async (email: string) => {
     if (!selectedChatflow) return;
-    
+
+    clearError();
+    setUserManagementError(null);
+
     try {
       await removeUserFromChatflow(selectedChatflow.flowise_id, email);
       setSuccessMessage(`User removed from ${selectedChatflow.name}.`);
+      setUserEmail('');
     } catch (err) {
       console.error('Failed to remove user:', err);
       // Error handled by store
     }
   };
 
-  // Bulk assign users (you might want to add this to the store)
+  const toggleUserSelection = (email: string) => {
+    setSelectedUsersForBulkRemove((current) => (
+      current.includes(email)
+        ? current.filter((selectedEmail) => selectedEmail !== email)
+        : [...current, email]
+    ));
+  };
+
+  const toggleSelectAllUsers = () => {
+    if (allSelectableUsersSelected) {
+      setSelectedUsersForBulkRemove([]);
+      return;
+    }
+
+    setSelectedUsersForBulkRemove(selectableUserEmails);
+  };
+
+  const handleBulkRemoveUsers = async () => {
+    if (!selectedChatflow || selectedUsersForBulkRemove.length === 0) return;
+
+    try {
+      const results = await bulkRemoveUsersFromChatflow(selectedChatflow.flowise_id, selectedUsersForBulkRemove);
+      const failedCount = results.failed.length;
+      const failedPreview = failedCount > 0 ? ` Failed: ${results.failed.slice(0, 3).join(', ')}${failedCount > 3 ? '...' : ''}` : '';
+
+      setSuccessMessage(`${results.successful} users removed. ${failedCount} blocked or failed.${failedPreview}`);
+      setSelectedUsersForBulkRemove([]);
+      await fetchChatflowUsers(selectedChatflow.flowise_id);
+    } catch (err) {
+      console.error('Failed to bulk remove users:', err);
+    }
+  };
+
+  // Bulk assign users by username or email
   const handleBulkAssign = async () => {
     if (!selectedChatflow || !bulkUserEmails.trim()) return;
     
     try {
-      const emails = bulkUserEmails.split('\n').map(e => e.trim()).filter(Boolean);
+      const identifiers = bulkUserEmails
+        .split(/[\s,]+/)
+        .map((entry) => entry.trim())
+        .filter(Boolean);
 
-      const results = await bulkAddUsersToChatflow(selectedChatflow.flowise_id, emails);
+      const results = await bulkAddUsersToChatflow(selectedChatflow.flowise_id, identifiers);
       const failedCount = results.failed.length;
       const failedPreview = failedCount > 0 ? ` Failed: ${results.failed.slice(0, 3).join(', ')}${failedCount > 3 ? '...' : ''}` : '';
 
-      setSuccessMessage(`${results.successful} users assigned. ${failedCount} failed.${failedPreview}`);
+      setSuccessMessage(`${results.successful} users assigned by username/email. ${failedCount} failed.${failedPreview}`);
       setBulkUserEmails('');
       setShowBulkAssignModal(false);
       
@@ -216,12 +316,24 @@ const AdminPage: React.FC = () => {
     setShowUserModal(false);
     setSelectedChatflow(null);
     setUserEmail('');
+    setSelectedUsersForBulkRemove([]);
+    setUserManagementError(null);
   };
 
   const handleCloseBulkModal = () => {
     setShowBulkAssignModal(false);
     setBulkUserEmails('');
   };
+
+  const flexTabPanelSx = {
+    p: 0,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    '&[hidden]': {
+      display: 'none !important',
+    },
+  } as const;
 
   // Early return for unauthorized access
   if (!canAccessAdmin) {
@@ -392,35 +504,35 @@ const AdminPage: React.FC = () => {
 
         {/* ---- Users Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="users" sx={{ p: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <TabPanel value="users" sx={{ ...flexTabPanelSx, overflow: 'auto' }}>
             <AdminUsersPanel />
           </TabPanel>
         )}
 
         {/* ---- Credits Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="credits" sx={{ p: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <TabPanel value="credits" sx={{ ...flexTabPanelSx, overflow: 'auto' }}>
             <AdminCreditsPanel />
           </TabPanel>
         )}
 
         {/* ---- Usage / Token Stats Tab ---- */}
         {canViewAnalytics && (
-          <TabPanel value="usage" sx={{ p: 0, minHeight: 0 }}>
+          <TabPanel value="usage" sx={{ ...flexTabPanelSx, overflow: 'auto' }}>
             <AdminUsagePanel />
           </TabPanel>
         )}
 
         {/* ---- Student Chat History Tab ---- */}
         {canManageUsers && (
-          <TabPanel value="student-chats" sx={{ p: 0, minHeight: 0 }}>
+          <TabPanel value="student-chats" sx={{ ...flexTabPanelSx, flex: 1, overflow: 'hidden' }}>
             <AdminChatHistoryPanel />
           </TabPanel>
         )}
 
         {/* ---- Runtime Settings Tab ---- */}
         {canManageChatflows && (
-          <TabPanel value="settings" sx={{ p: 0, minHeight: 0 }}>
+          <TabPanel value="settings" sx={{ ...flexTabPanelSx, overflow: 'auto' }}>
             <AdminFlowiseSettingsPanel />
           </TabPanel>
         )}
@@ -436,6 +548,12 @@ const AdminPage: React.FC = () => {
             {t('admin.manageUsersFor', { chatflowName: selectedChatflow?.name })}
           </Typography>
 
+          {userManagementError && (
+            <Alert color="danger" sx={{ mb: 2 }}>
+              {userManagementError}
+            </Alert>
+          )}
+
           {canManageUsers && (
             <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
               <Input
@@ -450,6 +568,14 @@ const AdminPage: React.FC = () => {
               <Button variant="outlined" onClick={() => setShowBulkAssignModal(true)}>
                 {t('admin.bulkAssign')}
               </Button>
+              <Button
+                variant="solid"
+                color="danger"
+                onClick={handleBulkRemoveUsers}
+                disabled={isLoading || selectedUsersForBulkRemove.length === 0}
+              >
+                {t('admin.bulkRemove')}
+              </Button>
             </Box>
           )}
 
@@ -457,24 +583,64 @@ const AdminPage: React.FC = () => {
             <Table aria-label="User list for chatflow">
               <thead>
                 <tr>
+                  {canManageUsers && (
+                    <th>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Checkbox
+                          checked={allSelectableUsersSelected}
+                          indeterminate={someSelectableUsersSelected}
+                          disabled={selectableUserEmails.length === 0}
+                          onChange={toggleSelectAllUsers}
+                          slotProps={{ input: { 'aria-label': 'Select all removable users' } }}
+                        />
+                        <Typography level="body-sm">{t('admin.selectUsers')}</Typography>
+                      </Box>
+                    </th>
+                  )}
                   <th>{t('admin.userEmail')}</th>
+                  <th>{t('admin.userRole')}</th>
                   {canManageUsers && <th>{t('admin.chatflowActions')}</th>}
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={canManageUsers ? 2 : 1} align="center">
+                    <td colSpan={canManageUsers ? 4 : 2} align="center">
                       <CircularProgress size="sm" />
                     </td>
                   </tr>
                 ) : chatflowUsers.length > 0 ? (
                   chatflowUsers.map((user) => (
                     <tr key={user.email}>
-                      <td>{user.email}</td>
                       {canManageUsers && (
                         <td>
-                          <Button size="sm" variant="outlined" color="danger" onClick={() => handleRemoveUser(user.email)}>
+                          <Checkbox
+                            checked={selectedUsersForBulkRemove.includes(user.email)}
+                            disabled={isBatchProtectedRole(user.role)}
+                            onChange={() => toggleUserSelection(user.email)}
+                          />
+                        </td>
+                      )}
+                      <td>{user.email}</td>
+                      <td>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography level="body-sm">{user.role || 'user'}</Typography>
+                          {isBatchProtectedRole(user.role) && (
+                            <Chip size="sm" color="warning" variant="soft">
+                              {t('admin.protectedBatchRemove')}
+                            </Chip>
+                          )}
+                        </Box>
+                      </td>
+                      {canManageUsers && (
+                        <td>
+                          <Button
+                            size="sm"
+                            variant="outlined"
+                            color="danger"
+                            disabled={isAdminRole(user.role)}
+                            onClick={() => handleRemoveUser(user.email)}
+                          >
                             {t('admin.removeButton')}
                           </Button>
                         </td>
@@ -483,7 +649,7 @@ const AdminPage: React.FC = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={canManageUsers ? 2 : 1}>{t('admin.noUsers')}</td>
+                    <td colSpan={canManageUsers ? 4 : 2}>{t('admin.noUsers')}</td>
                   </tr>
                 )}
               </tbody>

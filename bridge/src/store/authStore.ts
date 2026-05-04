@@ -6,7 +6,7 @@ import {
   refreshToken as apiRefreshToken,
   logout as apiLogout,
 } from '../api/auth';
-import { navigateTo } from '../api/navigationService';
+import { APP_ENTRY_PATH } from '../api/config';
 import type { AuthState, LoginCredentials, User, AuthTokens, LoginResponse } from '../types/auth';
 import { jwtDecode } from 'jwt-decode';
 
@@ -133,12 +133,21 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
       logout: async () => {
         const { tokens } = get();
+        const clearedPersistedState = JSON.stringify({
+          state: {
+            tokens: null,
+            user: null,
+            isAuthenticated: false,
+          },
+          version: 0,
+        });
 
         // Clear local auth state first so UI/route transition is immediate
         set(initialState);
+        localStorage.setItem('auth-storage', clearedPersistedState);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        navigateTo('/login');
+        window.location.replace(APP_ENTRY_PATH);
 
         // Best-effort server token invalidation runs after local logout.
         if (tokens?.refreshToken && tokens?.accessToken) {

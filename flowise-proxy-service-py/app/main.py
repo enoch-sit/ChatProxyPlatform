@@ -214,14 +214,15 @@ app = FastAPI(
 )
 module_logger.info(f"FastAPI app object created with lifespan. App: {app} (PID: {PID})")
 
-# Add CORS middleware
+# Add CORS middleware.
+# CORS_ALLOW_ORIGINS is a comma-separated string from env; split here.
+# Note: when allow_credentials=True, Starlette will NOT echo Origin if any
+# entry is "*". Use explicit origins (e.g. http://localhost:3082).
+_cors_raw = getattr(settings, "CORS_ALLOW_ORIGINS", "*") or "*"
+_cors_origins = [o.strip() for o in str(_cors_raw).split(",") if o.strip()] or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=(
-        settings.CORS_ALLOW_ORIGINS
-        if hasattr(settings, "CORS_ALLOW_ORIGINS")
-        else ["*"]
-    ),
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
