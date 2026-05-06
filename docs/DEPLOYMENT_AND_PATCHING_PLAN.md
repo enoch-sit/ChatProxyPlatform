@@ -1,5 +1,7 @@
 # Systematic Deployment & Patching Plan
 
+> Historical planning note: the branch model described in this document predates the current repository workflow. Use [BRANCHING_POLICY.md](BRANCHING_POLICY.md) as the source of truth for current branch roles and promotion flow.
+
 ## Problem Statement
 
 Two distinct but related problems:
@@ -12,7 +14,7 @@ Two distinct but related problems:
 ## Current State Summary
 
 | Area | What Exists | Gap |
-|------|-------------|-----|
+| ---- | ----------- | --- |
 | AWS Deploy | `deploy-service.ps1` builds/pushes/applies per-service | No CI/CD trigger, no gated promotion, bridge bypasses terraform |
 | Image Tagging | Ad-hoc (`debug-batch-f7d02e9`, `scroll-fix-f7d02e9`, `latest`) | No semantic versioning, can't tell what's deployed |
 | Rollback | Can re-deploy old tag manually | No automated rollback on health-check failure |
@@ -27,7 +29,7 @@ Two distinct but related problems:
 
 Three phases, each independently valuable:
 
-```
+```text
 Phase 1: Foundation        Phase 2: CI/CD Pipeline     Phase 3: Fleet Management
 (1-2 days)                 (2-3 days)                  (1-2 days)
 ─────────────────          ──────────────────          ──────────────────
@@ -44,22 +46,16 @@ Phase 1: Foundation        Phase 2: CI/CD Pipeline     Phase 3: Fleet Management
 
 ### 1.1 — Git Branching Model
 
-Adopt a lightweight trunk-based model:
+This section is superseded by [BRANCHING_POLICY.md](BRANCHING_POLICY.md).
 
-```
-main ──────●──────●──────●──────●─────── (always deployable)
-            \    /        \    /
-             feat/         fix/
-             xxx           yyy
-```
+Current working model:
 
-**Rules:**
-- `main` = source of truth, always deployable to dev
-- Feature branches: `feat/<description>` or `fix/<description>`
-- Release tags: `v1.2.3` on main (triggers deploy)
-- No long-lived environment branches — tags control what's deployed where
+- `test/localdeploy` = development source of truth
+- `bhss` = live Windows + Docker Desktop production branch
+- `release/aws-prod-candidate` = AWS promotion branch
+- short-lived working branches = `feat/...`, `fix/...`, `hotfix/...`, `refactor/...`, `chore/...`, `ops/...`, `spike/...`
 
-**Why not `release/aws` branches?** They drift, cause merge conflicts, and add ceremony. Tags on main are simpler and map 1:1 to deployed versions.
+Use the current branch policy document for operational decisions and branch hygiene.
 
 ### 1.2 — Semantic Versioning
 
@@ -85,6 +81,7 @@ Introduce a single version source at the repo root:
 - Sortable (semver prefix enables easy comparison)
 
 **Bump workflow:**
+
 ```powershell
 # bump-version.ps1 — bumps version.json + creates git tag
 .\infra\scripts\bump-version.ps1 -Service auth-service -Type patch
@@ -96,6 +93,7 @@ Introduce a single version source at the repo root:
 The `ignore_changes = [task_definition]` on bridge-ecs was added to prevent terraform from reverting manual deploys. The real fix:
 
 **Option A (Recommended):** Remove `ignore_changes` and always deploy via terraform:
+
 ```hcl
 # infra/modules/bridge-ecs/main.tf
 lifecycle {
@@ -105,6 +103,7 @@ lifecycle {
 ```
 
 This works because `deploy-service.ps1` already updates `terraform.tfvars` with the new image tag before running `terraform apply`. The cycle that caused the original problem was:
+
 1. Manual deploy → terraform.tfvars not updated → next `terraform apply` reverts
 2. Fix: `deploy-service.ps1` updates tfvars first → no revert
 
@@ -129,7 +128,8 @@ Enhance `deploy-service.ps1` to handle all services uniformly:
 **Dependency order:** auth-service → accounting-service → flowise-proxy → bridge
 
 **Auto-rollback logic:**
-```
+
+```text
 1. Record current task definition revision before deploy
 2. Deploy new revision
 3. aws ecs wait services-stable --timeout 300
@@ -145,7 +145,7 @@ Enhance `deploy-service.ps1` to handle all services uniformly:
 # At end of deploy-service.ps1, after successful deploy:
 git add infra/environments/dev/terraform.tfvars
 git commit -m "deploy($Service): $Tag"
-git push origin main
+git push origin release/aws-prod-candidate
 ```
 
 This eliminates state drift between the repo and what's actually deployed.
@@ -156,24 +156,26 @@ This eliminates state drift between the repo and what's actually deployed.
 
 ### 2.1 — Workflow Structure
 
-```
+The workflow names below are historical examples. In the current branch policy, the triggering branch should be the configured promotion branch rather than a hardcoded feature or trunk branch.
+
+```text
 .github/
   workflows/
     ci.yml              # PR checks: lint, test, type-check, docker build (no push)
-    deploy-dev.yml      # On push to main OR manual trigger: build + push + deploy
+    deploy-dev.yml      # On push to configured promotion branch OR manual trigger: build + push + deploy
     deploy-service.yml  # Manual: deploy single service with specific tag
     rollback.yml        # Manual: rollback a service to previous revision
 ```
 
 ### 2.2 — CI Workflow (ci.yml)
 
-Runs on every PR to `main`:
+Runs on every PR to the configured integration or promotion branch:
 
 ```yaml
 name: CI
 on:
   pull_request:
-    branches: [main]
+    branches: [test/localdeploy]
 
 jobs:
   changes:
@@ -222,13 +224,13 @@ jobs:
 
 ### 2.3 — Deploy Workflow (deploy-dev.yml)
 
-Runs on push to `main` (only changed services):
+Runs on push to the configured AWS promotion branch (only changed services):
 
 ```yaml
 name: Deploy Dev
 on:
   push:
-    branches: [main]
+    branches: [release/aws-prod-candidate]
   workflow_dispatch:
     inputs:
       services:
@@ -259,7 +261,7 @@ jobs:
       - name: Update tfvars
         run: |
           # Update terraform.tfvars with new image tag
-          # Commit back to main
+          # Commit back to the AWS promotion branch if your workflow requires tracked tfvars
 
       - name: Terraform Apply
         run: |
@@ -280,7 +282,7 @@ jobs:
 
 ### 2.4 — GitHub Actions Secrets Required
 
-```
+```text
 AWS_ACCESS_KEY_ID          # IAM user or OIDC role for GitHub Actions
 AWS_SECRET_ACCESS_KEY      # (prefer OIDC role assumption instead)
 AWS_ACCOUNT_ID             # 168437900315
@@ -321,6 +323,7 @@ jobs:
 ### 3.1 — Problem
 
 Multiple Windows workstations need:
+
 - Initial setup (Docker, Node, Python, Git, services, secrets)
 - Ongoing patches (code updates, config changes, new services)
 - Consistency (all machines on same version)
@@ -359,7 +362,7 @@ Create a central manifest that workstations check:
 
 A single `patch.ps1` that handles everything:
 
-```
+```text
 patch.ps1
 ├── Check current version (local version.json vs remote manifest)
 ├── If behind:
@@ -375,6 +378,7 @@ patch.ps1
 ```
 
 **Key improvements over `update_patch.bat`:**
+
 - **Selective rebuild** — Only rebuilds services that changed (saves 5-10 min)
 - **Rolling restart** — Restarts services one at a time, not all at once
 - **Health gating** — Won't proceed to next service if current one fails health check
@@ -385,7 +389,7 @@ patch.ps1
 
 Current state: 15+ `.bat`/`.ps1` files in repo root. Consolidate into a single entry point:
 
-```
+```text
 KEEP (rename/move):
   setup.ps1              ← consolidated from quick_install.bat + automated_setup.bat + automated_setup.py
   patch.ps1              ← consolidated from update_patch.bat + patch_local.ps1
@@ -401,9 +405,10 @@ ARCHIVE (move to scripts/archive/):
 
 For pushing updates to N workstations:
 
-**Option A: Git Tag + Scheduled Check (Simple)**
-```
-1. Developer merges to main, tags v1.2.0
+#### Option A: Git Tag + Scheduled Check (Simple)
+
+```text
+1. Developer merges to test/localdeploy, then tags v1.2.0 after promotion approval
 2. Each workstation has a scheduled task running daily:
    - git fetch --tags
    - Compare local version vs latest tag
@@ -411,8 +416,9 @@ For pushing updates to N workstations:
 3. Machines self-update overnight
 ```
 
-**Option B: Central Dashboard (More Control)**
-```
+#### Option B: Central Dashboard (More Control)
+
+```text
 1. Each workstation reports its version to a shared endpoint:
    POST /api/workstation-status { machine: "LAB-PC-01", version: "1.1.0", services: {...} }
 2. Admin dashboard shows fleet status:
@@ -429,7 +435,7 @@ For pushing updates to N workstations:
 ## Implementation Priority
 
 | # | Task | Effort | Impact | Dependency |
-|---|------|--------|--------|------------|
+| --- | ---- | ------ | ------ | ---------- |
 | 1 | Create `version.json` + image tag convention | 30 min | High | None |
 | 2 | Fix bridge-ecs `ignore_changes` | 30 min | High | None |
 | 3 | Enhance `deploy-service.ps1` with auto-rollback | 2 hr | High | #1 |
@@ -451,6 +457,6 @@ For pushing updates to N workstations:
 
 1. **Bridge terraform fix** — Remove `ignore_changes = [task_definition]`? Or keep the manual workaround?
 2. **GitHub Actions vs other CI** — GitHub Actions assumed (free for public repos, cheap for private). Any preference for AWS CodePipeline, Jenkins, etc.?
-3. **Auto-deploy on push to main?** — Or require manual trigger (safer but more friction)?
+3. **Auto-deploy on push to the promotion branch?** — Or require manual trigger (safer but more friction)?
 4. **Workstation auto-update overnight?** — Or always require manual `patch.ps1` run?
 5. **How many workstations?** — Determines whether simple git-tag approach or central dashboard is needed.

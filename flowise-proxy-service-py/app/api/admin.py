@@ -795,6 +795,16 @@ async def admin_get_user_sessions(
             ChatSession.user_id == user_id
         ).sort(-ChatSession.created_at).to_list()
 
+        chatflow_ids = list({s.chatflow_id for s in sessions if s.chatflow_id})
+        chatflow_names: Dict[str, str] = {}
+        if chatflow_ids:
+            chatflows = await Chatflow.find({"flowise_id": {"$in": chatflow_ids}}).to_list()
+            chatflow_names = {
+                chatflow.flowise_id: chatflow.name
+                for chatflow in chatflows
+                if chatflow.flowise_id and chatflow.name
+            }
+
         result = []
         for s in sessions:
             msg_count = await ChatMessage.find(
@@ -803,6 +813,7 @@ async def admin_get_user_sessions(
             result.append({
                 "session_id": s.session_id,
                 "chatflow_id": s.chatflow_id,
+                "chatflow_name": chatflow_names.get(s.chatflow_id),
                 "topic": s.topic,
                 "is_active": s.is_active,
                 "created_at": s.created_at.isoformat() if s.created_at else None,

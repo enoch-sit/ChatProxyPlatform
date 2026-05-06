@@ -125,8 +125,8 @@ Open browser: http://localhost:3002
 **First-time setup:**
 - Create admin account
 - Name: `admin`
-- Email: `ecysit@eduhk.hk`
-- Password: `Admin@2026`
+- Email: `admin@admin.com`
+- Password: `Test@1234`
 
 ### Step 5: Create Flowise API Key
 
@@ -329,8 +329,8 @@ See [check_drives_and_setup.bat](check_drives_and_setup.bat) for manual configur
 ## 🔐 Admin Credentials
 
 ### Flowise Admin
-- **Email:** `ecysit@eduhk.hk`
-- **Password:** `Admin@2026`
+- **Email:** `admin@admin.com`
+- **Password:** `Test@1234`
 - **Access:** http://localhost:3002
 
 ### Auth Service Admin

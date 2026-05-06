@@ -1,0 +1,42 @@
+ M .github/workflows/rollback.yml
+ M bridge/package.json
+ M bridge/src/App.tsx
+ M bridge/src/api/admin.ts
+ M bridge/src/api/config.ts
+ M bridge/src/components/admin/AdminChatHistoryPanel.tsx
+ M bridge/src/components/admin/AdminCreditsPanel.tsx
+ M bridge/src/components/admin/AdminUsersPanel.tsx
+ M bridge/src/components/auth/ProtectedRoute.tsx
+ M bridge/src/components/layout/Sidebar.tsx
+ M bridge/src/hooks/usePermissions.ts
+ M bridge/src/index.css
+ M bridge/src/locales/en/translation.json
+ M bridge/src/locales/zh-Hans/translation.json
+ M bridge/src/locales/zh-Hant/translation.json
+ M bridge/src/pages/AdminPage.tsx
+ M bridge/src/store/adminStore.ts
+ M bridge/src/store/authStore.ts
+ M bridge/src/types/admin.ts
+ M bridge/src/utils/chatParser.ts
+ M flowise-proxy-service-py/app/api/admin.py
+ M flowise-proxy-service-py/app/api/chatflows.py
+ M flowise-proxy-service-py/app/api/session_routes.py
+ M flowise-proxy-service-py/app/config.py
+ M flowise-proxy-service-py/app/database.py
+ M flowise-proxy-service-py/app/main.py
+ M flowise-proxy-service-py/app/models/user.py
+ M flowise-proxy-service-py/app/schemas.py
+ M flowise-proxy-service-py/app/services/chatflow_service.py
+ M flowise-proxy-service-py/app/services/external_auth_service.py
+ M flowise-proxy-service-py/docker-compose.yml
+ M flowise-proxy-service-py/init-mongo-prod.js
+ M infra/modules/flowise-aws/main.tf
+ M infra/modules/flowise-aws/variables.tf
+ M infra/modules/platform/main.tf
+ M infra/modules/platform/variables.tf
+ M version.json
+?? .github/workflows/deploy-prod.yml
+?? deploymentAndPatchLog/
+?? infra/environments/prod/
+?? infra/scripts/audit-ecs-status.ps1
+?? scripts/update_aws_secret.py

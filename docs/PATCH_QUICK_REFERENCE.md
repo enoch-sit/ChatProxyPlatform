@@ -3,6 +3,7 @@
 ## Quick Start - Local Patch
 
 ### Option 1: Full Automated Patch (Recommended)
+
 ```powershell
 # Test + Build + Deploy + Smoke Test
 .\patch_local.ps1 -ServiceName auth-service -Action Full
@@ -12,6 +13,7 @@
 ```
 
 ### Option 2: Step-by-Step
+
 ```powershell
 # Just run tests
 .\patch_local.ps1 -ServiceName auth-service -Action Test
@@ -24,6 +26,7 @@
 ```
 
 ### Manual Testing
+
 ```powershell
 cd auth-service
 npm test
@@ -41,61 +44,61 @@ cd ../accounting-service
 
 ## Quick Start - AWS Patch
 
-### Phase 1: Dev Deployment
+### Phase 1: Prepare and Validate on `test/localdeploy`
+
 ```powershell
-# 1. Make code changes locally
+# 1. Make code changes on a short-lived branch
 git add .
 git commit -m "[TICKET_ID] - Description"
-git push origin main
+git push origin feat/your-change
 
-# 2. Merge to release/aws (triggers GitHub Actions)
-git checkout release/aws
-git pull origin release/aws
-git merge main
-git push origin release/aws
+# 2. Merge the tested change set into test/localdeploy
+git checkout test/localdeploy
+git pull origin test/localdeploy
+git merge --ff-only feat/your-change
+git push origin test/localdeploy
 
-# 3. Monitor deployment (in separate terminal)
-.\patch_aws.ps1 -Environment dev -Action Monitor -Duration 120
+# 3. Run the service builds, tests, and smoke checks for the touched bundle
 ```
 
-### Phase 2: Staging Deployment
+### Phase 2: Windows Production Deployment (`bhss`)
+
 ```powershell
-# After 24+ hours in dev with no issues
+# After test/localdeploy validation passes
 
-# 1. Create release branch
-git checkout -b release/staging-v1.x.x release/aws
-git push origin release/staging-v1.x.x
+# 1. Promote the tested commit set to bhss
+git checkout bhss
+git merge --ff-only test/localdeploy
+git push origin bhss
 
-# 2. Trigger staging deployment via GitHub Actions UI
-# 3. Monitor
-.\patch_aws.ps1 -Environment staging -Action Monitor -Duration 120
+# 2. Deploy on the Windows + Docker Desktop target
+# 3. Run the BHSS smoke and admin patch checks
 ```
 
-### Phase 3: Production Deployment
+### Phase 3: AWS Production Deployment
+
+See `AWS_PROD_PATCH_RUNBOOK.md` for the full production procedure.
+
 ```powershell
-# After 24+ hours in staging with no issues
+# After bhss deployment is validated
 
-# 1. Ensure on main branch with latest changes
-git checkout main
-git pull origin main
+# 1. Promote the same commit set to the AWS production branch
+git checkout release/aws-prod-candidate
+git merge --ff-only test/localdeploy
+git push origin release/aws-prod-candidate
 
-# 2. Upgrade via Terraform (production)
-cd infra/environments/prod
+# 2. Read-only preflight
+.\infra\scripts\deploy-service.ps1 -Service <service> -Environment prod -Preflight
+.\infra\scripts\audit-ecs-status.ps1 -Environment prod
 
-# Plan first
-terraform plan -var-file=terraform.tfvars -out=tfplan
+# 3. Dry run the exact helper path
+.\infra\scripts\deploy-service.ps1 -Service <service> -Environment prod -DryRun
 
-# Review the plan carefully
-cat tfplan
+# 4. Deploy one service at a time with rollback protection
+.\infra\scripts\deploy-service.ps1 -Service <service> -Environment prod -AutoRollback
 
-# Apply (REQUIRES APPROVAL)
-terraform apply tfplan
-
-# 3. Monitor production
-.\patch_aws.ps1 -Environment prod -Action Monitor -Duration 120
-
-# 4. Post-deployment check (after 2 hours)
-.\patch_aws.ps1 -Environment prod -Action Status
+# 5. Re-audit and run the prod smoke subset after each service
+.\infra\scripts\audit-ecs-status.ps1 -Environment prod
 ```
 
 ---
@@ -103,7 +106,8 @@ terraform apply tfplan
 ## Service Port Reference
 
 ### Local (Docker Compose)
-```
+
+```text
 3000  - Auth Service
 3001  - Accounting Service
 3082  - Bridge UI
@@ -112,7 +116,8 @@ terraform apply tfplan
 ```
 
 ### AWS (ALB)
-```
+
+```text
 http://<alb-endpoint>/api/auth        - Auth Service
 http://<alb-endpoint>/api/accounting  - Accounting Service
 http://<alb-endpoint>/api/chat        - Flowise Proxy
@@ -124,6 +129,7 @@ http://<alb-endpoint>/                - Bridge UI
 ## Health Check URLs
 
 ### Local
+
 ```bash
 curl http://localhost:3000/health        # Auth
 curl http://localhost:3001/health        # Accounting
@@ -132,6 +138,7 @@ curl http://localhost:3082               # Bridge
 ```
 
 ### AWS
+
 ```bash
 curl http://<alb-dns>/api/auth/health       # Auth
 curl http://<alb-dns>/api/accounting/health # Accounting
@@ -144,6 +151,7 @@ curl http://<alb-dns>/                      # Bridge
 ## Troubleshooting
 
 ### Local Service Not Starting
+
 ```powershell
 # Check logs
 docker compose -f auth-service/docker-compose.dev.yml logs
@@ -157,6 +165,7 @@ docker compose -f auth-service/docker-compose.dev.yml up -d
 ```
 
 ### AWS Deployment Stuck
+
 ```powershell
 # Check ECS service status
 aws ecs describe-services `
@@ -175,30 +184,43 @@ aws ecs update-service `
 ```
 
 ### Rollback Local
+
 ```powershell
 # Revert to previous commit
 git revert <bad-commit-hash>
 
-# Rebuild
-.\automated_setup.bat
+# Rebuild the local stack from the reverted workspace
+.\patch.ps1 -Mode full
+.\diagnose.ps1 -Quick
 ```
 
 ### Rollback AWS
-```powershell
-# Quick revert (fastest)
-git revert -m 1 <bad-merge-commit>
-git push origin release/aws
-# GitHub Actions will automatically redeploy
 
-# Or monitor rollback
-.\patch_aws.ps1 -Environment prod -Action Rollback
+```powershell
+# Fastest safe restore: redeploy the previous known-good image tag
+.\infra\scripts\deploy-service.ps1 -Service <service> -Environment prod -Tag <previous-good-tag> -AutoRollback
+
+# If you already captured the previous task definition ARN
+aws ecs update-service `
+    --cluster chatproxy-prod-cluster `
+    --service chatproxy-prod-<service-suffix> `
+    --task-definition <previous-task-definition-arn> `
+    --region us-east-1
+
+aws ecs wait services-stable `
+    --cluster chatproxy-prod-cluster `
+    --services chatproxy-prod-<service-suffix> `
+    --region us-east-1
 ```
+
+Use `git revert` after service recovery if you need to make the rollback durable on `release/aws-prod-candidate`.
 
 ---
 
 ## Monitoring Commands
 
 ### Local Services
+
 ```powershell
 # Check all running containers
 docker ps --format "table {{.Names}}\t{{.Status}}"
@@ -211,12 +233,20 @@ docker stats
 ```
 
 ### AWS Services
+
 ```powershell
-# Get deployment status
-.\patch_aws.ps1 -Environment prod -Action Status
+# Read-only environment audit
+.\infra\scripts\audit-ecs-status.ps1 -Environment prod
 
 # View CloudWatch logs
-aws logs tail /chatproxy/prod/auth-service --follow
+aws logs tail /chatproxy/prod/<service> --follow
+
+# Check ECS service rollout
+aws ecs describe-services `
+    --cluster chatproxy-prod-cluster `
+    --services chatproxy-prod-<service-suffix> `
+    --region us-east-1 `
+    --query 'services[0].{taskDefinition:taskDefinition,rollout:deployments[0].rolloutState,running:runningCount,desired:desiredCount}'
 
 # Check ECS tasks
 aws ecs list-tasks --cluster chatproxy-prod-cluster
@@ -232,7 +262,9 @@ aws ecs describe-tasks `
 ## Common Patches
 
 ### Database Schema Migration
-**Local:**
+
+#### Local Database Migration
+
 ```powershell
 # Backup current database
 docker exec mongodb-accounting mongodump --out /backup
@@ -244,7 +276,8 @@ npm run migrate
 npm test
 ```
 
-**AWS:**
+#### AWS Database Migration
+
 ```powershell
 # Backup Aurora RDS
 aws rds create-db-snapshot `
@@ -252,11 +285,12 @@ aws rds create-db-snapshot `
     --db-snapshot-identifier accounting-backup-$(Get-Date -Format 'yyyyMMdd')
 
 # Deploy with migration
-git push origin release/aws
+git push origin release/aws-prod-candidate
 # Monitor GitHub Actions
 ```
 
 ### Dependency Update (npm)
+
 ```powershell
 cd auth-service
 npm update
@@ -267,6 +301,7 @@ git commit -m "[DEPS] Update dependencies"
 ```
 
 ### Security Patch (CVE)
+
 ```powershell
 # Check vulnerabilities
 npm audit
@@ -287,6 +322,7 @@ git commit -m "[SECURITY] Fix CVE-YYYY-XXXX"
 ## Environment-Specific Teardown
 
 ### Local Cleanup
+
 ```powershell
 # Stop all containers
 docker compose -f auth-service/docker-compose.dev.yml down
@@ -302,6 +338,7 @@ docker rmi auth-service accounting-service bridge flowise-proxy
 ```
 
 ### AWS Destroy (Development Only)
+
 ```powershell
 # WARNING: This destroys all AWS resources
 
@@ -314,6 +351,7 @@ terraform destroy -var-file=terraform.tfvars
 ## Backup Before Patching
 
 ### Local Backup
+
 ```powershell
 $backupDir = "backups/backup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
 New-Item -Path $backupDir -ItemType Directory
@@ -329,6 +367,7 @@ Copy-Item -Path docker-compose*.yml -Destination $backupDir/ -Recurse
 ```
 
 ### AWS Backup
+
 ```powershell
 # Aurora snapshots are automatic
 # But create manual snapshot before major patch
@@ -347,35 +386,40 @@ aws rds create-db-snapshot `
 
 ## Key Decision Matrix
 
-| Scenario | Local | AWS Dev | AWS Staging | AWS Prod |
-|----------|-------|---------|-------------|----------|
-| Critical Security Patch | Immediate + test | Immediate | 4-6 hours | During maintenance |
-| Bug Fix | Test + deploy | 24h wait | 24h wait | 48h wait |
-| Feature | New branch + test | Staging first | Prod after 48h | Scheduled release |
-| Dependency Update | Test immediately | Dev first | Staging 24h | Staging + 48h prod |
-| Database Migration | Backup + test | Dev + backup | Staging + backup | Prod + backup |
+| Scenario | test/localdeploy | bhss (Windows prod) | AWS prod |
+| ---------- | ------------------ | --------------------- | ---------- |
+| Critical Security Patch | Immediate fix + validate | Promote and deploy as soon as validated | Promote and deploy in maintenance window or immediately if required |
+| Bug Fix | Validate full bundle | Deploy after local validation passes | Deploy after bhss confirmation |
+| Feature | Build and validate on feature branch, then merge | Deploy the same tested commit set | Deploy the same tested commit set after bhss sign-off |
+| Dependency Update | Validate install, build, and smoke checks | Deploy and observe runtime behavior on Windows | Deploy and observe AWS runtime behavior |
+| Database Migration | Backup and validate migration locally | Deploy with Windows-specific runbook checks | Deploy with Terraform and AWS rollback checks |
 
 ---
 
 ## Files to Monitor
 
 | File | Purpose | When to Check |
-|------|---------|---------------|
-| `PATCHING_STRATEGY.md` | Full strategy document | Before starting patch |
+| ------ | --------- | --------------- |
+| `AWS_PROD_PATCH_RUNBOOK.md` | Current AWS production patch procedure | Before starting AWS prod patch |
+| `AWS_PATCH_PIPELINE_RUNBOOK.md` | Current AWS dev patch procedure | Before starting AWS dev patch |
 | `DEPLOYMENT_CHECKLIST.md` | Deployment requirements | Before deployment |
 | `DEPLOYMENT_PROGRESS.md` | Current status | During deployment |
-| `patch_local.ps1` | Local automation | Running local patch |
-| `patch_aws.ps1` | AWS automation | Running AWS patch |
-| GitHub Actions | CI/CD execution | After pushing to release/aws |
+| `patch.ps1` | Local workstation patch automation | Running local patch |
+| `infra/scripts/deploy-service.ps1` | ECS image deploy helper | Running AWS patch |
+| `infra/scripts/audit-ecs-status.ps1` | Read-only ECS audit | Before and after AWS patch |
+| GitHub Actions | CI/CD execution | After pushing to `test/localdeploy`, `bhss`, or `release/aws-prod-candidate` |
 | CloudWatch Logs | Production logs | During prod monitoring |
 
 ---
 
 ## Emergency Contacts
 
-**On-Call Rotation:** [Insert team member names and schedules]
+### On-Call Rotation
 
-**Escalation Path:**
+[Insert team member names and schedules]
+
+### Escalation Path
+
 1. Current on-call engineer
 2. Tech lead
 3. Engineering manager
@@ -385,26 +429,28 @@ aws rds create-db-snapshot `
 
 ## Success Criteria
 
-✅ **Local Patch Success:**
+### Local Patch Success
+
 - All unit tests pass
 - All smoke tests pass
 - No service downtime
 - Git commits created
 
-✅ **Dev Patch Success:**
-- GitHub Actions completes
-- All health checks pass
-- Integration tests pass
-- 24-hour soak test passes
+### `test/localdeploy` Validation Success
 
-✅ **Staging Patch Success:**
-- All health checks pass
-- Integration tests pass
-- 24-hour soak test passes
-- Performance metrics stable
-- Error logs reviewed
+- Touched services build and test successfully
+- Required smoke checks pass
+- The intended patch bundle is merged cleanly into `test/localdeploy`
 
-✅ **Production Patch Success:**
+### `bhss` Deployment Success
+
+- The same tested commit set is promoted to `bhss`
+- Windows + Docker Desktop health checks pass
+- Admin smoke tests pass on the live Windows deployment line
+- Error logs are reviewed with no high-severity regressions
+
+### AWS Production Patch Success
+
 - Zero-downtime deployment
 - All health checks pass
 - 2-hour monitoring passes

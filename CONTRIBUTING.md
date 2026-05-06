@@ -39,7 +39,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 **Before submitting a pull request:**
 
-1. **Fork the repository** and create your branch from `main`
+1. **Fork the repository** and create your branch from `test/localdeploy`
 2. **Test your changes** thoroughly:
    ```bash
    check_system.bat  # Verify system health
@@ -47,6 +47,13 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 3. **Update documentation** if you changed functionality
 4. **Follow existing code style** (see below)
 5. **Write clear commit messages**
+
+Branch policy:
+
+- Use [docs/BRANCHING_POLICY.md](docs/BRANCHING_POLICY.md) as the source of truth for branch roles and naming.
+- New feature work starts from `test/localdeploy`.
+- `bhss` and `release/aws-prod-candidate` are production-class promotion targets, not primary feature-authoring branches.
+- `bhss` is the live Windows + Docker Desktop deployment line.
 
 **Pull Request Process:**
 
@@ -80,6 +87,15 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
    - See [DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md)
 
 ### Development Workflow
+
+Branch workflow:
+
+1. Create a short-lived branch from `test/localdeploy` using `feat/...`, `fix/...`, `hotfix/...`, `refactor/...`, `chore/...`, `ops/...`, or `spike/...`.
+2. Implement the feature against the Docker-managed local stack on this Windows machine, typically via `python local-deploy.py`.
+3. Validate the full feature bundle against the local containers.
+4. Merge back into `test/localdeploy`.
+5. Promote the same tested commit set to `bhss` for the Windows + Docker Desktop production line.
+6. Promote the same tested commit set to `release/aws-prod-candidate` for the AWS production line.
 
 **Start services in development mode:**
 

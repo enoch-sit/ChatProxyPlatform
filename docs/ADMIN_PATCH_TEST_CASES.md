@@ -5,16 +5,16 @@ This suite verifies the admin scrolling fix, bulk chatflow assignment reliabilit
 
 Use these tests in this order:
 1. Run all cases before patch (baseline).
-2. Deploy patch to AWS dev.
-3. Run all cases again in AWS dev.
-4. Promote to staging, then prod after pass.
-5. Apply local patch and rerun selected smoke tests.
+2. Validate the patch bundle on `test/localdeploy`.
+3. Deploy the same commit set to `bhss`.
+4. Run the full admin patch suite on `bhss`.
+5. Promote the same commit set to AWS production and rerun the critical smoke subset.
 
 ## Test Environment Matrix
-- AWS dev: mandatory before any promotion.
-- AWS staging: required gate before prod.
-- AWS prod: final validation.
-- Local Windows: only after AWS verification.
+- `test/localdeploy`: mandatory validation source before any promotion.
+- `bhss`: live Windows + Docker Desktop production gate.
+- AWS prod: final production rollout verification.
+- Local ad hoc testing: optional support signal, not the promotion authority.
 
 ## Evidence To Capture For Every Case
 - Test Case ID
@@ -254,11 +254,12 @@ Expected:
 - Latency remains within normal range.
 
 ## Exit Criteria
-- All functional cases pass in AWS dev.
+- All functional cases pass on `test/localdeploy` or its feature branch before promotion.
 - No high-severity regression found in reliability cases.
 - AWS health gate cases pass.
-- Same critical smoke subset passes in AWS staging and prod.
-- Local parity smoke tests pass after AWS rollout.
+- The full admin suite passes on `bhss`.
+- The same critical smoke subset passes on AWS prod.
+- Local parity smoke tests pass when needed for investigation.
 
 ## Suggested Smoke Subset For Fast Recheck
 - TC-ADM-001

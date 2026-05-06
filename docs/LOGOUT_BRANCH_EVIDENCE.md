@@ -1,5 +1,7 @@
 ﻿# Logout Branch Evidence
 
+> Historical evidence note: branch names in this snapshot refer to the legacy `main` and `release/aws` workflow, not the current promotion model.
+
 Date: 2026-04-15 11:00:52
 Base branch: main (324e23d14307a90b410ad5071833521f90c62cc4)
 Target branch: release/aws (35dc12cce1d1e8e397bf97951cc98e3a18b1e67d)

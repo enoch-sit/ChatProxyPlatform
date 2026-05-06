@@ -270,6 +270,7 @@ export interface AdminChatUser {
 export interface AdminChatSession {
   session_id: string;
   chatflow_id: string;
+  chatflow_name?: string | null;
   topic: string | null;
   is_active: boolean;
   created_at: string | null;

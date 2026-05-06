@@ -52,6 +52,9 @@ There are **3 scripts** that handle everything on a workstation:
 # Deploy to AWS ECS (auto-tags from version.json)
 .\infra\scripts\deploy-service.ps1 -Service auth-service
 
+# Read-only preflight for the current AWS target
+.\infra\scripts\deploy-service.ps1 -Service auth-service -Environment prod -Preflight
+
 # Deploy with auto-rollback
 .\infra\scripts\deploy-service.ps1 -Service auth-service -AutoRollback
 
@@ -65,9 +68,13 @@ There are **3 scripts** that handle everything on a workstation:
 
 ### Getting Started
 - **[DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md)** - Complete installation guide for beginners (START HERE)
+- **[docs/TEACHER_ADMIN_WINDOWS_WORKSTATION_GUIDE.zh-TW.md](docs/TEACHER_ADMIN_WINDOWS_WORKSTATION_GUIDE.zh-TW.md)** - Traditional Chinese guide for teachers/admins using a Windows Docker Desktop workstation
+- **[docs/BRANCHING_POLICY.md](docs/BRANCHING_POLICY.md)** - Current branch roles, naming rules, and promotion workflow
+- **[docs/BRANCH_PROTECTION_CHECKLIST.md](docs/BRANCH_PROTECTION_CHECKLIST.md)** - GitHub branch protection settings to match the current workflow
 - **[DEPLOYMENT_AND_PATCHING_PLAN.md](DEPLOYMENT_AND_PATCHING_PLAN.md)** - Versioning, CI/CD, and fleet management plan
 - **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Service-specific setup instructions
 - **[docs/AWS_PATCH_PIPELINE_RUNBOOK.md](docs/AWS_PATCH_PIPELINE_RUNBOOK.md)** - Safe AWS dev patch procedure for ECS services
+- **[docs/AWS_PROD_PATCH_RUNBOOK.md](docs/AWS_PROD_PATCH_RUNBOOK.md)** - Safe AWS production patch procedure for ECS services
 
 ### Operations Scripts
 | Script | Description |
@@ -236,8 +243,8 @@ delete,olduser,old@school.com,,,0
 - **Teachers/Students:** Defined in users.csv
 
 ### Flowise (Admin Panel)
-- **Email:** ecysit@eduhk.hk
-- **Password:** Admin@2026
+- **Email:** admin@admin.com
+- **Password:** Test@1234
 
 ⚠️ **IMPORTANT:** Change these before production use!
 
@@ -462,11 +469,16 @@ ChatProxy Platform/
 
 Contributions are welcome! This is an open-source project.
 
+Current branch workflow note:
+
+- Use [docs/BRANCHING_POLICY.md](docs/BRANCHING_POLICY.md) as the source of truth for branch roles and naming.
+- In this repo, feature work starts from `test/localdeploy`, not `main`.
+
 ### How to Contribute
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+2. Switch to `test/localdeploy` and create a feature branch (`git checkout test/localdeploy` then `git checkout -b feat/your-feature-name`)
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
+4. Push to the branch (`git push origin feat/your-feature-name`)
 5. Open a Pull Request
 
 ### Development Setup

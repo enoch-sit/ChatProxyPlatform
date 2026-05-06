@@ -16,6 +16,61 @@ const protectedRouter = Router();
 const adminRouter = Router();
 const testingRouter = Router();
 
+const ACCOUNTING_SERVICE_URL =
+  process.env.ACCOUNTING_SERVICE_URL || process.env.ACCOUNTING_URL || 'http://accounting-service:3001';
+
+/**
+ * Best-effort idempotent sync of a newly-created user into the accounting
+ * service so that admins can find and allocate credits to the user before
+ * the user has logged in once. Failures are logged but do NOT fail the
+ * primary user-creation request.
+ */
+async function ensureAccountingUser(
+  bearerToken: string | undefined,
+  payload: { userId: string; email: string; username?: string; role?: string }
+): Promise<void> {
+  if (!bearerToken) {
+    logger.warn('ensureAccountingUser: skipped, no bearer token forwarded');
+    return;
+  }
+  try {
+    const url = `${ACCOUNTING_SERVICE_URL}/api/users/ensure`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bearerToken}`,
+      },
+      body: JSON.stringify({
+        sub: payload.userId,
+        email: payload.email,
+        username: payload.username,
+        role: payload.role,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      logger.warn(
+        `ensureAccountingUser: accounting-service responded ${res.status} for userId=${payload.userId}: ${text.slice(0, 300)}`
+      );
+    } else {
+      logger.info(`ensureAccountingUser: synced userId=${payload.userId} (status ${res.status})`);
+    }
+  } catch (err) {
+    logger.warn(
+      `ensureAccountingUser: failed for userId=${payload.userId}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
+const extractBearerToken = (req: Request): string | undefined => {
+  const h = req.headers.authorization;
+  if (typeof h === 'string' && h.startsWith('Bearer ')) {
+    return h.slice(7).trim();
+  }
+  return undefined;
+};
+
 const durationToMs = (value: string | undefined, fallbackMs: number): number => {
   const input = (value || '').trim();
   const match = input.match(/^(\d+)(ms|s|m|h|d)$/i);
@@ -544,6 +599,28 @@ adminRouter.get('/users/by-email/:email', authenticate, requireAdminOrTeacher, a
   }
 });
 
+// Get user by username (admin or teacher)
+adminRouter.get('/users/by-username/:username', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
+  try {
+    const { username } = req.params;
+
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+
+    const user = await User.findOne({ username }).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({ user });
+  } catch (error) {
+    logger.error('Error fetching user by username:', error);
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
 
 // Create a new user (admin or teacher)
 adminRouter.post('/users', authenticate, requireAdminOrTeacher, async (req: Request, res: Response) => {
@@ -580,6 +657,18 @@ adminRouter.post('/users', authenticate, requireAdminOrTeacher, async (req: Requ
     }
     
     logger.info(`User ${username} created by admin ${req.user?.username}`);
+
+    // Best-effort: sync the new user into accounting-service so admins can
+    // immediately see and allocate credits without waiting for first login.
+    if (result.userId) {
+      void ensureAccountingUser(extractBearerToken(req), {
+        userId: result.userId,
+        email,
+        username,
+        role: role || UserRole.ENDUSER,
+      });
+    }
+
     res.status(201).json({
       message: result.message,
       userId: result.userId
@@ -600,13 +689,18 @@ adminRouter.post('/users/batch', authenticate, requireAdminOrTeacher, async (req
       return res.status(400).json({ error: 'A non-empty array of users is required' });
     }
     
-    // Validate each user has required fields
+    // Validate each user has required fields; auto-generate email when absent
     for (const user of users) {
-      if (!user.username || !user.email) {
+      if (!user.username) {
         return res.status(400).json({ 
-          error: 'Each user must have a username and email',
+          error: 'Each user must have a username',
           invalidUser: user
         });
+      }
+
+      // Auto-generate a placeholder email when none is provided
+      if (!user.email) {
+        user.email = `${user.username.toLowerCase()}@internal.local`;
       }
 
       if (user.password && typeof user.password === 'string' && user.password.length < 8) {
@@ -641,7 +735,21 @@ adminRouter.post('/users/batch', authenticate, requireAdminOrTeacher, async (req
     );
     
     logger.info(`Batch user creation by admin ${req.user?.username}. Created: ${result.summary.successful}, Failed: ${result.summary.failed}, Total: ${result.summary.total}`);
-    
+
+    // Best-effort: sync each new user into accounting-service.
+    const bearer = extractBearerToken(req);
+    for (const r of result.results) {
+      if (r.success && r.userId) {
+        const matchInput = users.find((u) => u.username === r.username);
+        void ensureAccountingUser(bearer, {
+          userId: r.userId,
+          email: r.email,
+          username: r.username,
+          role: matchInput?.role || UserRole.ENDUSER,
+        });
+      }
+    }
+
     res.status(201).json({
       message: `${result.summary.successful} of ${result.summary.total} users created successfully`,
       results: result.results,

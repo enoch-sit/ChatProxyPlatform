@@ -77,6 +77,7 @@ const AdminChatHistoryPanel: React.FC = () => {
       `Student Chat Export`,
       `User: ${selectedUser?.username ?? selectedUser?.email ?? ''}`,
       `Session: ${selectedSession.session_id}`,
+      `Course: ${selectedSession.chatflow_name ?? selectedSession.chatflow_id ?? 'unknown'}`,
       `Date: ${selectedSession.created_at ? new Date(selectedSession.created_at).toLocaleString() : 'unknown'}`,
       `Messages: ${messages.length}`,
       '',
@@ -166,6 +167,9 @@ const AdminChatHistoryPanel: React.FC = () => {
               }}
             >
               <Typography level="body-sm" noWrap>{s.topic || `Session ${s.session_id.slice(0, 8)}`}</Typography>
+              <Typography level="body-xs" noWrap sx={{ color: 'text.secondary' }}>
+                {s.chatflow_name || s.chatflow_id || 'Unknown course'}
+              </Typography>
               <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
                 {s.created_at ? new Date(s.created_at).toLocaleDateString() : '—'}
               </Typography>
@@ -183,11 +187,18 @@ const AdminChatHistoryPanel: React.FC = () => {
         sx={{ flex: 1, minWidth: 0, borderRadius: 'sm', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}
       >
         <Box sx={{ p: 1, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography level="title-sm">
-            {selectedSession
-              ? (selectedSession.topic || `Session ${selectedSession.session_id.slice(0, 8)}`)
-              : 'Select a session'}
-          </Typography>
+          <Box>
+            <Typography level="title-sm">
+              {selectedSession
+                ? (selectedSession.topic || `Session ${selectedSession.session_id.slice(0, 8)}`)
+                : 'Select a session'}
+            </Typography>
+            {selectedSession && (
+              <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                Course: {selectedSession.chatflow_name || selectedSession.chatflow_id || 'Unknown'}
+              </Typography>
+            )}
+          </Box>
           {selectedSession && messages.length > 0 && (
             <Button size="sm" variant="outlined" onClick={handleExport}>Export .txt</Button>
           )}

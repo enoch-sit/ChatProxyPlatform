@@ -1,5 +1,8 @@
 # Systematic Patching Strategy - ChatProxy Platform
 
+> Historical archive: this document preserves an older `main -> release/aws -> staging -> prod` workflow and does not reflect the current branch policy.
+> For current operations, use [../BRANCHING_POLICY.md](../BRANCHING_POLICY.md), [../PATCH_QUICK_REFERENCE.md](../PATCH_QUICK_REFERENCE.md), and [../AWS_PATCH_PIPELINE_RUNBOOK.md](../AWS_PATCH_PIPELINE_RUNBOOK.md).
+
 ## Overview
 This document defines a systematic approach to patch both **Local Windows Deployment** and **AWS Deployment** (dev/staging/prod) safely and effectively.
 

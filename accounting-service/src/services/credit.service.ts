@@ -23,7 +23,31 @@ import UserAccountService from './user-account.service';
 import UserAccount from '../models/user-account.model';
 import logger from '../utils/logger'; // Import the logger
 
+type CurrentCreditBalance = {
+  userId: string;
+  username?: string;
+  email?: string;
+  currentCredits: number;
+  activeAllocationCount: number;
+};
+
 export class CreditService {
+  private async getUserDirectory(userIds: string[]): Promise<Map<string, UserAccount>> {
+    if (userIds.length === 0) {
+      return new Map();
+    }
+
+    const userAccounts = await UserAccount.findAll({
+      where: {
+        userId: {
+          [Op.in]: userIds,
+        },
+      },
+    });
+
+    return new Map(userAccounts.map((account) => [account.userId, account]));
+  }
+
   // 20250523_test_flow
   /**
    * Get active credit balance for a user
@@ -116,6 +140,96 @@ export class CreditService {
         allocatedBy: alloc.allocatedBy,
       };
     }));
+  }
+
+  async getAllCurrentBalances(): Promise<CurrentCreditBalance[]> {
+    const now = new Date();
+    const activeAllocations = await CreditAllocation.findAll({
+      where: {
+        expiresAt: { [Op.gt]: now },
+        remainingCredits: { [Op.gt]: 0 },
+      },
+      order: [['userId', 'ASC'], ['expiresAt', 'ASC']],
+    });
+
+    const balancesByUser = new Map<string, CurrentCreditBalance>();
+
+    for (const allocation of activeAllocations) {
+      const existing = balancesByUser.get(allocation.userId) ?? {
+        userId: allocation.userId,
+        currentCredits: 0,
+        activeAllocationCount: 0,
+      };
+
+      existing.currentCredits += allocation.remainingCredits;
+      existing.activeAllocationCount += 1;
+      balancesByUser.set(allocation.userId, existing);
+    }
+
+    const userIds = Array.from(balancesByUser.keys());
+    const userDirectory = await this.getUserDirectory(userIds);
+
+    return userIds.map((userId) => {
+      const balance = balancesByUser.get(userId)!;
+      const account = userDirectory.get(userId);
+
+      return {
+        ...balance,
+        username: account?.username,
+        email: account?.email,
+      };
+    });
+  }
+
+  /**
+   * Get every UserAccount row joined with its current (non-expired, non-zero)
+   * aggregate credit balance. Unlike getAllCurrentBalances, this includes users
+   * with zero credits so administrators can allocate to them from the UI.
+   *
+   * @returns Promise<Array<{ userId, username, email, role, currentCredits, activeAllocationCount }>>
+   */
+  async getUsersDirectory(): Promise<Array<{
+    userId: string;
+    username?: string;
+    email?: string;
+    role?: string;
+    currentCredits: number;
+    activeAllocationCount: number;
+  }>> {
+    const now = new Date();
+
+    // Load every user account in the system (zero-balance ones included).
+    const allAccounts = await UserAccount.findAll({
+      order: [['username', 'ASC']],
+    });
+
+    // Aggregate active credits per user in a single query.
+    const activeAllocations = await CreditAllocation.findAll({
+      where: {
+        expiresAt: { [Op.gt]: now },
+        remainingCredits: { [Op.gt]: 0 },
+      },
+    });
+
+    const balancesByUser = new Map<string, { currentCredits: number; activeAllocationCount: number }>();
+    for (const allocation of activeAllocations) {
+      const existing = balancesByUser.get(allocation.userId) ?? { currentCredits: 0, activeAllocationCount: 0 };
+      existing.currentCredits += allocation.remainingCredits;
+      existing.activeAllocationCount += 1;
+      balancesByUser.set(allocation.userId, existing);
+    }
+
+    return allAccounts.map((account) => {
+      const balance = balancesByUser.get(account.userId) ?? { currentCredits: 0, activeAllocationCount: 0 };
+      return {
+        userId: account.userId,
+        username: account.username,
+        email: account.email,
+        role: account.role,
+        currentCredits: balance.currentCredits,
+        activeAllocationCount: balance.activeAllocationCount,
+      };
+    });
   }
 
   // 20250523_test_flow

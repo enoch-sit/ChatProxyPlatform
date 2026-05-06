@@ -1,6 +1,8 @@
 # Manual Patch Guide — ChatProxy Platform
 
 > How to update services on a Windows workstation **without** using `fleet.ps1`.
+>
+> Branch note: do not follow old `main`-based patching habits. Use `bhss` for the live Windows production line and `test/localdeploy` for development workstations unless you intentionally need another branch for investigation.
 
 ---
 
@@ -25,7 +27,7 @@
 ```powershell
 # Minimal manual patch — run from the repo root on the workstation
 cd C:\chatproxy          # or wherever the repo is cloned
-git pull origin main
+git pull origin bhss      # use test/localdeploy on non-production workstations
 .\auth-service\rebuild.bat
 .\accounting-service\rebuild.bat
 .\flowise\start.bat
@@ -84,14 +86,14 @@ Services **must** be deployed in this order (defined in `workstation-manifest.js
 
 ```powershell
 cd C:\chatproxy
-git pull origin main
+git pull origin bhss      # use test/localdeploy on non-production workstations
 ```
 
 If you have local changes that conflict:
 
 ```powershell
 git stash
-git pull origin main
+git pull origin bhss      # use test/localdeploy on non-production workstations
 git stash pop       # re-apply your local changes
 ```
 
@@ -216,7 +218,7 @@ If you know only one service changed, you can patch just that service:
 
 ```powershell
 cd C:\chatproxy
-git pull origin main
+git pull origin bhss      # use test/localdeploy on non-production workstations
 
 # Example: only auth-service changed
 cd auth-service

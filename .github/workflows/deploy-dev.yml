@@ -2,7 +2,8 @@ name: Deploy Dev
 
 on:
   push:
-    branches: [main]
+    branches:
+      - release/aws-prod-candidate
     paths:
       - 'auth-service/**'
       - 'accounting-service/**'
