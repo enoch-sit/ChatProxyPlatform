@@ -582,7 +582,7 @@ if ($dockerDaemonReady) {
 }
 
 $expectedPorts = @(3000, 3001, 3002, 3082, 8000, 27017)
-$portUsage = Get-PortUsage -Ports $expectedPorts
+$portUsage = @(Get-PortUsage -Ports $expectedPorts)
 $portConflicts = @()
 foreach ($entry in $portUsage) {
     $isLikelyDockerProxy = $entry.ProcessName -match 'com\.docker|docker|vmmem|vpnkit|wslrelay'
