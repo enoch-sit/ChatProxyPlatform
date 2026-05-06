@@ -384,8 +384,8 @@ $toolDefinitions = @(
     @{ Name = 'docker'; Command = 'docker'; Args = @('--version'); Required = $requiredTools['docker']; AutoInstall = $true; HardMissing = $false },
     @{ Name = 'docker compose'; Command = 'docker'; Args = @('compose', 'version'); Required = $null; AutoInstall = $false; HardMissing = $true },
     @{ Name = 'node'; Command = 'node'; Args = @('--version'); Required = $requiredTools['node']; AutoInstall = $true; HardMissing = $false },
-    @{ Name = 'npm'; Command = 'npm'; Args = @('--version'); Required = $null; AutoInstall = $false; HardMissing = $true },
-    @{ Name = 'python'; Command = 'python'; Args = @('--version'); Required = $requiredTools['python']; AutoInstall = $false; HardMissing = $true },
+    @{ Name = 'npm'; Command = 'npm'; Args = @('--version'); Required = $null; AutoInstall = $true; HardMissing = $false },
+    @{ Name = 'python'; Command = 'python'; Args = @('--version'); Required = $requiredTools['python']; AutoInstall = $true; HardMissing = $false },
     @{ Name = 'git'; Command = 'git'; Args = @('--version'); Required = $requiredTools['git']; AutoInstall = $true; HardMissing = $false }
 )
 
@@ -658,7 +658,7 @@ $readyForSetup = (
 )
 
 $missingInstallerManagedPrereqs = @()
-foreach ($name in @('docker', 'node', 'git')) {
+foreach ($name in @('docker', 'node', 'python', 'git')) {
     $key = $name
     if ($toolResults.ContainsKey($key) -and -not $toolResults[$key].Installed) {
         $missingInstallerManagedPrereqs += $name

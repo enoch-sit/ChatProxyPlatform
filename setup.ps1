@@ -98,6 +98,7 @@ Write-Step $step $totalSteps "Checking prerequisites..."
 $prereqs = @{
     "docker"  = @{ Check = "docker"; Install = "Docker.DockerDesktop"; Version = "docker --version" }
     "node"    = @{ Check = "node";   Install = "OpenJS.NodeJS.LTS";    Version = "node --version" }
+    "python"  = @{ Check = "python"; Install = "Python.Python.3.12";   Version = "python --version" }
     "git"     = @{ Check = "git";    Install = "Git.Git";              Version = "git --version" }
 }
 
