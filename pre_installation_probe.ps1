@@ -12,7 +12,9 @@
       - avoid a fresh install and use diagnose.ps1 / patch.ps1 instead
 
 .PARAMETER ExpectedBranch
-    Branch the workstation should be on before installation. Defaults to
+    Branch the workstation should be on before installation. If omitted, the
+    probe uses the current checked-out deployment branch when it is
+    test/localdeploy or test/deploylocal; otherwise it falls back to
     test/localdeploy.
 
 .PARAMETER AsJson
@@ -23,10 +25,13 @@
 
 .EXAMPLE
     .\pre_installation_probe.ps1 -ExpectedBranch test/localdeploy -AsJson
+
+.EXAMPLE
+    .\pre_installation_probe.ps1 -ExpectedBranch test/deploylocal
 #>
 [CmdletBinding()]
 param(
-    [string]$ExpectedBranch = "test/localdeploy",
+    [string]$ExpectedBranch = "",
     [switch]$AsJson
 )
 
@@ -35,6 +40,9 @@ $ErrorActionPreference = "Stop"
 
 $scriptRoot = $PSScriptRoot
 if (-not $scriptRoot) { $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path }
+
+$defaultExpectedBranch = 'test/localdeploy'
+$autoDetectedDeploymentBranches = @('test/localdeploy', 'test/deploylocal')
 
 $checks = [System.Collections.Generic.List[object]]::new()
 
@@ -453,6 +461,15 @@ if ($gitAvailable) {
             $currentBranch = $branchResult.Output.Trim()
         }
 
+        if (-not $ExpectedBranch) {
+            if ($currentBranch -and $currentBranch -in $autoDetectedDeploymentBranches) {
+                $ExpectedBranch = $currentBranch
+            }
+            else {
+                $ExpectedBranch = $defaultExpectedBranch
+            }
+        }
+
         $originResult = Invoke-ExternalCommand -Command 'git' -Arguments @('remote', 'get-url', 'origin')
         if ($originResult.Success -and $originResult.Output) {
             $originUrl = $originResult.Output.Trim()
@@ -529,6 +546,10 @@ if ($gitAvailable) {
 }
 else {
     Add-Check -Area 'git' -Name 'Repository' -Status 'fail' -Message 'Git is unavailable, so repo state could not be verified.' -Recommendation 'Install Git before using a repo-based workstation setup.'
+}
+
+if (-not $ExpectedBranch) {
+    $ExpectedBranch = $defaultExpectedBranch
 }
 
 $serviceDirectories = @(
