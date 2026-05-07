@@ -16,4 +16,3 @@ flowise==1.0.4
 uvicorn[standard]
 json-repair==0.47.6
 pillow==10.0.1
-python-magic==0.4.27

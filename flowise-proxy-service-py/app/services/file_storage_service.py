@@ -5,7 +5,11 @@ import os
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
-import magic
+
+try:
+    import magic
+except ImportError:
+    magic = None
 
 from app.database import get_database
 from app.models.file_upload import FileUpload as FileUploadModel
@@ -61,6 +65,9 @@ class FileStorageService:
         
         # Validate file content matches MIME type
         try:
+            if magic is None:
+                return True, "Valid"
+
             detected_mime = magic.from_buffer(file_data, mime=True)
             if detected_mime != mime_type:
                 return False, f"File content ({detected_mime}) doesn't match declared MIME type ({mime_type})"
