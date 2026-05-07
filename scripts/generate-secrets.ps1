@@ -84,18 +84,89 @@ function Backup-EnvFile {
     }
 }
 
+function Get-EnvVarValue {
+    param(
+        [string]$EnvPath,
+        [string]$Key
+    )
+
+    if (-not (Test-Path $EnvPath)) {
+        return $null
+    }
+
+    foreach ($line in [System.IO.File]::ReadAllLines($EnvPath)) {
+        if ($line -match "^\s*$([regex]::Escape($Key))=(.*)$") {
+            return $matches[1].Trim()
+        }
+    }
+
+    return $null
+}
+
+function Get-ReusableSecret {
+    param(
+        [string[]]$EnvPaths,
+        [string[]]$Keys,
+        [string[]]$DisallowedValues = @(),
+        [string[]]$DisallowedPatterns = @()
+    )
+
+    foreach ($envPath in $EnvPaths) {
+        foreach ($key in $Keys) {
+            $value = Get-EnvVarValue -EnvPath $envPath -Key $key
+            if ([string]::IsNullOrWhiteSpace($value)) {
+                continue
+            }
+
+            if ($DisallowedValues -contains $value) {
+                continue
+            }
+
+            $patternHit = $false
+            foreach ($pattern in $DisallowedPatterns) {
+                if ($value -match $pattern) {
+                    $patternHit = $true
+                    break
+                }
+            }
+
+            if (-not $patternHit) {
+                return $value
+            }
+        }
+    }
+
+    return $null
+}
+
 # ════════════════════════════════════════════════════════════════════════════
 # 1. Generate secrets
 # ════════════════════════════════════════════════════════════════════════════
 Write-Host ""
 Write-Host "  Generating cryptographically secure secrets..." -ForegroundColor Cyan
 
-$jwtAccessSecret   = New-SecureRandomString -Length 64
-$jwtRefreshSecret  = New-SecureRandomString -Length 64
-$postgresPassword  = New-SecureRandomString -Length 32
-$mongoPassword     = New-SecureRandomString -Length 32
-$flowiseSecretKey  = New-SecureRandomString -Length 32
-$proxyJwtSecretKey = New-SecureRandomString -Length 64
+$authEnvPath      = Join-Path $WorkspaceRoot 'auth-service\.env'
+$accountingEnvPath = Join-Path $WorkspaceRoot 'accounting-service\.env'
+$flowiseEnvPath   = Join-Path $WorkspaceRoot 'flowise\.env'
+$proxyEnvPath     = Join-Path $WorkspaceRoot 'flowise-proxy-service-py\.env'
+
+$jwtAccessSecret = Get-ReusableSecret -EnvPaths @($authEnvPath, $accountingEnvPath, $proxyEnvPath) -Keys @('JWT_ACCESS_SECRET') -DisallowedPatterns @('^your_generated_', '^dev_')
+if (-not $jwtAccessSecret) { $jwtAccessSecret = New-SecureRandomString -Length 64 }
+
+$jwtRefreshSecret = Get-ReusableSecret -EnvPaths @($authEnvPath, $accountingEnvPath, $proxyEnvPath) -Keys @('JWT_REFRESH_SECRET') -DisallowedPatterns @('^your_generated_', '^dev_')
+if (-not $jwtRefreshSecret) { $jwtRefreshSecret = New-SecureRandomString -Length 64 }
+
+$postgresPassword = Get-ReusableSecret -EnvPaths @($accountingEnvPath, $flowiseEnvPath) -Keys @('DB_PASSWORD', 'POSTGRES_PASSWORD', 'DATABASE_PASSWORD') -DisallowedValues @('postgres', 'postgres123')
+if (-not $postgresPassword) { $postgresPassword = New-SecureRandomString -Length 32 }
+
+$mongoPassword = Get-ReusableSecret -EnvPaths @($authEnvPath) -Keys @('MONGO_INITDB_ROOT_PASSWORD') -DisallowedPatterns @('^dev_')
+if (-not $mongoPassword) { $mongoPassword = New-SecureRandomString -Length 32 }
+
+$flowiseSecretKey = Get-ReusableSecret -EnvPaths @($flowiseEnvPath) -Keys @('FLOWISE_SECRETKEY_OVERWRITE') -DisallowedPatterns @('^changeme$', '^dev_')
+if (-not $flowiseSecretKey) { $flowiseSecretKey = New-SecureRandomString -Length 32 }
+
+$proxyJwtSecretKey = Get-ReusableSecret -EnvPaths @($proxyEnvPath) -Keys @('JWT_SECRET_KEY') -DisallowedPatterns @('^dev_')
+if (-not $proxyJwtSecretKey) { $proxyJwtSecretKey = New-SecureRandomString -Length 64 }
 
 Write-Host "  [OK] Secrets generated"
 
