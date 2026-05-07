@@ -2,6 +2,12 @@
 
 This runbook covers patching AWS through the existing dev ECS pipeline.
 
+Branch workflow note:
+
+- Prepare and validate changes on `test/localdeploy` first.
+- Promote the tested commit set to the AWS deployment branch you are targeting.
+- For production candidate work in this repo, use `release/aws-prod-candidate` as the AWS promotion branch.
+
 ## Scope
 
 Only these recent changes belong in the AWS patch rollout:
@@ -34,7 +40,7 @@ There are two supported ways to patch dev AWS.
 
 ### Option 1: GitHub Actions automatic path
 
-Merge the AWS-relevant changes to `main`.
+Promote the AWS-relevant tested changes from `test/localdeploy` to the AWS deployment branch you are targeting.
 
 Workflow:
 
@@ -42,7 +48,7 @@ Workflow:
 
 Trigger conditions:
 
-- push to `main` that changes `flowise-proxy-service-py/**`, `bridge/**`, or `version.json`
+- push to the configured AWS deployment branch that changes `flowise-proxy-service-py/**`, `bridge/**`, or `version.json`
 - manual `workflow_dispatch`
 
 ### Option 2: Manual per-service path
@@ -93,9 +99,10 @@ Note:
 
 ## GitHub Actions Rollout Procedure
 
-1. Merge AWS-relevant changes to `main`.
-2. Open GitHub Actions and monitor `Deploy Dev`.
-3. Confirm these stages pass:
+1. Merge AWS-relevant changes into `test/localdeploy` and validate there first.
+2. Promote the exact tested commit set to the AWS deployment branch.
+3. Open GitHub Actions and monitor `Deploy Dev`.
+4. Confirm these stages pass:
 
 - change detection
 - secret validation
@@ -103,7 +110,7 @@ Note:
 - Terraform apply
 - ECS wait for service stability
 
-4. If both services changed together, verify `flowise-proxy` deploy completes before validating `bridge` behavior.
+5. If both services changed together, verify `flowise-proxy` deploy completes before validating `bridge` behavior.
 
 ## Manual Workflow Dispatch Procedure
 

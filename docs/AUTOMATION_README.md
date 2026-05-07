@@ -1,5 +1,8 @@
 # 🤖 Automated Setup Complete - README
 
+> Historical note: this setup README predates the current branch policy. Any examples that mention `main` or a default-base-branch workflow should be read as legacy examples only.
+> For current branch roles and promotion flow, use [BRANCHING_POLICY.md](BRANCHING_POLICY.md) and [PATCH_QUICK_REFERENCE.md](PATCH_QUICK_REFERENCE.md).
+
 ## 📦 What's Been Created
 
 Your ChatProxyPlatform fork now includes a complete automated setup system! Here's what was generated:
@@ -126,7 +129,7 @@ Adds: Complete automation from fresh install to 10,000 credits"
 ### Step 2: Push to Your Fork
 
 ```bash
-git push origin main
+git push origin your-branch-name
 # Or: git push origin your-branch-name
 ```
 
@@ -136,7 +139,7 @@ git push origin main
 2. Click "Pull requests" tab
 3. Click "New pull request"
 4. Set base repository: `enoch-sit/chatbotproxyPlatform`
-5. Set base branch: `main` (or whatever their default branch is)
+5. Set base branch to the appropriate current target, typically `test/localdeploy`
 6. Set compare: `vocabbreaker/ChatProxyPlatform` → your branch
 
 ### Step 4: Use the PR Template

@@ -43,7 +43,6 @@ if (-not $scriptRoot) { $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand
 
 $defaultExpectedBranch = 'test/localdeploy'
 $autoDetectedDeploymentBranches = @('test/localdeploy', 'test/deploylocal')
-
 $checks = [System.Collections.Generic.List[object]]::new()
 
 function Add-Check {
@@ -469,7 +468,6 @@ if ($gitAvailable) {
                 $ExpectedBranch = $defaultExpectedBranch
             }
         }
-
         $originResult = Invoke-ExternalCommand -Command 'git' -Arguments @('remote', 'get-url', 'origin')
         if ($originResult.Success -and $originResult.Output) {
             $originUrl = $originResult.Output.Trim()
@@ -551,7 +549,6 @@ else {
 if (-not $ExpectedBranch) {
     $ExpectedBranch = $defaultExpectedBranch
 }
-
 $serviceDirectories = @(
     'auth-service',
     'accounting-service',

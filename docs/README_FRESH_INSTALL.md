@@ -202,8 +202,8 @@ check_system.bat
 - **Students:** Defined in `users.csv`
 
 ### Flowise (Admin Panel)
-- **Email:** `ecysit@eduhk.hk`
-- **Password:** `Admin@2026`
+- **Email:** `admin@admin.com`
+- **Password:** `Test@1234`
 
 ### API Keys
 - **Flowise API Key:** Generated in Flowise UI → Settings → API Keys

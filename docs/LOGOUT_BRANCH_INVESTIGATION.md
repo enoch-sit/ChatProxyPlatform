@@ -1,5 +1,7 @@
 # Logout Investigation: main vs release/aws
 
+> Historical investigation note: this document captures a point-in-time comparison before the repository moved to the current `test/localdeploy`, `bhss`, and `release/aws-prod-candidate` branch model.
+
 Date: 2026-04-15
 
 Comparison branches:

@@ -45,3 +45,9 @@ variable "certificate_arn" {
   description = "ACM certificate ARN covering apex + wildcard"
   type        = string
 }
+
+variable "create_dns_records" {
+  description = "Whether to create the Route53 apex record. Set to false in environments that share a hosted zone with another active environment to avoid collisions."
+  type        = bool
+  default     = true
+}

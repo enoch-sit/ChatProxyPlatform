@@ -377,7 +377,7 @@ A table showing running containers. You should see at least 2 rows:
    - **Fill in:**
      - Name: `admin` (or your name)
      - Email: `your-email@example.com` (use your real email)
-     - Password: `Admin@2026` (or choose your own secure password)
+       - Password: Choose your own secure password and store it safely
    - Click "Sign Up"
 
 4. **You should now see the Flowise dashboard** - colorful interface with options to create chatflows

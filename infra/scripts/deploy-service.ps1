@@ -36,6 +36,9 @@
 .PARAMETER DryRun
     Show what would happen without executing anything.
 
+.PARAMETER Preflight
+    Show the live ECS target, current task definition, and planned image without building, pushing, or applying.
+
 .PARAMETER AutoRollback
     If the ECS service fails to stabilise, automatically revert to the previous task definition.
 
@@ -55,6 +58,9 @@
     # Dry run -- see what would happen
     .\infra\scripts\deploy-service.ps1 -Service bridge -DryRun
 
+    # Preflight -- inspect the current prod target before any changes
+    .\infra\scripts\deploy-service.ps1 -Service bridge -Environment prod -Preflight
+
     # Deploy + commit tfvars to git
     .\infra\scripts\deploy-service.ps1 -Service auth-service -Tag v1.1.0 -CommitTfvars
 #>
@@ -71,6 +77,8 @@ param(
     [switch]$SkipTerraform,
 
     [switch]$DryRun,
+
+    [switch]$Preflight,
 
     [switch]$AutoRollback,
 
@@ -130,6 +138,24 @@ foreach ($p in @($tfvarsPath, $sourceDir)) {
     if (-not (Test-Path $p)) { throw "Path not found: $p" }
 }
 
+function Get-TfvarsValue {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [Parameter(Mandatory)]
+        [string]$VariableName
+    )
+
+    foreach ($line in Get-Content $Path) {
+        if ($line -match ('^\s*' + [regex]::Escape($VariableName) + '\s*=\s*"([^"]*)"\s*$')) {
+            return $matches[1]
+        }
+    }
+
+    return $null
+}
+
 # ─── Auto-generate tag from version.json if not provided ─────────────────────
 if (-not $Tag) {
     $versionFile = Join-Path $repoRoot "version.json"
@@ -163,9 +189,68 @@ Write-Host "  Tag         : $Tag"                             -ForegroundColor C
 Write-Host "  Environment : $Environment"                     -ForegroundColor Cyan
 Write-Host "  Image       : $versionedImage"                  -ForegroundColor Cyan
 if ($DryRun)       { Write-Host "  Mode        : DRY RUN"    -ForegroundColor Yellow }
+if ($Preflight)    { Write-Host "  Mode        : PREFLIGHT"  -ForegroundColor Yellow }
 if ($AutoRollback) { Write-Host "  AutoRollback: ON"         -ForegroundColor Yellow }
 Write-Host "================================================" -ForegroundColor Cyan
 Write-Host ""
+
+$terraformApplyArgs = @(
+    'apply'
+    '-var-file=terraform.tfvars'
+    "-target=$($cfg.TfModule)"
+    '-auto-approve'
+)
+
+$terraformManualArgs = @(
+    'apply'
+    '-var-file=terraform.tfvars'
+    "-target=$($cfg.TfModule)"
+)
+
+if ($Preflight) {
+    $identityArn = (aws sts get-caller-identity --query Arn --output text).Trim()
+    $configuredImage = Get-TfvarsValue -Path $tfvarsPath -VariableName $cfg.TfVar
+
+    $svcJson = aws ecs describe-services --cluster $ecsCluster --services $ecsService --region $region --output json 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $message = ($svcJson | Out-String).Trim()
+        throw "Failed to describe ECS service '$ecsService'.`n$message"
+    }
+
+    $svcInfo = ($svcJson | Out-String | ConvertFrom-Json).services[0]
+    if (-not $svcInfo) {
+        throw "ECS service not found: $ecsService"
+    }
+
+    $taskDefinitionArn = $svcInfo.taskDefinition
+    $taskJson = aws ecs describe-task-definition --task-definition $taskDefinitionArn --region $region --output json 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $message = ($taskJson | Out-String).Trim()
+        throw "Failed to describe task definition '$taskDefinitionArn'.`n$message"
+    }
+
+    $taskDefinition = ($taskJson | Out-String | ConvertFrom-Json).taskDefinition
+    $liveImage = @($taskDefinition.containerDefinitions)[0].image
+    $primaryDeployment = @($svcInfo.deployments | Where-Object { $_.status -eq 'PRIMARY' })[0]
+    $rolloutState = if ($primaryDeployment) { $primaryDeployment.rolloutState } else { 'unknown' }
+
+    Write-Host "[PREFLIGHT] Current AWS target:" -ForegroundColor Yellow
+    Write-Host "  Identity ARN        : $identityArn"
+    Write-Host "  Cluster             : $ecsCluster"
+    Write-Host "  ECS Service         : $ecsService"
+    Write-Host "  Terraform Module    : $($cfg.TfModule)"
+    Write-Host "  Terraform Variable  : $($cfg.TfVar)"
+    Write-Host "  tfvars Image        : $configuredImage"
+    Write-Host "  Live Task Definition: $taskDefinitionArn"
+    Write-Host "  Live ECS Image      : $liveImage"
+    Write-Host "  Desired Count       : $($svcInfo.desiredCount)"
+    Write-Host "  Running Count       : $($svcInfo.runningCount)"
+    Write-Host "  Rollout State       : $rolloutState"
+    Write-Host "  Planned Image       : $versionedImage"
+    Write-Host ""
+    Write-Host "No changes made." -ForegroundColor Green
+    exit 0
+}
 
 if ($DryRun) {
     Write-Host "[DRY RUN] Would execute:" -ForegroundColor Yellow
@@ -173,7 +258,7 @@ if ($DryRun) {
     Write-Host "  2. docker build -t $($cfg.EcrRepo):$Tag $sourceDir"
     Write-Host "  3. docker push $versionedImage"
     Write-Host "  4. Update $tfvarsPath : $($cfg.TfVar) = `"$versionedImage`""
-    Write-Host "  5. terraform apply -target=$($cfg.TfModule)"
+    Write-Host "  5. terraform $($terraformApplyArgs -join ' ')"
     if ($CommitTfvars) { Write-Host "  6. git commit terraform.tfvars" }
     Write-Host ""
     Write-Host "No changes made." -ForegroundColor Green
@@ -243,14 +328,15 @@ if ($SkipTerraform) {
     Write-Host ""
     Write-Host "To finish the deploy, run:" -ForegroundColor Cyan
     Write-Host "  cd `"$tfDir`""
-    Write-Host "  terraform apply -var-file=terraform.tfvars -target=$($cfg.TfModule)"
+    Write-Host "  terraform $($terraformManualArgs -join ' ')"
     exit 0
 }
 
 Write-Host "[5/5] Running terraform apply..." -ForegroundColor Yellow
 Push-Location $tfDir
 try {
-    terraform apply -var-file=terraform.tfvars -target=$($cfg.TfModule) -auto-approve
+    # Splat native arguments so PowerShell passes -target=module.* unchanged to Terraform.
+    & terraform @terraformApplyArgs
     if ($LASTEXITCODE -ne 0) { throw "terraform apply failed" }
 } finally {
     Pop-Location

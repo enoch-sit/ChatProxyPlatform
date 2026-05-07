@@ -65,7 +65,7 @@
 
 | Status | Task | Time | Notes |
 |--------|------|------|-------|
-| ✅ | 4.1 Create Flowise admin account | 2 min | Email: ecysit@eduhk.hk |
+| ✅ | 4.1 Create Flowise admin account | 2 min | Email: admin@admin.com |
 | ✅ | 4.2 Generate Flowise API key | 1 min | Key: <redacted — rotate via Flowise UI after AWS deployment> |
 | ✅ | 4.3 Add key to .env file | 1 min | File updated: ✅ |
 | ✅ | 4.4 Restart flowise-proxy | 1 min | Restarted: ✅ |

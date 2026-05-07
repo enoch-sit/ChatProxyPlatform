@@ -2,9 +2,15 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - test/localdeploy
+      - bhss
+      - release/aws-prod-candidate
   push:
-    branches: [main]
+    branches:
+      - test/localdeploy
+      - bhss
+      - release/aws-prod-candidate
 
 permissions:
   contents: read

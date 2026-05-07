@@ -194,8 +194,8 @@ start-with-postgres.bat
 1. You'll see "Create Admin Account" screen
 2. Fill in:
    - **Username:** `admin`
-   - **Email:** `ecysit@eduhk.hk`
-   - **Password:** `Admin@2026`
+   - **Email:** `admin@admin.com`
+   - **Password:** `Test@1234`
 3. Click "Create Account"
 4. You're now logged in to Flowise!
 
@@ -278,8 +278,8 @@ Look for:
 
 1. **Open Flowise:** http://localhost:3002
 2. **Login:**
-   - Email: `ecysit@eduhk.hk`
-   - Password: `Admin@2026`
+   - Email: `admin@admin.com`
+   - Password: `Test@1234`
 3. **Navigate to Settings:**
    - Click your profile icon (top-right)
    - Click "Settings"
@@ -386,8 +386,8 @@ sync_all_users.bat
 
 1. Open http://localhost:3002
 2. Login with admin credentials:
-   - Email: `ecysit@eduhk.hk`
-   - Password: `Admin@2026`
+   - Email: `admin@admin.com`
+   - Password: `Test@1234`
 
 ---
 
@@ -655,7 +655,7 @@ check_system.bat
 
 1. **Change default passwords:**
    - Admin password: `admin@admin` → Strong password
-   - Flowise password: `Admin@2026` → Strong password
+   - Flowise password: Replace the initial setup password with a strong password and store it securely
 
 2. **Update JWT secrets:**
    ```batch
@@ -729,7 +729,7 @@ check_system.bat
 
 ### Default Credentials
 - **Admin:** admin / admin@admin
-- **Flowise Admin:** ecysit@eduhk.hk / Admin@2026
+- **Flowise Admin:** admin@admin.com / Test@1234
 
 ### Essential Commands
 ```batch

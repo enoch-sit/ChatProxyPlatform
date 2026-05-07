@@ -63,6 +63,7 @@ const AdminUsersPanel: React.FC = () => {
   // Create user modal
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ username: '', email: '', password: '', role: 'enduser', skipVerification: true });
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // Batch create modal
   const [showBatch, setShowBatch] = useState(false);
@@ -110,13 +111,72 @@ const AdminUsersPanel: React.FC = () => {
     setTimeout(() => setSuccess(null), 3500);
   };
 
+  const closeCreateModal = () => {
+    setShowCreate(false);
+    setCreateError(null);
+    clearError();
+  };
+
   const handleCreate = async () => {
+    clearError();
+    setCreateError(null);
+    if (createForm.password.length < 8) {
+      setCreateError('Password must be at least 8 characters.');
+      return;
+    }
+
     try {
       await createUser(createForm);
       setShowCreate(false);
+      setCreateError(null);
       setCreateForm({ username: '', email: '', password: '', role: 'enduser', skipVerification: true });
       flash('User created successfully');
-    } catch { /* error shown via store */ }
+    } catch (err: unknown) {
+      setCreateError(getErrorMessage(err, 'User creation failed.'));
+    }
+  };
+
+  const parseBatchLines = (raw: string): Array<{ username: string; email?: string; password: string; role: string }> => {
+    const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (batchMode === 'simple') {
+      // Format: username password
+      return lines.map((line) => {
+        const parts = line.split(/\s+/);
+        const username = parts[0];
+        const password = parts[1] || batchDefaultPassword;
+        return { username, password, role: batchCreateRole };
+      });
+    } else {
+      // Advanced format: email username password
+      return lines.map((line) => {
+        const parts = line.split(/[\s,]+/);
+        const email = parts[0];
+        const username = parts[1] || email.split('@')[0];
+        const password = parts[2] || batchDefaultPassword;
+        return { email, username, password, role: batchCreateRole };
+      });
+    }
+  };
+
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      if (!text) return;
+      const rows = text.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
+      // Strip header row if present
+      const firstRow = rows[0]?.toLowerCase() ?? '';
+      const isHeader = firstRow.startsWith('username') || firstRow.startsWith('email');
+      const dataRows = isHeader ? rows.slice(1) : rows;
+      // Convert CSV columns to space-separated lines for the textarea
+      const lines = dataRows.map((row) => row.split(',').map((c) => c.trim()).join(' '));
+      setBatchLines(lines.join('\n'));
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be re-uploaded
+    e.target.value = '';
   };
 
   const parseBatchLines = (raw: string): Array<{ username: string; email?: string; password: string; role: string }> => {
@@ -322,7 +382,7 @@ const AdminUsersPanel: React.FC = () => {
             Batch Role ({selectedUserIds.length})
           </Button>
           <Button size="sm" variant="outlined" color="neutral" onClick={() => setShowBatch(true)}>Batch Create</Button>
-          <Button size="sm" onClick={() => setShowCreate(true)}>+ New User</Button>
+          <Button size="sm" onClick={() => { setCreateError(null); clearError(); setShowCreate(true); }}>+ New User</Button>
         </Stack>
       </Box>
 
@@ -391,10 +451,12 @@ const AdminUsersPanel: React.FC = () => {
       </Sheet>
 
       {/* Create User Modal */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)}>
+      <Modal open={showCreate} onClose={closeCreateModal}>
         <ModalDialog sx={{ minWidth: 360 }}>
           <ModalClose />
           <Typography level="h4">Create User</Typography>
+          {createError && <Alert color="danger" sx={{ mt: 1 }}>{createError}</Alert>}
+          {!createError && error && <Alert color="danger" sx={{ mt: 1 }}>{error}</Alert>}
           <FormControl>
             <FormLabel>Username</FormLabel>
             <Input value={createForm.username} onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })} />
@@ -404,7 +466,7 @@ const AdminUsersPanel: React.FC = () => {
             <Input type="email" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} />
           </FormControl>
           <FormControl sx={{ mt: 1 }}>
-            <FormLabel>Password</FormLabel>
+            <FormLabel>Password (min 8 chars)</FormLabel>
             <Input type="password" value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} />
           </FormControl>
           <FormControl sx={{ mt: 1 }}>
