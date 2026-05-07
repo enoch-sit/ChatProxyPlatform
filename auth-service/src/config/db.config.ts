@@ -8,7 +8,7 @@ import { logger } from '../utils/logger';
 export const connectDB = async (): Promise<void> => {
   try {
     // Retrieve MongoDB URI from environment variables
-    const mongoUri = process.env.MONGO_URI;
+    const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
     
     // Check if MongoDB URI is defined
     if (!mongoUri) {
