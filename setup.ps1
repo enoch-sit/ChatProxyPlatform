@@ -267,11 +267,28 @@ foreach ($svc in $deployOrder) {
     Write-Host "  Starting $svc..." -ForegroundColor Yellow
     Push-Location (Join-Path $scriptRoot $dir)
     $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-    docker compose -f $composeFile up -d 2>&1 | Out-Null
+    $composeOutput = docker compose -f $composeFile up -d 2>&1 | Out-String
     $dockerExit = $LASTEXITCODE
     $ErrorActionPreference = $savedEAP
     if ($dockerExit -ne 0) {
         Write-Fail "$svc failed to start"
+        $composeLines = @($composeOutput -split "`r?`n" | Where-Object { $_.Trim() })
+        if ($composeLines.Count -gt 0) {
+            Write-Host "    docker compose output:" -ForegroundColor DarkYellow
+            foreach ($line in ($composeLines | Select-Object -Last 12)) {
+                Write-Host "      $line" -ForegroundColor DarkGray
+            }
+        }
+
+        $composePs = docker compose -f $composeFile ps --all 2>&1 | Out-String
+        if ($LASTEXITCODE -eq 0 -and $composePs.Trim()) {
+            Write-Host "    docker compose ps:" -ForegroundColor DarkYellow
+            foreach ($line in ($composePs -split "`r?`n" | Where-Object { $_.Trim() })) {
+                Write-Host "      $line" -ForegroundColor DarkGray
+            }
+        }
+
+        Write-Host "    Next: docker compose -f $composeFile logs --tail 50" -ForegroundColor DarkYellow
         $errors += $svc
     } else {
         Write-OK "$svc started"
