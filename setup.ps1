@@ -61,8 +61,16 @@ function Test-Command { param([string]$Cmd) return [bool](Get-Command $Cmd -Erro
 function Invoke-CmdCapture {
     param([Parameter(Mandatory)][string]$CommandLine)
 
-    $output = & cmd.exe /d /c $CommandLine 2>&1 | Out-String
-    $exitCode = $LASTEXITCODE
+    $savedEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+
+    try {
+        $output = & cmd.exe /d /s /c "$CommandLine 2>&1" | Out-String
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $savedEAP
+    }
 
     return [pscustomobject]@{
         Success  = ($exitCode -eq 0)
