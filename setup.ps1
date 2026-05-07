@@ -58,6 +58,19 @@ function Write-Fail { param([string]$Msg) Write-Host "  [FAIL] $Msg" -Foreground
 
 function Test-Command { param([string]$Cmd) return [bool](Get-Command $Cmd -ErrorAction SilentlyContinue) }
 
+function Invoke-CmdCapture {
+    param([Parameter(Mandatory)][string]$CommandLine)
+
+    $output = & cmd.exe /d /c $CommandLine 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+
+    return [pscustomobject]@{
+        Success  = ($exitCode -eq 0)
+        ExitCode = $exitCode
+        Output   = $output.TrimEnd()
+    }
+}
+
 function Test-ServiceHealth {
     param([string]$Name, [int]$Port, [string]$Path = "/health", [int]$Retries = 5)
     for ($i = 1; $i -le $Retries; $i++) {
@@ -247,6 +260,26 @@ $svcDirs = @{
     "bridge"             = "bridge"
 }
 
+$sharedDockerNetwork = 'chatproxy-network'
+$networkInspect = Invoke-CmdCapture -CommandLine "docker network inspect $sharedDockerNetwork"
+if (-not $networkInspect.Success) {
+    Write-Host "  Creating Docker network $sharedDockerNetwork..." -ForegroundColor Yellow
+    $networkCreate = Invoke-CmdCapture -CommandLine "docker network create $sharedDockerNetwork"
+    if (-not $networkCreate.Success) {
+        Write-Fail "Could not create Docker network $sharedDockerNetwork"
+        if ($networkCreate.Output) {
+            foreach ($line in ($networkCreate.Output -split "`r?`n" | Where-Object { $_.Trim() })) {
+                Write-Host "    $line" -ForegroundColor DarkGray
+            }
+        }
+        exit 1
+    }
+    Write-OK "Docker network $sharedDockerNetwork created"
+}
+else {
+    Write-OK "Docker network $sharedDockerNetwork is ready"
+}
+
 $errors = @()
 foreach ($svc in $deployOrder) {
     if ($svc -eq "flowise" -and $SkipFlowise) {
@@ -266,13 +299,10 @@ foreach ($svc in $deployOrder) {
 
     Write-Host "  Starting $svc..." -ForegroundColor Yellow
     Push-Location (Join-Path $scriptRoot $dir)
-    $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-    $composeOutput = docker compose -f $composeFile up -d 2>&1 | Out-String
-    $dockerExit = $LASTEXITCODE
-    $ErrorActionPreference = $savedEAP
-    if ($dockerExit -ne 0) {
+    $composeUp = Invoke-CmdCapture -CommandLine "docker compose -f $composeFile up -d"
+    if (-not $composeUp.Success) {
         Write-Fail "$svc failed to start"
-        $composeLines = @($composeOutput -split "`r?`n" | Where-Object { $_.Trim() })
+        $composeLines = @($composeUp.Output -split "`r?`n" | Where-Object { $_.Trim() })
         if ($composeLines.Count -gt 0) {
             Write-Host "    docker compose output:" -ForegroundColor DarkYellow
             foreach ($line in ($composeLines | Select-Object -Last 12)) {
@@ -280,10 +310,10 @@ foreach ($svc in $deployOrder) {
             }
         }
 
-        $composePs = docker compose -f $composeFile ps --all 2>&1 | Out-String
-        if ($LASTEXITCODE -eq 0 -and $composePs.Trim()) {
+        $composePs = Invoke-CmdCapture -CommandLine "docker compose -f $composeFile ps --all"
+        if ($composePs.Success -and $composePs.Output) {
             Write-Host "    docker compose ps:" -ForegroundColor DarkYellow
-            foreach ($line in ($composePs -split "`r?`n" | Where-Object { $_.Trim() })) {
+            foreach ($line in ($composePs.Output -split "`r?`n" | Where-Object { $_.Trim() })) {
                 Write-Host "      $line" -ForegroundColor DarkGray
             }
         }
