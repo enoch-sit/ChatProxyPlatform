@@ -106,6 +106,117 @@ function Invoke-JsonPost {
     return [pscustomobject]$result
 }
 
+function Test-HttpGet {
+    param([string]$Url)
+
+    $result = [ordered]@{
+        Url = $Url
+        Ok = $false
+        StatusCode = 0
+        Body = ""
+        Error = ""
+    }
+
+    try {
+        $response = Invoke-WebRequest -Uri $Url -Method GET -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+        $result.Ok = $true
+        $result.StatusCode = [int]$response.StatusCode
+        $result.Body = $response.Content
+    }
+    catch {
+        $exception = $_.Exception
+        if ($exception.Response -and $exception.Response.StatusCode) {
+            $result.StatusCode = [int]$exception.Response.StatusCode
+        }
+        $result.Error = $exception.Message
+    }
+
+    return [pscustomobject]$result
+}
+
+function Invoke-AuthContainerProbe {
+    param(
+        [string]$Path,
+        [hashtable]$Body
+    )
+
+    $nodeScript = @'
+const url = process.env.TARGET_URL;
+const body = process.env.TARGET_BODY ? JSON.parse(process.env.TARGET_BODY) : undefined;
+
+(async () => {
+  const response = await fetch(url, {
+    method: body ? 'POST' : 'GET',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const text = await response.text();
+  process.stdout.write(JSON.stringify({
+    ok: response.ok,
+    statusCode: response.status,
+    body: text
+  }));
+})().catch((err) => {
+  process.stdout.write(JSON.stringify({
+    ok: false,
+    statusCode: 0,
+    body: '',
+    error: err && err.message ? err.message : String(err)
+  }));
+  process.exit(1);
+});
+'@
+
+    $targetUrl = "http://127.0.0.1:3000$Path"
+    $targetBody = if ($Body) { ($Body | ConvertTo-Json -Depth 5 -Compress) } else { "" }
+    $output = & docker exec `
+        -e "TARGET_URL=$targetUrl" `
+        -e "TARGET_BODY=$targetBody" `
+        auth-service node -e $nodeScript 2>&1
+
+    $jsonText = ($output | Out-String).Trim()
+    if ([string]::IsNullOrWhiteSpace($jsonText)) {
+        return [pscustomobject]@{
+            Ok = $false
+            StatusCode = 0
+            Body = ""
+            Error = "No output from auth-service container probe"
+        }
+    }
+
+    try {
+        $parsed = $jsonText | ConvertFrom-Json
+        return [pscustomobject]@{
+            Ok = [bool]$parsed.ok
+            StatusCode = [int]$parsed.statusCode
+            Body = [string]$parsed.body
+            Error = [string]$parsed.error
+        }
+    }
+    catch {
+        return [pscustomobject]@{
+            Ok = $false
+            StatusCode = 0
+            Body = $jsonText
+            Error = "Could not parse container probe output"
+        }
+    }
+}
+
+function Write-RecentAuthLogs {
+    param([int]$Tail = 20)
+
+    Write-Info "auth-service recent logs (last $Tail lines):"
+    $logs = & docker logs auth-service --tail=$Tail 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        $logs | ForEach-Object { Write-Host "  $_" }
+    } else {
+        Write-Warn "Could not read auth-service logs"
+        ($logs | Out-String).Trim() -split "`r?`n" | ForEach-Object { if ($_){ Write-Host "  $_" } }
+    }
+}
+
 function Test-AdminLogin {
     param(
         [string]$ProbeUsername,
@@ -200,6 +311,11 @@ const bcrypt = require('bcryptjs');
 
 Write-Section "Probe And Set Admin"
 
+# Apply seed defaults before prompting or validating
+if ([string]::IsNullOrWhiteSpace($Username)) { $Username = "admin" }
+if ([string]::IsNullOrWhiteSpace($Email))    { $Email    = "admin@admin.com" }
+if ([string]::IsNullOrWhiteSpace($Password)) { $Password = "admin@admin" }
+
 if (-not $NoPrompt) {
     Write-Info "Enter the admin credentials to probe/set on this machine"
     $Username = Read-ValueOrDefault -Prompt "Admin username" -DefaultValue $Username
@@ -281,14 +397,42 @@ if (-not $resetSucceeded) {
 }
 
 Write-Section "Post-Reset Probe"
+$hostHealth = Test-HttpGet -Url "http://localhost:3000/health"
+if ($hostHealth.Ok -and $hostHealth.StatusCode -eq 200) {
+    Write-Ok "auth-service health endpoint responds on localhost"
+} else {
+    Write-Warn "auth-service health endpoint is not healthy from localhost (HTTP $($hostHealth.StatusCode))"
+    if ($hostHealth.Error) { Write-Host "  Error: $($hostHealth.Error)" }
+}
+
 $finalLogin = Test-AdminLogin -ProbeUsername $Username -ProbePassword $Password
 if ($finalLogin.Ok -and $finalLogin.StatusCode -eq 200) {
     Write-Ok "auth-service login now works for $Username / $Password"
 } else {
-    Write-Fail "Admin reset completed, but login still failed (HTTP $($finalLogin.StatusCode))"
+    Write-Warn "Host-side auth login probe still failed (HTTP $($finalLogin.StatusCode))"
     if ($finalLogin.Body) { Write-Host "  Body : $($finalLogin.Body)" }
     if ($finalLogin.Error) { Write-Host "  Error: $($finalLogin.Error)" }
-    exit 1
+
+    Write-Info "Re-checking auth from inside the auth-service container..."
+    $containerHealth = Invoke-AuthContainerProbe -Path "/health"
+    if ($containerHealth.Ok -and $containerHealth.StatusCode -eq 200) {
+        Write-Ok "auth-service container health probe succeeded"
+    } else {
+        Write-Warn "auth-service container health probe failed (HTTP $($containerHealth.StatusCode))"
+        if ($containerHealth.Error) { Write-Host "  Error: $($containerHealth.Error)" }
+    }
+
+    $containerLogin = Invoke-AuthContainerProbe -Path "/api/auth/login" -Body @{ username = $Username; password = $Password }
+    if ($containerLogin.Ok -and $containerLogin.StatusCode -eq 200) {
+        Write-Ok "auth-service container login probe succeeded"
+        Write-Warn "The credentials are set correctly, but the host-side localhost probe is still failing. Check host networking or rerun diagnose_auth_connection.ps1 if Bridge login still fails."
+    } else {
+        Write-Fail "Auth login still failed from inside the auth-service container (HTTP $($containerLogin.StatusCode))"
+        if ($containerLogin.Body) { Write-Host "  Body : $($containerLogin.Body)" }
+        if ($containerLogin.Error) { Write-Host "  Error: $($containerLogin.Error)" }
+        Write-RecentAuthLogs -Tail 30
+        exit 1
+    }
 }
 
 Write-Section "Proxy Probe"
