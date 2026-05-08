@@ -224,8 +224,8 @@ if (Test-Path $accountingEnv) {
 $authEnv = Join-Path $WorkspaceRoot 'auth-service\.env'
 if (Test-Path $authEnv) {
     Backup-EnvFile $authEnv
-    Set-EnvVar -EnvPath $authEnv -Key 'MONGO_URI' -Value 'mongodb://mongodb-auth:27017/auth_db'
-    Set-EnvVar -EnvPath $authEnv -Key 'MONGODB_URI' -Value 'mongodb://mongodb-auth:27017/auth_db'
+    Set-EnvVar -EnvPath $authEnv -Key 'MONGO_URI'                  -Value 'mongodb://mongodb-auth:27017/auth_db'
+    Set-EnvVar -EnvPath $authEnv -Key 'MONGODB_URI'                -Value 'mongodb://mongodb-auth:27017/auth_db'
     Set-EnvVar -EnvPath $authEnv -Key 'MONGO_INITDB_ROOT_PASSWORD' -Value $mongoPassword
     Write-Host "  [OK] auth-service -- MongoDB password updated"
 }
